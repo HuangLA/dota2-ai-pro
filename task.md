@@ -1,47 +1,47 @@
-# Task List: Dota 2 Professional Replay Analysis Tool
+# 任务列表: Dota 2 职业级录像分析工具
 
-## Phase 1: Planning & Requirements [ ]
-- [/] **Feasibility & Feature Discussion**
-    - [x] Research Valve .dem file format and parsing feasibility.
-    - [x] Present feature proposals (Vision, Economy, Combat, Movement) to user.
-    - [x] Refine requirements based on user feedback.
-- [/] **Product Requirements Document (PRD)**
-    - [x] Draft PRD.md including User Stories, Functional Requirements, and Non-functional Requirements.
-    - [x] Define MVP scope vs Future features.
-    - [x] Review PRD with user.
-- [x] **Technical Architecture**
-    - [x] Select Replay Parser (Go - Manta).
-    - [x] Define Backend stack (Python + Pandas for AI).
-    - [x] Define Frontend stack (Electron + React + PixiJS).
+## 第一阶段: 规划与需求 [ ]
+- [/] **可行性与功能讨论**
+    - [x] 研究 Valve .dem 文件格式及解析可行性。
+    - [x] 向用户展示功能提案 (视野、经济、战斗、移动)。
+    - [x] 根据用户反馈优化需求。
+- [x] **产品需求文档 (PRD)**
+    - [x] 起草 PRD.md (包含用户故事、功能需求、非功能需求)。
+    - [x] 定义 MVP 范围 vs 未来功能。
+    - [x] 与用户评审 PRD。
+- [x] **技术架构设计**
+    - [x] 选择录像解析器 (Go - Manta)。
+    - [x] 定义后端技术栈 (Python + Pandas 用于 AI)。
+    - [x] 定义前端技术栈 (Electron + React + PixiJS)。
 
-## Phase 2: MVP Implementation [ ]
-- [ ] **Setup & Infrastructure**
-    - [ ] Initialize Electron + React project.
-    - [ ] Set up Python virtual environment and sidecar script.
-    - [ ] Compile/Install Manta parsing tool.
-- [ ] **Core Parsing Engine**
-    - [ ] Implement Node.js <-> Python IPC bridge.
-    - [ ] Implement .dem file parsing pipe (Dem -> Manta -> JSON -> Python).
-    - [ ] Data Cleaning: Convert raw JSON to Pandas DataFrames.
-- [ ] **Data Analysis Modules**
-    - [ ] Basic Stats: Gold/XP graphs, LH/DN.
-    - [ ] Map Data: Extract Hero trajectories (X, Y, Time).
-    - [ ] Combat Log: Parse damage events.
-- [ ] **Frontend Visualization**
-    - [ ] Dashboard UI (Chart.js/Recharts).
-    - [ ] Interactive Map (PixiJS) - Rendering background and hero icons.
+## 第二阶段: MVP 开发 (基础版) [ ]
+- [ ] **环境搭建与基础设施**
+    - [ ] 初始化 Electron + React 项目。
+    - [ ] 设置 Python 虚拟环境及 Sidecar 脚本。
+    - [ ] 编译/安装 Manta 解析工具。
+- [ ] **核心解析引擎**
+    - [ ] 实现 Node.js <-> Python 进程间通信 (IPC)。
+    - [ ] 实现 .dem 文件解析管道 (Dem -> Manta -> JSON -> Python)。
+    - [ ] 数据清洗: 将原始 JSON 转换为 Pandas DataFrame。
+- [ ] **数据分析模块**
+    - [ ] 基础数据: 经济/经验图表，正反补数据。
+    - [ ] 地图数据: 提取英雄移动轨迹 (X, Y坐标, 时间)。
+    - [ ] 战斗日志: 解析伤害事件。
+- [ ] **前端可视化**
+    - [ ] 仪表盘 UI (Chart.js/Recharts)。
+    - [ ] 交互式地图 (PixiJS) - 渲染地图背景及英雄图标。
 
-## Phase 3: AI & Advanced Modules [ ]
-- [ ] **Habit Analysis Engine**
-    - [ ] Implement Ward Clustering (Scikit-learn DBSCAN).
-    - [ ] Implement Rotation Timing Logic.
-- [ ] **Multi-Match Analysis**
-    - [ ] Database schema for storing aggregate match data.
-    - [ ] "Compare to Pro" functionality.
+## 第三阶段: AI 与进阶模块 [ ]
+- [ ] **习惯分析引擎**
+    - [ ] 实现眼位聚类分析 (Scikit-learn DBSCAN)。
+    - [ ] 实现游走时机逻辑分析。
+- [ ] **多场次分析**
+    - [ ] 搭建数据库模式以存储聚合比赛数据。
+    - [ ] “职业选手对标”功能。
 
-## Phase 3: Verification & Delivery [ ]
-- [ ] **Testing**
-    - [ ] Test with sample .dem files (Standard & Pro matches).
-    - [ ] Verify data accuracy against in-game scoreboard.
-- [ ] **Documentation**
-    - [ ] Writing User Guide for analysts.
+## 第四阶段: 验证与交付 [ ]
+- [ ] **测试**
+    - [ ] 使用样本 .dem 文件测试 (路人局 & 职业比赛)。
+    - [ ] 验证数据准确性 (对比游戏内记分板)。
+- [ ] **文档**
+    - [ ] 编写分析师用户手册。
