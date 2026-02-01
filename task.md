@@ -10,7 +10,7 @@
     - [x] 定义 MVP 范围 vs 未来功能。
     - [x] 与用户评审 PRD。
 - [x] **技术架构设计**
-    - [x] 选择录像解析器 (Go - Manta)。
+    - [x] 选择录像解析器 (Go - Manta)。 [已核实: MIT协议, 可商用]
     - [x] 定义后端技术栈 (Python + Pandas 用于 AI)。
     - [x] 定义前端技术栈 (Electron + React + PixiJS)。
 
