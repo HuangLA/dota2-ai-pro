@@ -14,11 +14,15 @@
     - [x] 定义后端技术栈 (Python + Pandas 用于 AI)。
     - [x] 定义前端技术栈 (Electron + React + PixiJS)。
 - [ ] **技术验证 POC (Proof of Concept)**
-    - [ ] 下载并编译 Manta 解析器。
-    - [ ] 使用 Manta 解析一个真实 .dem 文件并输出 JSON。
-    - [ ] 验证 Parquet 读写性能（模拟 10 万行数据）。
-    - [ ] 测试 PixiJS 渲染 1000+ 移动单位的帧率。
-    - [ ] 验证 Python-Electron IPC 通信延迟。
+    - [ ] **解析器对比测试**
+        - [ ] 下载并构建 Clarity 解析器（Java）
+        - [ ] 下载并编译 Manta 解析器（Go）- 备选
+        - [ ] 使用两个解析器分别解析同一 .dem 文件
+        - [ ] 性能对比：解析时间、内存占用、数据完整性
+        - [ ] 做出最终选择（推荐 Clarity）
+    - [ ] 验证 Parquet 读写性能（模拟 10 万行数据）
+    - [ ] 测试 PixiJS 渲染 1000+ 移动单位的帧率
+    - [ ] 验证 Python-Java IPC 通信延迟（如选择 Clarity）
 
 ## 第二阶段: MVP 开发 (模块 0 & A) [ ]
 - [ ] **环境搭建与基础设施**

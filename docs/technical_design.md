@@ -24,7 +24,7 @@
                           │
 ┌─────────────────────────────────────────────────────────┐
 │                  采集层 (Data Ingestion)                 │
-│              Manta (Go) + Replay Downloader             │
+│            Clarity (Java) + Replay Downloader           │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -51,11 +51,81 @@
   - Parquet (时序数据存储)
 
 #### 数据采集
-- **录像解析器**: Manta (Go) - MIT 协议
+- **录像解析器**: **Clarity (Java)** - BSD-3-Clause 协议 ⭐ **推荐**
+  - 性能最优: TI 决赛 < 3秒（比 Manta 快 3-5 倍）
+  - 功能最全: 支持语音、声音等高级功能
+  - 维护最活跃: 2025-12 最新更新 (v3.1.3)
+  - 备选方案: Manta (Go) - 如无法接受 Java 依赖
+  - 详细对比: 见第 1.3 节
 - **API 集成**: OpenDota API, Stratz API
 - **文件下载**: axios / node-fetch
 
 ---
+
+### 1.3 录像解析器选型对比
+
+> **⚠️ 重要技术决策**: 经过深入对比，推荐使用 **Clarity (Java)** 替代 Manta (Go)
+
+#### 三大候选方案对比
+
+| 维度 | Clarity (Java) | Manta (Go) | OpenDota Core |
+|------|----------------|------------|---------------|
+| **性能** | ⭐⭐⭐⭐⭐ (< 3秒) | ⭐⭐⭐ (~10秒) | ⭐⭐⭐⭐⭐ (基于 Clarity) |
+| **集成难度** | ⭐⭐⭐⭐ 中等 | ⭐⭐⭐ 简单 | ⭐⭐⭐⭐⭐ 复杂 |
+| **维护状态** | ✅ 非常活跃 (2025-12) | ✅ 活跃 (2025) | ✅ 活跃 (2025) |
+| **功能完整性** | ⭐⭐⭐⭐⭐ 最全 | ⭐⭐⭐⭐ 良好 | ⭐⭐⭐⭐⭐ 完整平台 |
+| **推荐度** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+
+#### Clarity 的核心优势
+
+1. **性能最优** ⚡
+   - 45分钟比赛 < 2秒，TI 决赛 < 3秒
+   - 比 Manta 快 **3-5 倍**
+   - 使用 `MappedFileSource` 达到最快速度
+
+2. **功能最全** 📦
+   - ✅ 战斗日志、实体、光环、用户消息
+   - ✅ 语音数据（Manta 不支持）
+   - ✅ 声音事件（Manta 不支持）
+   - ✅ 支持多游戏（CSGO/CS2/Deadlock）
+
+3. **维护最活跃** 🔄
+   - 最新版本: v3.1.3 (2025-12-16)
+   - 每月更新，版本兼容性最好
+   - OpenDota 使用，生产验证
+
+#### 集成方案
+
+```python
+# Python 调用 Java 解析器
+import subprocess
+import json
+
+def parse_replay_with_clarity(replay_path):
+    result = subprocess.run([
+        'java', '-jar', 'clarity-parser.jar',
+        '--replay', replay_path,
+        '--output', 'json'
+    ], capture_output=True, text=True)
+    
+    return json.loads(result.stdout)
+```
+
+#### 风险缓解
+
+- **JRE 依赖**: 打包 JRE 到应用（增加 ~100MB）或提供自动安装脚本
+- **启动开销**: 使用常驻 Java 进程（HTTP 服务），避免每次重启 JVM
+- **内存占用**: JVM 需要 ~500MB，但性能提升值得
+
+#### 备选方案: Manta (Go)
+
+仅在以下情况选择 Manta:
+- 无法接受 Java 依赖
+- 性能要求可放宽到 10-15 秒
+- 不需要语音/声音数据
+
+详细对比分析请参考: [解析器对比分析报告](../parser_comparison_analysis.md)
+
 
 ## 2. 数据库架构设计
 
@@ -314,7 +384,7 @@ result = conn.execute(query).fetchdf()
 ### 2.5 数据流设计
 
 ```
-录像解析 (Manta)
+录像解析 (Clarity Java)
     ↓
 写入 Parquet 文件 (时序数据)
     ↓
@@ -620,7 +690,20 @@ pip install duckdb scikit-learn
 pip install requests aiohttp
 ```
 
-**Go 依赖** (Manta 解析器):
+**Java 依赖** (Clarity 解析器):
+```bash
+# 安装 JRE 17+
+# Windows: 下载并安装 OpenJDK 17
+# macOS: brew install openjdk@17
+# Linux: sudo apt install openjdk-17-jre
+
+# 下载 Clarity
+git clone https://github.com/skadistats/clarity.git
+cd clarity
+./gradlew build
+```
+
+**备选: Go 依赖** (Manta 解析器):
 ```bash
 go get github.com/dotabuff/manta/v2
 ```

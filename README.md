@@ -42,8 +42,9 @@ dota2-ai-pro/
 
 ## 📚 核心文档
 
-- **[PRD.md](./PRD.md)** - 产品需求文档
-- **[technical_design.md](./technical_design.md)** - 技术设计文档
+- **[PRD.md](./docs/PRD.md)** - 产品需求文档
+- **[technical_design.md](./docs/technical_design.md)** - 技术设计文档
+- **[parser_comparison_analysis.md](./docs/parser_comparison_analysis.md)** - 解析器对比分析
 - **[task.md](./task.md)** - 开发任务清单
 
 ## 🚀 快速开始
