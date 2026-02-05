@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles */
+@layer base {
+  body {
+    @apply bg-dota-bg text-gray-100 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-dota-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dota-primary rounded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dota-accent;
+  }
+}
+
+/* Component classes */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-dota-accent text-white rounded 
+           hover:bg-red-600 transition-colors 
+           focus:outline-none focus:ring-2 focus:ring-dota-accent focus:ring-offset-2 focus:ring-offset-dota-bg;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-dota-primary text-white rounded 
+           hover:bg-blue-800 transition-colors
+           focus:outline-none focus:ring-2 focus:ring-dota-primary focus:ring-offset-2 focus:ring-offset-dota-bg;
+  }
+
+  .card {
+    @apply bg-dota-surface p-4 rounded-lg shadow-lg border border-gray-700;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 bg-dota-bg border border-gray-600 rounded
+           focus:outline-none focus:ring-2 focus:ring-dota-accent focus:border-transparent
+           placeholder-gray-500;
+  }
+}
+
+/* Utility classes */
+@layer utilities {
+  .text-radiant {
+    @apply text-radiant-400;
+  }
+
+  .text-dire {
+    @apply text-dire-400;
+  }
+
+  .bg-radiant {
+    @apply bg-radiant-600;
+  }
+
+  .bg-dire {
+    @apply bg-dire-600;
+  }
+}

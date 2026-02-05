@@ -1,0 +1,76 @@
+{
+  "match_id": 86083386,
+  "game_mode": 22,
+  "game_winner": 3,
+  "leagueid": 0,
+  "duration_seconds": null,
+  "total_ticks": 111857,
+  "parse_time_ms": 2974,
+  "file_size_bytes": 115618026,
+  "replay_path": "N:\\dota2-ai-pro\\data\\replays\\8676017978.dem",
+  "players": [
+    {
+      "hero_name": "npc_dota_hero_razor",
+      "player_name": "123",
+      "game_team": 2
+    },
+    {
+      "hero_name": "npc_dota_hero_skywrath_mage",
+      "player_name": "DUSK",
+      "game_team": 2
+    },
+    {
+      "hero_name": "npc_dota_hero_viper",
+      "player_name": "逆行",
+      "game_team": 2
+    },
+    {
+      "hero_name": "npc_dota_hero_ursa",
+      "player_name": "镐子",
+      "game_team": 2
+    },
+    {
+      "hero_name": "npc_dota_hero_disruptor",
+      "player_name": "木成风",
+      "game_team": 2
+    },
+    {
+      "hero_name": "npc_dota_hero_leshrac",
+      "player_name": "SumaiL-",
+      "game_team": 3
+    },
+    {
+      "hero_name": "npc_dota_hero_spectre",
+      "player_name": "pos6",
+      "game_team": 3
+    },
+    {
+      "hero_name": "npc_dota_hero_tidehunter",
+      "player_name": "Dr.Wu",
+      "game_team": 3
+    },
+    {
+      "hero_name": "npc_dota_hero_shadow_shaman",
+      "player_name": "人生如戏全靠演技",
+      "game_team": 3
+    },
+    {
+      "hero_name": "npc_dota_hero_snapfire",
+      "player_name": "旋风向日葵",
+      "game_team": 3
+    }
+  ],
+  "picks_bans": [],
+  "heroes": {
+    "6193582": "ShadowShaman",
+    "10257705": "Razor",
+    "3671421": "Viper",
+    "7587238": "Ursa",
+    "11452763": "Spectre",
+    "14745988": "Tidehunter",
+    "7636307": "Skywrath_Mage",
+    "10978767": "Disruptor",
+    "14746074": "Snapfire",
+    "8898042": "Leshrac"
+  }
+}

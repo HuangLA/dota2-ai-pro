@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-02-04T18:30:50.455057",
+  "tests": {
+    "dependencies": {
+      "dependencies": {
+        "pandas": true,
+        "numpy": true,
+        "pyarrow": true,
+        "duckdb": true,
+        "fastapi": true,
+        "uvicorn": true,
+        "pydantic": true,
+        "scikit-learn": false
+      },
+      "all_installed": false
+    },
+    "parquet": {
+      "data_generation": {
+        "rows": 100000
+      },
+      "write": {
+        "rows": 100000,
+        "write_time_ms": 25.65530000720173,
+        "file_size_mb": 2.3783740997314453,
+        "rows_per_second": 3897830.076901415
+      },
+      "read": {
+        "rows": 100000,
+        "read_time_ms": 17.751399995177053,
+        "rows_per_second": 5633358.497198496
+      },
+      "filtered_read": {
+        "rows": 10000,
+        "read_time_ms": 4.569600001559593
+      },
+      "duckdb_aggregation": {
+        "query_time_ms": 5.961000002571382,
+        "result_rows": 100
+      },
+      "all_passed": true
+    },
+    "sqlite": {
+      "insert": {
+        "matches_inserted": 500,
+        "player_records_inserted": 5000,
+        "insert_time_ms": 16.530699998838827
+      },
+      "queries": {
+        "list_matches": {
+          "time_ms": 0.05959998816251755,
+          "rows": 20
+        },
+        "filter_league": {
+          "time_ms": 0.1824999926611781,
+          "rows": 144
+        },
+        "player_history": {
+          "time_ms": 0.1438000035705045,
+          "rows": 50
+        },
+        "hero_stats": {
+          "time_ms": 0.8342999935848638,
+          "rows": 20
+        },
+        "match_details": {
+          "time_ms": 0.05149999924469739,
+          "rows": 10
+        }
+      },
+      "all_passed": true
+    },
+    "pixijs_data": {
+      "all_passed": true
+    }
+  }
+}

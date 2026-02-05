@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend API Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a2e;
+            color: #fff;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success { background: #22c55e33; border: 1px solid #22c55e; }
+        .error { background: #ef444433; border: 1px solid #ef4444; }
+        button {
+            background: #0f3460;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1a5490; }
+        pre { 
+            background: #16213e; 
+            padding: 10px; 
+            border-radius: 5px; 
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Frontend-Backend API Test</h1>
+    <p>Testing communication with FastAPI backend on http://localhost:8000</p>
+    
+    <div>
+        <button onclick="testHealth()">Test Health Check</button>
+        <button onclick="testMatches()">Test Matches</button>
+        <button onclick="testAll()">Test All</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const resultsDiv = document.getElementById('results');
+
+        async function testHealth() {
+            const start = performance.now();
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                const time = Math.round(performance.now() - start);
+                
+                showResult('Health Check', true, data, time);
+            } catch (error) {
+                const time = Math.round(performance.now() - start);
+                showResult('Health Check', false, error.message, time);
+            }
+        }
+
+        async function testMatches() {
+            const start = performance.now();
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/matches`);
+                const data = await response.json();
+                const time = Math.round(performance.now() - start);
+                
+                showResult('List Matches', true, data, time);
+            } catch (error) {
+                const time = Math.round(performance.now() - start);
+                showResult('List Matches', false, error.message, time);
+            }
+        }
+
+        async function testAll() {
+            resultsDiv.innerHTML = '<p>Running all tests...</p>';
+            await testHealth();
+            await testMatches();
+        }
+
+        function showResult(testName, success, data, time) {
+            const div = document.createElement('div');
+            div.className = `test-result ${success ? 'success' : 'error'}`;
+            div.innerHTML = `
+                <h3>${success ? '✅' : '❌'} ${testName}</h3>
+                <p>Response time: ${time}ms</p>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(div);
+        }
+
+        // Auto test on load
+        window.onload = () => {
+            setTimeout(testAll, 500);
+        };
+    </script>
+</body>
+</html>

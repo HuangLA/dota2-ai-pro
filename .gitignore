@@ -26,3 +26,9 @@ Thumbs.db
 *.dem
 logs/
 .env
+
+# Large Files & Parsers Dependencies
+parsers/jdk17/
+parsers/gradle-8.5/
+*.zip
+.gradle/

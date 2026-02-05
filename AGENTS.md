@@ -150,6 +150,130 @@ refactor: 重构 | test: 测试 | chore: 构建
 
 - Node.js 18+ | Python 3.9+ | Go 1.20+ | Java 17+ (Clarity)
 
+## API 规范
+
+**完整文档**: `docs/api_specification.md` (52 个端点)
+
+### 核心端点速查
+
+| 模块 | 端点示例 | 用途 |
+|------|---------|------|
+| 录像运维 | `POST /api/v1/replays/upload` | 上传 .dem 文件 |
+| | `GET /api/v1/replays/tasks` | 查询解析队列 |
+| 比赛数据 | `GET /api/v1/matches?team_id=15` | 检索比赛列表 |
+| | `GET /api/v1/matches/{id}/players` | 选手表现 |
+| 回放引擎 | `GET /api/v1/playback/{id}/ticks` | 时序坐标（PixiJS） |
+| | `GET /api/v1/playback/{id}/events` | 关键事件（时间轴） |
+| 可视化 | `GET /api/v1/visualization/{id}/heatmap` | 单场热力图 |
+| 聚合分析 | `POST /api/v1/analytics/ward-clusters` | 眼位聚类（AI） |
+| BP 辅助 | `POST /api/v1/draft/simulate` | BP 预测 |
+
+### 数据模型核心字段
+
+```typescript
+// Match (比赛)
+{ match_id, start_time, duration, winner_team, parse_status }
+
+// Tick (时序数据 - 用于地图渲染)
+{ time, hero_id, x, y, hp, mana, gold, level, is_alive }
+
+// Ward (眼位)
+{ ward_id, type, x, y, placer_team, placed_at, destroyed_at }
+
+// Event (游戏事件)
+{ type, time, killer_hero_id, victim_hero_id, x, y }
+```
+
+### 通用响应格式
+
+```json
+// 成功
+{ "data": {...}, "meta": { "timestamp": 1738645200 } }
+
+// 错误
+{ "error": { "code": "REPLAY_PARSE_FAILED", "message": "..." } }
+```
+
+### 性能 SLA
+- 比赛列表查询 < 150ms
+- 时序数据（5分钟）< 200ms
+- 热力图生成 < 500ms
+- 聚合查询（50场）< 1秒
+
+**详细定义见**: `docs/api_specification.md`
+
+---
+
+## AI 协同开发工作流
+
+> **重要**: 每次完成任务后，必须更新 `PROGRESS.md` 文件！这是 AI 协作的核心机制。
+
+### 进度追踪文件
+- **`PROGRESS.md`**: 开发进度追踪（**AI 必须读写**）
+- **`task.md`**: 总体任务规划（只读参考）
+
+### AI 工作流程
+
+1. **开始任务前**
+   ```
+   1. 阅读 PROGRESS.md 了解当前状态
+   2. 检查是否有阻塞问题
+   3. 将任务状态改为 IN_PROGRESS
+   4. 填写 "负责 AI" 字段
+   ```
+
+2. **完成任务后** ⚠️ **必须执行**
+   ```
+   1. 将任务状态改为 DONE
+   2. 更新 "最后更新" 日期
+   3. 如果实现了 API，更新 API 实现状态表
+   4. 在 "更新日志" 中添加记录
+   5. 如果有性能测试结果，更新 "POC 性能测试结果" 表
+   ```
+
+3. **遇到阻塞时**
+   ```
+   1. 在 "阻塞问题" 表格中添加记录
+   2. 将任务状态改为 BLOCKED
+   3. 描述问题和可能的解决方案
+   ```
+
+4. **做出重要决策时**
+   ```
+   1. 在 "决策记录" 表格中添加记录
+   2. 说明决策原因和相关文档链接
+   ```
+
+### PROGRESS.md 更新检查清单
+
+每次完成任务后，检查是否需要更新以下内容：
+
+- [ ] 当前冲刺任务状态
+- [ ] 前端/后端开发进度表
+- [ ] API 实现状态表（如果涉及 API）
+- [ ] 阻塞问题（如果已解决，标记为 RESOLVED）
+- [ ] 更新日志（添加本次更新内容）
+- [ ] 运行中的服务（如果启动了新服务）
+
+### 前后端协作契约
+
+```
+后端 AI: 实现 API → 更新 PROGRESS.md 中 API 状态为 DONE
+前端 AI: 查看 PROGRESS.md → 发现可用 API → 实现调用 → 更新状态
+```
+
+### 状态值
+| 状态 | 含义 |
+|------|------|
+| `TODO` | 未开始 |
+| `IN_PROGRESS` | 进行中 |
+| `STUB` | API 已定义但未实现业务逻辑 |
+| `REVIEW` | 待审核 |
+| `DONE` | 已完成 |
+| `BLOCKED` | 被阻塞 |
+
+---
+
 ## 注意事项
 
 1. 不要提交 `.dem` 文件 (已在 .gitignore)
@@ -157,3 +281,6 @@ refactor: 重构 | test: 测试 | chore: 构建
 3. 代码需兼容 Windows/macOS/Linux
 4. 避免使用 `any` 类型，使用 `unknown` 或具体类型
 5. React 组件优先使用函数组件 + Hooks
+6. **⚠️ 每次开发前先阅读 `PROGRESS.md`，完成后必须更新状态**
+7. **⚠️ 不要忘记在更新日志中记录所做的更改**
+8. 全程使用中文
