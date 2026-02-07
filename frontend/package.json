@@ -15,38 +15,39 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.17.0",
+    "axios": "^1.6.0",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.3.0",
+    "pixi.js": "^8.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "pixi.js": "^8.0.0",
-    "zustand": "^4.5.0",
     "recharts": "^2.12.0",
-    "axios": "^1.6.0",
-    "@tanstack/react-query": "^5.17.0",
-    "date-fns": "^3.3.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.0"
+    "sharp": "^0.34.5",
+    "tailwind-merge": "^2.2.0",
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@types/node": "^20.11.0",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/ui": "^1.2.2",
+    "autoprefixer": "^10.4.17",
+    "concurrently": "^8.2.2",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.12",
     "vitest": "^1.2.2",
-    "@vitest/ui": "^1.2.2",
-    "electron": "^28.2.0",
-    "electron-builder": "^24.9.1",
-    "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8.4.33",
-    "autoprefixer": "^10.4.17",
-    "eslint": "^8.56.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.1",
-    "@typescript-eslint/parser": "^6.19.1",
-    "eslint-plugin-react": "^7.33.2",
-    "eslint-plugin-react-hooks": "^4.6.0"
+    "wait-on": "^7.2.0"
   },
   "build": {
     "appId": "com.truesight.app",
@@ -59,15 +60,23 @@
       "package.json"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "src/assets/icon.ico"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "src/assets/icon.icns"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "src/assets/icon.png"
     }
   }

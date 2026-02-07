@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 3 - MVP 功能开发 🚀 |
-| 最后更新 | 2026-02-05 |
+| 最后更新 | 2026-02-06 |
 | 更新者 | AI Assistant (Claude - Frontend) |
 
 ---
@@ -187,8 +187,8 @@
 | **Parser Integration** | `DONE` | **100%** | Claude | 2026-02-04 20:30 |
 | **Parse Service** | `DONE` | **100%** | Claude | 2026-02-04 21:45 |
 | **Heatmap Analyzer** | `DONE` | **100%** | Claude | 2026-02-05 |
+| **Path Analyzer** | `DONE` | **100%** | Claude | 2026-02-06 |
 | Ward Analyzer | `TODO` | 0% | - | - |
-| Movement Analyzer | `TODO` | 0% | - | - |
 
 ### POC 测试脚本
 | 脚本 | 状态 | 用途 |
@@ -257,7 +257,8 @@
 | 端点 | 方法 | 后端 | 前端调用 | MVP |
 |------|------|------|----------|-----|
 | /api/v1/visualization/{id}/heatmap | GET | `DONE` | `TODO` | v1.5 |
-| /api/v1/visualization/{id}/paths | GET | `STUB` | `TODO` | v1.5 |
+| /api/v1/visualization/{id}/paths | GET | `DONE` | `TODO` | v1.5 |
+| /api/v1/visualization/{id}/paths/{hero} | GET | `DONE` | `TODO` | v1.5 |
 | /api/v1/visualization/aggregate/heatmap | POST | `STUB` | `TODO` | v2.0 |
 | /api/v1/visualization/aggregate/ward-clusters | POST | `STUB` | `TODO` | v2.0 |
 
@@ -396,6 +397,33 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-05 | **修复英雄阵亡显示问题**: RealMatchViewer 添加 hp>0 过滤，阵亡英雄不再显示在地图上 | AI Assistant (Claude) |
 | 2026-02-05 | **实现热力图 API**: HeatmapAnalyzer + visualization.py 完整实现，支持 movement/kill/death 类型 | AI Assistant (Claude) |
 | 2026-02-05 | **热力图性能测试通过**: 64x64 网格 43ms, 128x128 网格 100ms, 远低于 500ms 目标 | AI Assistant (Claude) |
+| 2026-02-06 | **实现路径 API**: PathAnalyzer + Douglas-Peucker 算法，支持路径简化和分段 | AI Assistant (Claude) |
+| 2026-02-06 | **路径性能测试**: 单英雄 97ms, 时间范围 135ms, 简化率 73.5% | AI Assistant (Claude) |
+| 2026-02-06 | **集成 Dota 2 资源本地化**: 创建英雄数据配置 (heroes.ts) 含 127 个英雄中文名 | AI Assistant (Claude) |
+| 2026-02-06 | **下载英雄图标**: 从 Steam CDN 下载 127 个英雄头像和 minimap 图标 | AI Assistant (Claude) |
+| 2026-02-06 | **更新 DotaMapRenderer**: 支持英雄图标显示，带队伍颜色边框 | AI Assistant (Claude) |
+| 2026-02-06 | **资源位置**: `frontend/public/assets/dota/heroes/` (头像) + `icons/` (minimap图标) | AI Assistant (Claude) |
+| 2026-02-06 | **修复真假眼映射**: Observer Ward = 假眼(黄色), Sentry Ward = 真眼(蓝色) | AI Assistant (Claude) |
+| 2026-02-06 | **添加 minimap 背景**: 从 OpenDota 下载真实 minimap 图片替换网格背景 | AI Assistant (Claude) |
+| 2026-02-06 | **添加眼位图标**: 从 Steam CDN 下载假眼/真眼图标，带队伍颜色边框 | AI Assistant (Claude) |
+| 2026-02-06 | **英雄名称智能匹配**: 支持多种格式 (驼峰/下划线/无下划线)，解决 Clarity 返回名称不一致问题 | AI Assistant (Claude) |
+| 2026-02-06 | **完成眼位图标集成**: 实现 preloadWardTextures() + createWardContainer() 使用 Liquipedia 眼位图标 | AI Assistant (Claude) |
+| 2026-02-06 | **眼位显示规则**: Radiant=绿色边框, Dire=红色边框, Observer/Sentry 使用对应小地图图标 | AI Assistant (Claude) |
+| 2026-02-06 | **坐标系校准**: 更新 DOTA_MAP_BOUNDS 为理论边界 (8192~24576)，与 minimap 图片精确对齐 | AI Assistant (Claude) |
+| 2026-02-06 | **创建地图元素数据**: mapElements.ts 包含 40+ 静态元素位置 (塔、兵营、Roshan、神符等) | AI Assistant (Claude) |
+| 2026-02-06 | **实现地图元素渲染**: DotaMapRenderer.drawMapElements() 绘制建筑、Roshan、神符、传送门等 | AI Assistant (Claude) |
+| 2026-02-06 | **添加校准标记功能**: showCalibrationMarkers 选项用于调试坐标对齐 | AI Assistant (Claude) |
+| 2026-02-06 | **修复 minimap 边框问题**: 分析图片发现 6% 透明边框，添加 MINIMAP_IMAGE_CONFIG 配置 | AI Assistant (Claude) |
+| 2026-02-06 | **更新坐标转换**: gameToScreen() 方法考虑 minimap 图片透明边框偏移 | AI Assistant (Claude) |
+| 2026-02-06 | **基于录像数据校准**: 使用眼位数据推断 Roshan、神符等元素的实际游戏坐标 | AI Assistant (Claude) |
+| 2026-02-06 | **精确坐标校准**: 使用泉水位置作为校准点，计算精确的游戏坐标边界 | AI Assistant (Claude) |
+| 2026-02-06 | **校准数据**: Radiant泉水(9504,9964), Dire泉水(23462,22749) -> bounds(7951~25226, 8468~24141) | AI Assistant (Claude) |
+| 2026-02-06 | **禁用静态地图元素**: 建筑/Roshan等应从录像数据动态获取，暂时禁用静态渲染 | AI Assistant (Claude) |
+| 2026-02-07 | **坐标边界数据分析**: 分析 2 场录像的 72,480 个位置样本，验证坐标范围 | AI Assistant (Claude Opus 4.5) |
+| 2026-02-07 | **实测坐标范围**: X: 7901~25011, Y: 7844~24928 | AI Assistant (Claude Opus 4.5) |
+| 2026-02-07 | **泉水位置校准**: 天辉(9550,9950)屏幕11.2%/86.2%, 夜魇(23450,22750)屏幕89.3%/14.2% | AI Assistant (Claude Opus 4.5) |
+| 2026-02-07 | **更新 DOTA_MAP_BOUNDS**: 基于实测数据重新计算边界 minX=7558 maxX=25353 minY=7502 maxY=25269 | AI Assistant (Claude Opus 4.5) |
+| 2026-02-07 | **创建分析工具**: backend/poc/analyze_coordinates.py, optimize_bounds.py 用于坐标校准 | AI Assistant (Claude Opus 4.5) |
 
 ---
 
@@ -426,11 +454,12 @@ print(f"Kill events: {len(result.kills)}")
 | ~~P0~~ | ~~前端连接 playback API，渲染真实数据~~ | ~~1 天~~ | ~~后端 API ✅~~ | ~~Frontend~~ | ✅ DONE |
 | ~~P0~~ | ~~实现时间轴控件 (Timeline)~~ | ~~2-3 天~~ | ~~RealMatchViewer ✅~~ | ~~Frontend~~ | ✅ DONE |
 | ~~P1~~ | ~~实现单场热力图 API~~ | ~~1 天~~ | ~~position数据 ✅~~ | ~~Backend~~ | ✅ DONE |
+| ~~P1~~ | ~~移动轨迹分析 / 路径 API~~ | ~~2-3 天~~ | ~~position数据 ✅~~ | ~~Backend~~ | ✅ DONE |
 | **P1** | **实现比赛列表页面** | **2 天** | **API 实现 ✅** | **Frontend** |
 | **P1** | **前端热力图可视化组件** | **1 天** | **热力图 API ✅** | **Frontend** |
-| P1 | 加载真实 minimap 图片 | 0.5 天 | 地图引擎 ✅ | Frontend |
+| **P1** | **前端路径轨迹组件** | **1 天** | **路径 API ✅** | **Frontend** |
+| ~~P1~~ | ~~加载真实 minimap 图片~~ | ~~0.5 天~~ | ~~地图引擎 ✅~~ | ~~Frontend~~ | ✅ DONE |
 | P2 | 眼位聚类分析 (AI) | 3-5 天 | ward数据 ✅ | Backend |
-| P2 | 移动轨迹分析 / 路径 API | 2-3 天 | position数据 ✅ | Backend |
 | P2 | 解析器增强：击杀位置坐标 | 1 天 | - | Backend |
 
 ### 已完成的前后端集成 ✅
@@ -453,9 +482,13 @@ print(f"Kill events: {len(result.kills)}")
 
 ### 前端下一步
 1. ~~实现时间轴控件（播放/暂停/拖动）~~ ✅ 已完成
-2. 添加英雄移动轨迹线
-3. 加载真实 Dota 2 minimap 图片替换网格背景
-4. 实现击杀事件在地图上显示
+2. ~~英雄图标显示~~ ✅ 已完成 (127 个英雄图标 + 队伍颜色边框)
+3. ~~加载真实 Dota 2 minimap 图片~~ ✅ 已完成 (从 OpenDota 获取)
+4. ~~眼位图标显示~~ ✅ 已完成 (假眼/真眼图标 + 队伍颜色边框)
+5. 添加英雄移动轨迹线 (使用 PathAnalyzer API)
+6. 实现击杀事件在地图上显示
+7. 热力图可视化组件
+8. 路径轨迹可视化组件
 
 ---
 
@@ -500,22 +533,33 @@ data/
 ├── replays/              # .dem 文件存储
 └── truesight.db          # SQLite 元数据库
 
-frontend/src/renderer/
-├── components/
-│   ├── map/              # ✅ 地图渲染组件
-│   │   ├── DotaMapRenderer.ts  # 核心渲染引擎 (PixiJS 8)
-│   │   └── MapViewer.tsx       # React 组件封装
-│   ├── timeline/         # ✅ NEW - 时间轴组件
-│   │   ├── Timeline.tsx        # 播放控制组件
-│   │   └── index.ts            # 模块导出
-│   └── poc/              # POC 测试组件
-│       └── PixiJSStressTest.tsx
-├── pages/
-│   ├── POCTestPage.tsx   # POC 测试页面
-│   ├── MapTestPage.tsx   # 地图测试页面 (示例数据)
-│   └── RealMatchViewer.tsx  # ✅ NEW - 真实比赛查看器
-├── api/
-│   └── backend.ts        # Backend API 服务 (含 playback API)
-└── App.tsx               # 主应用 (含 Real Match 导航)
+frontend/
+├── public/assets/dota/   # ✅ NEW - Dota 2 游戏资源 (本地化)
+│   ├── heroes/           # 英雄头像 (127 个 PNG)
+│   ├── heroes/icons/     # Minimap 图标 (127 个 PNG)
+│   ├── minimap/          # 小地图背景 (minimap_740.png)
+│   └── wards/            # 眼位图标 (observer_mapicon.png, sentry_mapicon.png)
+├── scripts/
+│   └── download-dota-assets.js  # 资源下载脚本
+└── src/renderer/
+    ├── components/
+    │   ├── map/              # ✅ 地图渲染组件
+    │   │   ├── DotaMapRenderer.ts  # 核心渲染引擎 (支持英雄图标)
+    │   │   └── MapViewer.tsx       # React 组件封装
+    │   ├── timeline/         # ✅ 时间轴组件
+    │   │   ├── Timeline.tsx        # 播放控制组件
+    │   │   └── index.ts            # 模块导出
+    │   └── poc/              # POC 测试组件
+    │       └── PixiJSStressTest.tsx
+    ├── data/                 # ✅ NEW - 静态数据配置
+    │   ├── heroes.ts         # 英雄数据 (127个英雄ID/名称/中文名映射)
+    │   └── mapElements.ts    # 地图元素配置 (建筑、Roshan、神符等位置)
+    ├── pages/
+    │   ├── POCTestPage.tsx   # POC 测试页面
+    │   ├── MapTestPage.tsx   # 地图测试页面 (示例数据)
+    │   └── RealMatchViewer.tsx  # 真实比赛查看器
+    ├── api/
+    │   └── backend.ts        # Backend API 服务 (含 playback API)
+    └── App.tsx               # 主应用 (含 Real Match 导航)
 ```
 

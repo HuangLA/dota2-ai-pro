@@ -30,6 +30,7 @@ export function RealMatchViewer() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCalibration, setShowCalibration] = useState(false);
   
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
@@ -351,8 +352,8 @@ export function RealMatchViewer() {
                       夜魇: {heroPositions.filter(h => h.team === 'dire').length}
                     </p>
                     <p className="text-xs text-gray-500">
-                      真眼: {wards.filter(w => w.type === 'observer').length} |
-                      假眼: {wards.filter(w => w.type === 'sentry').length}
+                      假眼: {wards.filter(w => w.type === 'observer').length} |
+                      真眼: {wards.filter(w => w.type === 'sentry').length}
                     </p>
                   </div>
                 )}
@@ -387,17 +388,30 @@ export function RealMatchViewer() {
             <div className="bg-dota-surface p-4 rounded-lg">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-medium">地图视图</h2>
-                {loading && (
-                  <span className="text-sm text-gray-400 animate-pulse">加载中...</span>
-                )}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showCalibration}
+                      onChange={(e) => setShowCalibration(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span>显示校准标记</span>
+                  </label>
+                  {loading && (
+                    <span className="text-sm text-gray-400 animate-pulse">加载中...</span>
+                  )}
+                </div>
               </div>
 
               {selectedMatch ? (
                 <MapViewer
+                  key={showCalibration ? 'calibration' : 'normal'}
                   width={900}
                   height={900}
                   heroPositions={heroPositions}
                   wards={wards}
+                  showCalibrationMarkers={showCalibration}
                 />
               ) : (
                 <div className="flex items-center justify-center h-96 bg-dota-bg rounded">

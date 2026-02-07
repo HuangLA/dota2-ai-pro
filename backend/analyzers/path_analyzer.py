@@ -124,8 +124,8 @@ class PathAnalyzer:
         start_tick = int(start_time * 30) if start_time else None
         end_tick = int(end_time * 30) if end_time else None
         
-        # Get position data
-        positions_df = self.storage.get_positions(
+        # Get position data using optimized query
+        positions_df = self._get_positions_optimized(
             match_id=match_id,
             start_tick=start_tick,
             end_tick=end_tick,
@@ -221,6 +221,54 @@ class PathAnalyzer:
             generation_time_ms=generation_time_ms
         )
     
+    def _get_positions_optimized(
+        self,
+        match_id: int,
+        start_tick: Optional[int] = None,
+        end_tick: Optional[int] = None,
+        hero: Optional[str] = None,
+        team: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        Get position data with optimized column selection.
+        
+        Only reads necessary columns to reduce memory and improve performance.
+        """
+        import duckdb
+        
+        parquet_path = self.storage.get_match_dir(match_id) / "positions.parquet"
+        
+        if not parquet_path.exists():
+            return pd.DataFrame()
+        
+        # Build query with only needed columns
+        columns = "tick, hero, team, x, y, hp, level"
+        conditions = []
+        
+        if start_tick is not None:
+            conditions.append(f"tick >= {start_tick}")
+        if end_tick is not None:
+            conditions.append(f"tick <= {end_tick}")
+        if hero:
+            conditions.append(f"hero = '{hero}'")
+        if team:
+            conditions.append(f"team = {team}")
+        
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        
+        query = f"""
+        SELECT {columns}
+        FROM read_parquet('{parquet_path}')
+        {where_clause}
+        ORDER BY hero, tick
+        """
+        
+        con = duckdb.connect(":memory:")
+        result_df = con.execute(query).fetchdf()
+        con.close()
+        
+        return result_df
+
     def _douglas_peucker(
         self, 
         points: list[PathPoint], 
@@ -322,7 +370,7 @@ class PathAnalyzer:
     def _calculate_alive_stats(
         self, 
         hero_df: pd.DataFrame
-    ) -> tuple[float, float, float]:
+    ) -> tuple[float, float, int]:
         """
         Calculate time alive/dead and death count from position data.
         

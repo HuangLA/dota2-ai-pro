@@ -25,6 +25,7 @@
     "paths": {
       "@/*": ["src/renderer/*"],
       "@/components/*": ["src/renderer/components/*"],
+      "@/data/*": ["src/renderer/data/*"],
       "@/hooks/*": ["src/renderer/hooks/*"],
       "@/pages/*": ["src/renderer/pages/*"],
       "@/utils/*": ["src/renderer/utils/*"],

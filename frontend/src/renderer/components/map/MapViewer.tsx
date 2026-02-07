@@ -12,6 +12,12 @@ export interface MapViewerProps {
   mapImageUrl?: string;
   heroPositions?: HeroPosition[];
   wards?: Ward[];
+  /** 是否使用英雄图标（默认 true） */
+  useHeroIcons?: boolean;
+  /** 英雄图标大小（默认 32） */
+  heroIconSize?: number;
+  /** 是否显示校准标记（用于调试坐标对齐） */
+  showCalibrationMarkers?: boolean;
 }
 
 export function MapViewer({
@@ -20,6 +26,9 @@ export function MapViewer({
   mapImageUrl,
   heroPositions = [],
   wards = [],
+  useHeroIcons = true,
+  heroIconSize = 32,
+  showCalibrationMarkers = false,
 }: MapViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DotaMapRenderer | null>(null);
@@ -51,7 +60,11 @@ export function MapViewer({
     const renderer = new DotaMapRenderer({
       width,
       height,
-      mapImageUrl,
+      // 只有在明确传入时才覆盖默认值
+      ...(mapImageUrl !== undefined && { mapImageUrl }),
+      useHeroIcons,
+      heroIconSize,
+      showCalibrationMarkers,
     });
 
     renderer.init(container).then(() => {
@@ -80,7 +93,7 @@ export function MapViewer({
         setIsInitialized(false);
       }
     };
-  }, [width, height, mapImageUrl]);
+  }, [width, height, mapImageUrl, useHeroIcons, heroIconSize, showCalibrationMarkers]);
 
   // Update hero positions
   useEffect(() => {
