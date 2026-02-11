@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from storage.match_storage import MatchStorage
 from storage.parquet_storage import ParquetStorage
+from utils.hero_mapping import get_hero_id
 
 router = APIRouter()
 
@@ -73,28 +74,38 @@ class MatchListResponse(BaseModel):
 
 @router.get("", response_model=MatchListResponse)
 async def list_matches(
-    status: Optional[str] = Query(None, description="Filter by parse status"),
+    status: Optional[str] = Query(None, description="Filter by parse status (pending/parsing/completed/failed)"),
     league_id: Optional[int] = Query(None, description="Filter by league ID"),
+    hero_id: Optional[int] = Query(None, description="Filter matches containing this hero (via player_matches)"),
+    account_id: Optional[int] = Query(None, description="Filter matches containing this player account (via player_matches)"),
+    team_id: Optional[int] = Query(None, description="Filter matches containing this team (via team_matches)"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> MatchListResponse:
     """
-    List matches with optional filters.
-    
-    Args:
-        status: Filter by parse status (pending, parsing, completed, failed)
-        league_id: Filter by league ID
-        limit: Maximum results (1-100)
-        offset: Skip results for pagination
+    List matches with optional search & filter.
+
+    Supports filtering by parse status, league, hero, player account, and team.
+    Filters on hero_id / account_id use a JOIN on player_matches (indexed).
+    Filter on team_id uses a JOIN on team_matches (indexed).
     """
     matches = match_storage.list_matches(
         limit=limit,
         offset=offset,
         status=status,
-        league_id=league_id
+        league_id=league_id,
+        hero_id=hero_id,
+        account_id=account_id,
+        team_id=team_id,
     )
-    
-    total = match_storage.count_matches(status=status)
+
+    total = match_storage.count_matches(
+        status=status,
+        league_id=league_id,
+        hero_id=hero_id,
+        account_id=account_id,
+        team_id=team_id,
+    )
     
     return MatchListResponse(
         matches=[
@@ -180,7 +191,7 @@ async def get_match_players(match_id: int) -> dict:
         for i, p in enumerate(meta["players"]):
             player_data = {
                 "account_id": i + 1,  # Placeholder
-                "hero_id": 0,
+                "hero_id": get_hero_id(p.get("hero_name", "")),
                 "hero_name": p.get("hero_name", ""),
                 "player_name": p.get("player_name", ""),
                 "team": "radiant" if p.get("game_team") == 2 else "dire",

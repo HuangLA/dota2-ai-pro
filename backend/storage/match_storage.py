@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from database.sqlite_db import get_connection
 from parsers.models import ParseResult
+from utils.hero_mapping import get_hero_id
 
 
 @dataclass
@@ -120,7 +121,7 @@ class MatchStorage:
         for i, player in enumerate(meta.players):
             # Generate a fake account_id from player slot if not available
             account_id = i + 1  # Placeholder
-            hero_id = 0  # We'd need a hero name to ID mapping
+            hero_id = get_hero_id(player.hero_name)  # Convert hero name to ID
             team_id = 2 if player.game_team == 2 else 3
             
             cursor.execute("""
@@ -171,47 +172,104 @@ class MatchStorage:
             updated_at=row["updated_at"]
         )
     
+    def _build_filter_clause(
+        self,
+        status: Optional[str] = None,
+        league_id: Optional[int] = None,
+        hero_id: Optional[int] = None,
+        account_id: Optional[int] = None,
+        team_id: Optional[int] = None,
+    ) -> tuple[str, str, list]:
+        """
+        Build shared WHERE/JOIN clauses for list and count queries.
+
+        Returns:
+            (join_clause, where_clause, params)
+        """
+        joins: list[str] = []
+        conditions: list[str] = []
+        params: list = []
+
+        if status:
+            conditions.append("m.parse_status = ?")
+            params.append(status)
+
+        if league_id is not None:
+            conditions.append("m.league_id = ?")
+            params.append(league_id)
+
+        # Filter by hero or account via player_matches (single JOIN covers both)
+        if hero_id is not None or account_id is not None:
+            joins.append(
+                "JOIN player_matches pm ON pm.match_id = m.match_id"
+            )
+            if hero_id is not None:
+                conditions.append("pm.hero_id = ?")
+                params.append(hero_id)
+            if account_id is not None:
+                conditions.append("pm.account_id = ?")
+                params.append(account_id)
+
+        if team_id is not None:
+            joins.append(
+                "JOIN team_matches tm ON tm.match_id = m.match_id"
+            )
+            conditions.append("tm.team_id = ?")
+            params.append(team_id)
+
+        join_clause = " ".join(joins)
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        return join_clause, where_clause, params
+
     def list_matches(
         self,
         limit: int = 20,
         offset: int = 0,
         status: Optional[str] = None,
-        league_id: Optional[int] = None
+        league_id: Optional[int] = None,
+        hero_id: Optional[int] = None,
+        account_id: Optional[int] = None,
+        team_id: Optional[int] = None,
     ) -> list[MatchRecord]:
         """
-        List matches with pagination.
-        
+        List matches with pagination and filters.
+
         Args:
             limit: Maximum number of results
             offset: Skip this many results
             status: Filter by parse status
             league_id: Filter by league
+            hero_id: Filter by hero (via player_matches)
+            account_id: Filter by player account (via player_matches)
+            team_id: Filter by team (via team_matches)
         """
         conn = get_connection()
         cursor = conn.cursor()
-        
-        query = """
-            SELECT match_id, start_time, duration, game_mode, patch_version,
-                   winner_team, radiant_score, dire_score, league_id,
-                   replay_path, parse_status, created_at, updated_at
-            FROM matches
-            WHERE 1=1
+
+        join_clause, where_clause, params = self._build_filter_clause(
+            status=status,
+            league_id=league_id,
+            hero_id=hero_id,
+            account_id=account_id,
+            team_id=team_id,
+        )
+
+        query = f"""
+            SELECT DISTINCT
+                   m.match_id, m.start_time, m.duration, m.game_mode,
+                   m.patch_version, m.winner_team, m.radiant_score,
+                   m.dire_score, m.league_id, m.replay_path,
+                   m.parse_status, m.created_at, m.updated_at
+            FROM matches m
+            {join_clause}
+            WHERE {where_clause}
+            ORDER BY m.created_at DESC
+            LIMIT ? OFFSET ?
         """
-        params = []
-        
-        if status:
-            query += " AND parse_status = ?"
-            params.append(status)
-        
-        if league_id:
-            query += " AND league_id = ?"
-            params.append(league_id)
-        
-        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
-        
+
         cursor.execute(query, params)
-        
+
         matches = []
         for row in cursor.fetchall():
             matches.append(MatchRecord(
@@ -229,22 +287,37 @@ class MatchStorage:
                 created_at=row["created_at"],
                 updated_at=row["updated_at"]
             ))
-        
+
         return matches
-    
-    def count_matches(self, status: Optional[str] = None) -> int:
-        """Count total matches."""
+
+    def count_matches(
+        self,
+        status: Optional[str] = None,
+        league_id: Optional[int] = None,
+        hero_id: Optional[int] = None,
+        account_id: Optional[int] = None,
+        team_id: Optional[int] = None,
+    ) -> int:
+        """Count total matches matching the given filters."""
         conn = get_connection()
         cursor = conn.cursor()
-        
-        if status:
-            cursor.execute(
-                "SELECT COUNT(*) FROM matches WHERE parse_status = ?",
-                (status,)
-            )
-        else:
-            cursor.execute("SELECT COUNT(*) FROM matches")
-        
+
+        join_clause, where_clause, params = self._build_filter_clause(
+            status=status,
+            league_id=league_id,
+            hero_id=hero_id,
+            account_id=account_id,
+            team_id=team_id,
+        )
+
+        query = f"""
+            SELECT COUNT(DISTINCT m.match_id)
+            FROM matches m
+            {join_clause}
+            WHERE {where_clause}
+        """
+
+        cursor.execute(query, params)
         return cursor.fetchone()[0]
     
     def update_parse_status(

@@ -424,6 +424,9 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-07 | **泉水位置校准**: 天辉(9550,9950)屏幕11.2%/86.2%, 夜魇(23450,22750)屏幕89.3%/14.2% | AI Assistant (Claude Opus 4.5) |
 | 2026-02-07 | **更新 DOTA_MAP_BOUNDS**: 基于实测数据重新计算边界 minX=7558 maxX=25353 minY=7502 maxY=25269 | AI Assistant (Claude Opus 4.5) |
 | 2026-02-07 | **创建分析工具**: backend/poc/analyze_coordinates.py, optimize_bounds.py 用于坐标校准 | AI Assistant (Claude Opus 4.5) |
+| 2026-02-11 | **完成录像管理系统**: MatchListPage + ReplayUploader + API 搜索功能完整实现 | AI Assistant (Antigravity) |
+| 2026-02-11 | **修复 Hero ID 映射**: 创建 hero_mapping.py 模块，修复所有英雄 ID 数据 | AI Assistant (Antigravity) |
+| 2026-02-11 | **测试验证通过**: 所有搜索功能（Match/Hero/Player）正常工作 | AI Assistant (Antigravity) |
 
 ---
 
@@ -455,12 +458,38 @@ print(f"Kill events: {len(result.kills)}")
 | ~~P0~~ | ~~实现时间轴控件 (Timeline)~~ | ~~2-3 天~~ | ~~RealMatchViewer ✅~~ | ~~Frontend~~ | ✅ DONE |
 | ~~P1~~ | ~~实现单场热力图 API~~ | ~~1 天~~ | ~~position数据 ✅~~ | ~~Backend~~ | ✅ DONE |
 | ~~P1~~ | ~~移动轨迹分析 / 路径 API~~ | ~~2-3 天~~ | ~~position数据 ✅~~ | ~~Backend~~ | ✅ DONE |
-| **P1** | **实现比赛列表页面** | **2 天** | **API 实现 ✅** | **Frontend** |
-| **P1** | **前端热力图可视化组件** | **1 天** | **热力图 API ✅** | **Frontend** |
-| **P1** | **前端路径轨迹组件** | **1 天** | **路径 API ✅** | **Frontend** |
+| ~~P0~~ | ~~[后端] 扩展比赛列表搜索接口~~ | ~~1 天~~ | ~~Existing API~~ | ~~Backend~~ | ✅ DONE |
+| ~~P0~~ | ~~[前端] 录像管理/上传/列表页面~~ | ~~3 天~~ | ~~Search API~~ | ~~Frontend~~ | ✅ DONE |
+| | - API Client (matchService.ts) | - | - | Frontend | ✅ DONE |
+| | - Match List Page (列表 & 搜索) | - | - | Frontend | ✅ DONE |
+| | - Replay Uploader (上传 & 监控) | - | - | Frontend | ✅ DONE |
+| | - **Hero ID 数据修复 (映射模块)** | - | - | Backend | ✅ DONE |
+| P1 | 前端热力图可视化组件 | 1 天 | 热力图 API ✅ | Frontend |
+| P1 | 前端路径轨迹组件 | 1 天 | 路径 API ✅ | Frontend |
 | ~~P1~~ | ~~加载真实 minimap 图片~~ | ~~0.5 天~~ | ~~地图引擎 ✅~~ | ~~Frontend~~ | ✅ DONE |
 | P2 | 眼位聚类分析 (AI) | 3-5 天 | ward数据 ✅ | Backend |
-| P2 | 解析器增强：击杀位置坐标 | 1 天 | - | Backend |
+
+### 录像管理系统实施规划 (Replay System Roadmap) 🚀
+此规划旨在实现完整的录像上传、管理、搜索功能。
+
+#### 阶段一：后端搜索能力增强 (Backend Search)
+1.  **扩展存储层 (`storage/match_storage.py`)**:
+    *   更新 `list_matches` 方法，支持 `hero_id`, `account_id` (选手), `team_id` (队伍) 过滤参数。
+    *   优化 `player_matches` 表的联表查询。
+2.  **更新路由层 (`routers/matches.py`)**:
+    *   `/api/v1/matches` 增加查询参数 (`hero_id`, `player_id`, `team_id`)。
+    *   确保搜索参数能正确传递给存储层。
+
+#### 阶段二：前端管理界面 (Frontend Replay Manager)
+1.  **API 客户端封装 (`api/matchService.ts`)**:
+    *   封装 `uploadReplay`, `getMatchList` (带搜索参数), `deleteMatch`, `getParseTasks`。
+2.  **录像列表页 (`MatchListPage`)**:
+    *   **数据表格**: 展示 Match ID, 获胜方, 持续时间, 录像时间, 解析状态。
+    *   **操作栏**: "观看比赛" (跳转 Viewer), "删除录像" (带确认弹窗)。
+    *   **搜索/过滤栏**: 支持按 `Match ID`, `Player ID`, `Hero` 筛选比赛。
+3.  **上传与任务监控 (`ReplayUploader`)**:
+    *   **拖拽上传区**: 支持 `.dem` 文件拖拽上传。
+    *   **任务状态面板**: 轮询 `/tasks` 接口，实时显示解析进度条和状态 (Pending -> Parsing -> Done)。
 
 ### 已完成的前后端集成 ✅
 - RealMatchViewer 页面可显示真实录像数据
