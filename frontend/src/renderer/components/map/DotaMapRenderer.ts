@@ -11,53 +11,22 @@
 import * as PIXI from 'pixi.js';
 import { HEROES, getHeroById } from '@/data/heroes';
 import { MAP_ELEMENTS, MapElement } from '@/data/mapElements';
+import {
+  createMapCoordinateMapper,
+  DOTA_MAP_BOUNDS,
+  MINIMAP_CONTENT_BOUNDS,
+  type MapCoordinateMapper,
+} from './mapCoordinateMapper';
 
-/**
- * Dota 2 game world coordinates
- *
- * 基于 2 场已解析录像的实测数据计算边界:
- *
- * 实测坐标范围:
- * - X: 7901 ~ 25011
- * - Y: 7844 ~ 24928
- *
- * 关键校准点 (英雄开局位置):
- * - 天辉泉水: 约 (9550, 9950)
- * - 夜魇泉水: 约 (23450, 22750)
- *
- * 屏幕位置 (minimap 内容区域百分比):
- * - 天辉泉水: (11.2%, 86.2%)
- * - 夜魇泉水: (89.3%, 14.2%)
- *
- * 校准日期: 2026-02-07
- */
-export const DOTA_MAP_BOUNDS = {
-  // 基于实测数据 + 2% 余量计算
-  minX: 7558,
-  maxX: 25353,
-  minY: 7502,
-  maxY: 25269,
-  width: 17795,
-  height: 17767,
-};
+export { DOTA_MAP_BOUNDS } from './mapCoordinateMapper';
 
-/**
- * Minimap 图片配置
- * 
- * 通过分析 minimap_740.png 得到:
- * - 图片尺寸: 1024 x 1024
- * - 实际内容区域: (61, 61) 到 (962, 962)
- * - 透明边框: 约 6% (61/1024 ≈ 0.0596)
- */
 export const MINIMAP_IMAGE_CONFIG = {
-  // 图片中实际地图内容的边界 (像素百分比 0-1)
-  contentLeft: 61 / 1024,   // ~0.0596
-  contentRight: 962 / 1024, // ~0.9395
-  contentTop: 61 / 1024,    // ~0.0596
-  contentBottom: 962 / 1024, // ~0.9395
-  // 内容区域占图片的比例
-  contentWidthRatio: (962 - 61) / 1024,  // ~0.88
-  contentHeightRatio: (962 - 61) / 1024, // ~0.88
+  contentLeft: MINIMAP_CONTENT_BOUNDS.left,
+  contentRight: MINIMAP_CONTENT_BOUNDS.right,
+  contentTop: MINIMAP_CONTENT_BOUNDS.top,
+  contentBottom: MINIMAP_CONTENT_BOUNDS.bottom,
+  contentWidthRatio: MINIMAP_CONTENT_BOUNDS.right - MINIMAP_CONTENT_BOUNDS.left,
+  contentHeightRatio: MINIMAP_CONTENT_BOUNDS.bottom - MINIMAP_CONTENT_BOUNDS.top,
 };
 
 /**
@@ -138,6 +107,7 @@ export class DotaMapRenderer {
   /** 眼位小地图图标纹理 */
   private observerWardTexture?: PIXI.Texture;
   private sentryWardTexture?: PIXI.Texture;
+  private coordinateMapper: MapCoordinateMapper;
   
   private config: Required<RendererConfig>;
   private initialized = false;
@@ -155,6 +125,13 @@ export class DotaMapRenderer {
       showCalibrationMarkers: false,
       ...config,
     };
+
+    this.coordinateMapper = createMapCoordinateMapper({
+      viewportWidth: this.config.width,
+      viewportHeight: this.config.height,
+      worldBounds: DOTA_MAP_BOUNDS,
+      minimapContentBounds: MINIMAP_CONTENT_BOUNDS,
+    });
   }
 
   /**
@@ -919,22 +896,7 @@ export class DotaMapRenderer {
    * - 需要将游戏坐标映射到这个内容区域内
    */
   gameToScreen(gameX: number, gameY: number): { x: number; y: number } {
-    // 1. 先计算归一化坐标 (0-1 范围)
-    const normalizedX = (gameX - DOTA_MAP_BOUNDS.minX) / DOTA_MAP_BOUNDS.width;
-    const normalizedY = (DOTA_MAP_BOUNDS.maxY - gameY) / DOTA_MAP_BOUNDS.height;
-    
-    // 2. 将归一化坐标映射到图片的内容区域
-    // 内容区域从 contentLeft 到 contentRight (约 0.06 到 0.94)
-    const adjustedX = MINIMAP_IMAGE_CONFIG.contentLeft + 
-      normalizedX * MINIMAP_IMAGE_CONFIG.contentWidthRatio;
-    const adjustedY = MINIMAP_IMAGE_CONFIG.contentTop + 
-      normalizedY * MINIMAP_IMAGE_CONFIG.contentHeightRatio;
-    
-    // 3. 转换为屏幕像素坐标
-    const screenX = adjustedX * this.config.width;
-    const screenY = adjustedY * this.config.height;
-    
-    return { x: screenX, y: screenY };
+    return this.coordinateMapper.gameToScreen(gameX, gameY);
   }
 
   /**
@@ -942,19 +904,7 @@ export class DotaMapRenderer {
    * (gameToScreen 的反向操作)
    */
   screenToGame(screenX: number, screenY: number): { x: number; y: number } {
-    // 1. 从屏幕像素坐标转换为比例 (0-1)
-    const adjustedX = screenX / this.config.width;
-    const adjustedY = screenY / this.config.height;
-    
-    // 2. 从图片内容区域映射回归一化坐标
-    const normalizedX = (adjustedX - MINIMAP_IMAGE_CONFIG.contentLeft) / MINIMAP_IMAGE_CONFIG.contentWidthRatio;
-    const normalizedY = (adjustedY - MINIMAP_IMAGE_CONFIG.contentTop) / MINIMAP_IMAGE_CONFIG.contentHeightRatio;
-    
-    // 3. 从归一化坐标转换为游戏坐标
-    const gameX = normalizedX * DOTA_MAP_BOUNDS.width + DOTA_MAP_BOUNDS.minX;
-    const gameY = DOTA_MAP_BOUNDS.maxY - normalizedY * DOTA_MAP_BOUNDS.height;
-    
-    return { x: Math.round(gameX), y: Math.round(gameY) };
+    return this.coordinateMapper.screenToGame(screenX, screenY);
   }
 
   /**

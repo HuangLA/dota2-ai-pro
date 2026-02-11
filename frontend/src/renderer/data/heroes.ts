@@ -17,6 +17,25 @@ export interface HeroData {
   attackType: string;
 }
 
+type HeroNameIndex = Map<string, HeroData>;
+
+function normalizeHeroLookupKey(name: string): string {
+  let normalized = name.trim();
+
+  normalized = normalized.replace(/^npc_dota_hero_/i, '');
+  normalized = normalized.replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2');
+  normalized = normalized.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
+  normalized = normalized.replace(/[\s-]+/g, '_');
+  normalized = normalized.replace(/[^\p{L}\p{N}_]+/gu, '');
+  normalized = normalized.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+
+  return normalized.toLowerCase();
+}
+
+function toCompactHeroLookupKey(name: string): string {
+  return normalizeHeroLookupKey(name).replace(/_/g, '');
+}
+
 /**
  * 英雄数据映射表 (按 ID 索引)
  */
@@ -150,6 +169,33 @@ export const HEROES: Record<number, HeroData> = {
   155: { id: 155, name: 'largo', localizedName: 'Largo', chineseName: '拉尔戈', primaryAttr: 'str', attackType: 'Melee' },
 };
 
+const HERO_NAME_INDEX: HeroNameIndex = (() => {
+  const index: HeroNameIndex = new Map();
+
+  for (const hero of Object.values(HEROES)) {
+    const seeds = [
+      hero.name,
+      hero.localizedName,
+      hero.chineseName,
+      `npc_dota_hero_${hero.name}`,
+    ];
+
+    for (const seed of seeds) {
+      const normalized = normalizeHeroLookupKey(seed);
+      if (normalized) {
+        index.set(normalized, hero);
+      }
+
+      const compact = toCompactHeroLookupKey(seed);
+      if (compact) {
+        index.set(compact, hero);
+      }
+    }
+  }
+
+  return index;
+})();
+
 /**
  * 根据英雄 ID 获取英雄数据
  */
@@ -161,9 +207,24 @@ export function getHeroById(id: number): HeroData | undefined {
  * 根据英雄内部名称获取英雄数据
  */
 export function getHeroByName(name: string): HeroData | undefined {
-  // 处理完整名称 (npc_dota_hero_xxx)
-  const shortName = name.replace('npc_dota_hero_', '');
-  return Object.values(HEROES).find(h => h.name === shortName);
+  if (!name?.trim()) {
+    return undefined;
+  }
+
+  const normalized = normalizeHeroLookupKey(name);
+  if (normalized) {
+    const byNormalized = HERO_NAME_INDEX.get(normalized);
+    if (byNormalized) {
+      return byNormalized;
+    }
+  }
+
+  const compact = toCompactHeroLookupKey(name);
+  if (compact) {
+    return HERO_NAME_INDEX.get(compact);
+  }
+
+  return undefined;
 }
 
 /**

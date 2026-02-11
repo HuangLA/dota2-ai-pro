@@ -428,6 +428,9 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-11 | **修复 Hero ID 映射**: 创建 hero_mapping.py 模块，修复所有英雄 ID 数据 | AI Assistant (Antigravity) |
 | 2026-02-11 | **测试验证通过**: 所有搜索功能（Match/Hero/Player）正常工作 | AI Assistant (Antigravity) |
 | 2026-02-11 | **修复 Timeline 时间同步问题**: 拖动/播放共享时间源，避免回跳 | OpenCode |
+| 2026-02-11 | **修复英雄名称中文映射**: 增强 getHeroByName 兼容多格式名称匹配 | OpenCode |
+| 2026-02-11 | **重构地图坐标映射模块**: 抽离 mapCoordinateMapper 纯函数并统一英雄/眼位/校准标记坐标入口 | OpenCode |
+| 2026-02-11 | **修复小地图对齐偏移**: 统一边界/内容区域配置并在映射中加入边界夹取，提升边缘点对齐稳定性 | OpenCode |
 
 ---
 
