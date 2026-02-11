@@ -62,10 +62,14 @@ export interface RendererConfig {
   height: number;
   mapImageUrl?: string;
   backgroundColor?: number;
+  /** 小地图遮罩透明度（0-1，值越大地图越暗） */
+  mapDimOpacity?: number;
   /** 是否使用英雄图标（否则使用圆形图形） */
   useHeroIcons?: boolean;
   /** 英雄图标大小 */
   heroIconSize?: number;
+  /** 眼位图标大小 */
+  wardIconSize?: number;
   /** 是否显示调试校准标记 */
   showCalibrationMarkers?: boolean;
 }
@@ -104,9 +108,11 @@ export class DotaMapRenderer {
   private heroTexturesById: Map<number, PIXI.Texture> = new Map();
   /** 按英雄名称索引的纹理缓存 (用于后端返回英雄名而非 ID 的情况) */
   private heroTexturesByName: Map<string, PIXI.Texture> = new Map();
-  /** 眼位小地图图标纹理 */
-  private observerWardTexture?: PIXI.Texture;
-  private sentryWardTexture?: PIXI.Texture;
+  /** 眼位 SVG 纹理缓存 (按类型 + 阵营) */
+  private wardTextures: Record<Ward['type'], Record<Ward['team'], PIXI.Texture | undefined>> = {
+    observer: { radiant: undefined, dire: undefined },
+    sentry: { radiant: undefined, dire: undefined },
+  };
   private coordinateMapper: MapCoordinateMapper;
   
   private config: Required<RendererConfig>;
@@ -120,8 +126,10 @@ export class DotaMapRenderer {
     this.config = {
       backgroundColor: 0x1a1a2e,
       mapImageUrl: '/assets/dota/minimap/minimap_740.png',
+      mapDimOpacity: 0.32,
       useHeroIcons: true,
       heroIconSize: 32,
+      wardIconSize: 26,
       showCalibrationMarkers: false,
       ...config,
     };
@@ -170,6 +178,8 @@ export class DotaMapRenderer {
     } else {
       this.drawGrid();
     }
+
+    this.drawMapDimOverlay();
     
     // 预加载英雄图标
     if (this.config.useHeroIcons) {
@@ -597,24 +607,121 @@ export class DotaMapRenderer {
   }
 
   /**
-   * 预加载眼位图标纹理
+   * 预加载眼位 SVG 纹理
+   *
+   * 实现方式：
+   * - 以原始 ward PNG 图标为基底（保持形状与细节一致）
+   * - 在 SVG 中使用颜色矩阵做阵营着色（天辉绿/夜魇红）
    */
   private async preloadWardTextures(): Promise<void> {
-    console.log('[DotaMapRenderer] Preloading ward textures...');
+    console.log('[DotaMapRenderer] Preloading ward SVG textures...');
+
+    const wardTypes: Ward['type'][] = ['observer', 'sentry'];
+    const teams: Ward['team'][] = ['radiant', 'dire'];
+
     try {
-      const [observerTexture, sentryTexture] = await Promise.all([
-        PIXI.Assets.load('/assets/dota/wards/observer_mapicon.png'),
-        PIXI.Assets.load('/assets/dota/wards/sentry_mapicon.png'),
-      ]);
-      this.observerWardTexture = observerTexture;
-      this.sentryWardTexture = sentryTexture;
-      console.log('[DotaMapRenderer] Ward textures loaded successfully');
+      const loadPromises: Promise<void>[] = [];
+      const sourceDataUrls = await Promise.all(
+        wardTypes.map(async (type) => ({
+          type,
+          dataUrl: await this.loadWardSourceDataUrl(type),
+        }))
+      );
+      const sourceMap = new Map<Ward['type'], string>(
+        sourceDataUrls.map((item) => [item.type, item.dataUrl])
+      );
+
+      for (const type of wardTypes) {
+        const sourceDataUrl = sourceMap.get(type);
+        if (!sourceDataUrl) {
+          continue;
+        }
+
+        for (const team of teams) {
+          const svgDataUrl = this.createWardSvgDataUrl(team, sourceDataUrl);
+          loadPromises.push(
+            PIXI.Assets.load<PIXI.Texture>(svgDataUrl).then((texture) => {
+              this.wardTextures[type][team] = texture;
+            })
+          );
+        }
+      }
+
+      await Promise.all(loadPromises);
+      console.log('[DotaMapRenderer] Ward SVG textures loaded successfully');
     } catch (error) {
-      console.warn('[DotaMapRenderer] Failed to load ward textures, using fallback graphics:', error);
-      // 加载失败时使用 fallback 几何图形
-      this.observerWardTexture = undefined;
-      this.sentryWardTexture = undefined;
+      console.warn('[DotaMapRenderer] Failed to load ward SVG textures, using fallback graphics:', error);
+      for (const type of wardTypes) {
+        for (const team of teams) {
+          this.wardTextures[type][team] = undefined;
+        }
+      }
     }
+  }
+
+  private async loadWardSourceDataUrl(type: Ward['type']): Promise<string> {
+    const sourcePath =
+      type === 'observer'
+        ? '/assets/dota/wards/observer_mapicon.svg'
+        : '/assets/dota/wards/sentry_mapicon.svg';
+
+    const response = await fetch(sourcePath);
+    if (!response.ok) {
+      throw new Error(`Failed to load ward source image: ${sourcePath}`);
+    }
+
+    const blob = await response.blob();
+    return this.blobToDataUrl(blob);
+  }
+
+  private blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert blob to data URL'));
+        }
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('FileReader error'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * 生成 ward SVG data URL
+   *
+   * 关键点：
+   * - 复用原始 observer/sentry 图标轮廓与细节（形状不变）
+   * - 通过 feColorMatrix 将 RGB 统一映射为阵营色
+   * - 保留 alpha 通道，确保图标边缘与透明区域一致
+   */
+  private createWardSvgDataUrl(team: Ward['team'], sourceImageDataUrl: string): string {
+
+    const colorHex = team === 'radiant' ? '#22c55e' : '#ef4444';
+    const red = parseInt(colorHex.slice(1, 3), 16) / 255;
+    const green = parseInt(colorHex.slice(3, 5), 16) / 255;
+    const blue = parseInt(colorHex.slice(5, 7), 16) / 255;
+
+    // 颜色矩阵：忽略输入 RGB，直接输出目标阵营色；alpha 保持原图 alpha
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+        <defs>
+          <filter id="teamTint" color-interpolation-filters="sRGB">
+            <feColorMatrix type="matrix" values="
+              0 0 0 0 ${red}
+              0 0 0 0 ${green}
+              0 0 0 0 ${blue}
+              0 0 0 1 0
+            "/>
+          </filter>
+        </defs>
+        <image href="${sourceImageDataUrl}" x="0" y="0" width="32" height="32" filter="url(#teamTint)" preserveAspectRatio="xMidYMid meet"/>
+      </svg>
+    `.replace(/\s+/g, ' ').trim();
+
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
 
   /**
@@ -888,6 +995,21 @@ export class DotaMapRenderer {
   }
 
   /**
+   * 在小地图上加一层轻微暗化遮罩，提升前景元素可读性
+   */
+  private drawMapDimOverlay(): void {
+    const opacity = Math.max(0, Math.min(1, this.config.mapDimOpacity));
+    if (opacity <= 0) {
+      return;
+    }
+
+    const overlay = new PIXI.Graphics();
+    overlay.rect(0, 0, this.config.width, this.config.height);
+    overlay.fill({ color: 0x000000, alpha: opacity });
+    this.mapContainer.addChild(overlay);
+  }
+
+  /**
    * Convert game world coordinates to screen coordinates
    * 
    * 考虑 minimap 图片的透明边框:
@@ -1116,40 +1238,25 @@ export class DotaMapRenderer {
   /**
    * 创建眼位容器
    * 
-   * 设计说明 (基于 Liquipedia 观战模式):
-   * - Radiant 眼位: 绿色边框
-   * - Dire 眼位: 红色边框
-   * - Observer (假眼): 使用 observer_mapicon.png 图标
-   * - Sentry (真眼): 使用 sentry_mapicon.png 图标
+   * 设计说明:
+   * - 使用 SVG 封装原始 ward 图标，保持原图形状
+   * - 通过 SVG 颜色矩阵做阵营着色（Radiant 绿 / Dire 红）
    */
   private createWardContainer(type: 'observer' | 'sentry', team: 'radiant' | 'dire'): PIXI.Container {
     const container = new PIXI.Container();
-    const teamColor = team === 'radiant' ? 0x22c55e : 0xef4444;
-    const wardSize = 20; // 眼位图标大小
-    
-    // 获取对应的眼位纹理
-    const texture = type === 'observer' ? this.observerWardTexture : this.sentryWardTexture;
+    const wardSize = this.config.wardIconSize;
+    const texture = this.wardTextures[type][team];
+
+    const glow = this.createWardGlow(type, team, wardSize);
+    container.addChild(glow);
     
     if (texture) {
-      // 使用图标纹理
-      // 1. 队伍颜色背景圆形
-      const background = new PIXI.Graphics();
-      background.circle(0, 0, wardSize / 2 + 3);
-      background.fill({ color: teamColor, alpha: 0.8 });
-      container.addChild(background);
-      
-      // 2. 眼位图标精灵
+      // 使用 SVG 纹理
       const sprite = new PIXI.Sprite(texture);
       sprite.width = wardSize;
       sprite.height = wardSize;
       sprite.anchor.set(0.5, 0.5);
       container.addChild(sprite);
-      
-      // 3. 队伍颜色边框（最外层）
-      const border = new PIXI.Graphics();
-      border.circle(0, 0, wardSize / 2 + 3);
-      border.stroke({ color: teamColor, width: 2 });
-      container.addChild(border);
     } else {
       // Fallback: 使用几何图形
       const graphic = this.createWardGraphic(type, team);
@@ -1157,6 +1264,22 @@ export class DotaMapRenderer {
     }
     
     return container;
+  }
+
+  /**
+   * 创建眼位柔和辉光，增强在复杂背景上的识别度
+   */
+  private createWardGlow(type: 'observer' | 'sentry', team: 'radiant' | 'dire', wardSize: number): PIXI.Graphics {
+    void type;
+    const glow = new PIXI.Graphics();
+    const color = team === 'radiant' ? 0x22c55e : 0xef4444;
+
+    // 使用单层柔和光晕，避免明显图层感
+    glow.circle(0, 0, wardSize * 0.58);
+    glow.fill({ color, alpha: 0.12 });
+    glow.filters = [new PIXI.BlurFilter(3)];
+
+    return glow;
   }
 
   /**
@@ -1206,8 +1329,10 @@ export class DotaMapRenderer {
     }
     this.heroTexturesById.clear();
     this.heroTexturesByName.clear();
-    this.observerWardTexture = undefined;
-    this.sentryWardTexture = undefined;
+    this.wardTextures.observer.radiant = undefined;
+    this.wardTextures.observer.dire = undefined;
+    this.wardTextures.sentry.radiant = undefined;
+    this.wardTextures.sentry.dire = undefined;
   }
 
   /**

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 100 100">
+  <defs>
+    <style>
+      .eye-frame {
+        fill: none;
+        stroke: black;
+        stroke-width: 10;
+        stroke-linejoin: miter;
+        stroke-miterlimit: 25;
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1) translate(0,-100)">
+    <circle cx="50" cy="58" r="18" fill="none" stroke="black" stroke-width="10" />
+    <path class="eye-frame" d="M 10,50 C 35,12 65,12 90,50 C 65,88 35,88 10,50 Z"/>
+  </g>
+</svg>
