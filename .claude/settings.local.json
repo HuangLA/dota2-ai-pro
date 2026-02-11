@@ -6,7 +6,11 @@
       "Bash(\".venv/Scripts/python.exe\" poc/analyze_minimap.py)",
       "Bash(\".venv/Scripts/pip.exe\" install Pillow)",
       "Bash(\".venv/Scripts/python.exe\" poc/calculate_bounds.py)",
-      "Bash(\".venv/Scripts/python.exe\" poc/optimize_bounds.py)"
+      "Bash(\".venv/Scripts/python.exe\" poc/optimize_bounds.py)",
+      "Bash(python -m pytest:*)",
+      "Bash(python.exe -m pytest:*)",
+      "Bash(ls:*)",
+      "Bash(\"N:/dota2-ai-pro/backend/.venv/Scripts/python.exe\" -m pytest \"N:/dota2-ai-pro/backend/tests/test_match_filters.py\" -v)"
     ]
   }
 }

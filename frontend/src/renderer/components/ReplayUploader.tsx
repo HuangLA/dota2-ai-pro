@@ -71,7 +71,7 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
   // Handle file upload
   const handleUpload = async (file: File) => {
     if (!file.name.endsWith('.dem')) {
-      setError('Invalid file type. Please upload a .dem file.');
+       setError('文件类型无效，请上传 .dem 文件。');
       return;
     }
 
@@ -84,7 +84,7 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
       await fetchTasks();
     } catch (err) {
       console.error('Upload failed', err);
-      setError('Failed to upload replay. Please try again.');
+       setError('上传录像失败，请重试。');
     } finally {
       setUploading(false);
     }
@@ -164,13 +164,13 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
           </div>
           
           <div className="text-xl font-semibold text-gray-200">
-            {uploading ? 'Uploading replay...' : dragActive ? 'Drop replay here' : 'Upload Replay File'}
+             {uploading ? '正在上传录像...' : dragActive ? '松开鼠标上传' : '上传录像文件'}
           </div>
           <div className="text-sm text-gray-400">
-            {uploading ? 'Please wait...' : 'Drag and drop a .dem file here, or click to browse'}
+             {uploading ? '请稍候...' : '拖拽 .dem 文件到此处，或点击选择文件'}
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            Supported format: Dota 2 Replay (.dem)
+             支持格式: Dota 2 录像文件 (.dem)
           </div>
         </div>
 
@@ -186,10 +186,10 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
         <div className="mt-6 space-y-2">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">
-              Recent Parsing Tasks
+               最近解析任务
             </h3>
             <span className="text-xs text-gray-500">
-              {tasks.filter(t => t.status === 'running').length} running, {tasks.filter(t => t.status === 'completed').length} completed
+               {tasks.filter(t => t.status === 'running').length} 运行中, {tasks.filter(t => t.status === 'completed').length} 已完成
             </span>
           </div>
           <div className="bg-dota-surface rounded-lg border border-gray-700 divide-y divide-gray-800 shadow-lg">
@@ -204,32 +204,36 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
 }
 
 function TaskItem({ task }: { task: ParseTask }) {
-  const fileName = task.replay_path.split(/[/\\]/).pop(); // Handle both forward and back slashes
-  
-  return (
-    <div className="p-4 flex items-center justify-between text-sm hover:bg-white/5 transition-colors">
-      <div className="flex items-center gap-4 flex-1 min-w-0">
-        <StatusIcon status={task.status} />
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-gray-200 truncate font-medium text-base" title={fileName}>
-            {fileName}
-          </span>
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden max-w-[300px] border border-gray-600">
-              <div 
-                className={cn(
-                  "h-full transition-all duration-500 ease-out",
-                  task.status === 'failed' ? "bg-red-500" : 
-                  task.status === 'completed' ? "bg-green-500" :
-                  "bg-dota-primary"
-                )}
-                style={{ width: `${Math.max(5, task.progress)}%` }} // Minimum 5% visibility
-              />
-            </div>
-            <span className="text-xs text-gray-400 w-12 text-right font-mono">
-              {Math.round(task.progress)}%
-            </span>
-          </div>
+   const fileName = task.replay_path.split(/[/\\]/).pop(); // Handle both forward and back slashes
+   
+   // 后端返回 0.0~1.0 的进度值，需要转换为百分比
+   // 如果值 <= 1 则视为小数比例，否则视为已经是百分比
+   const progressPercent = task.progress <= 1 ? task.progress * 100 : task.progress;
+   
+   return (
+     <div className="p-4 flex items-center justify-between text-sm hover:bg-white/5 transition-colors">
+       <div className="flex items-center gap-4 flex-1 min-w-0">
+         <StatusIcon status={task.status} />
+         <div className="flex flex-col min-w-0 flex-1">
+           <span className="text-gray-200 truncate font-medium text-base" title={fileName}>
+             {fileName}
+           </span>
+           <div className="flex items-center gap-3 mt-2">
+             <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden max-w-[300px] border border-gray-600">
+               <div 
+                 className={cn(
+                   "h-full transition-all duration-500 ease-out",
+                   task.status === 'failed' ? "bg-red-500" : 
+                   task.status === 'completed' ? "bg-green-500" :
+                   "bg-dota-primary"
+                 )}
+                 style={{ width: `${Math.max(5, progressPercent)}%` }}
+               />
+             </div>
+             <span className="text-xs text-gray-400 w-12 text-right font-mono">
+               {Math.round(progressPercent)}%
+             </span>
+           </div>
           {task.error && (
             <span className="text-xs text-red-400 mt-2 truncate bg-red-900/20 px-2 py-1 rounded border border-red-800">
               {task.error}
@@ -247,11 +251,11 @@ function TaskItem({ task }: { task: ParseTask }) {
 
 function StatusBadge({ status }: { status: TaskStatus }) {
   const config = {
-    completed: { text: 'Completed', className: 'bg-green-900/50 text-green-400 border-green-700' },
-    failed: { text: 'Failed', className: 'bg-red-900/50 text-red-400 border-red-700' },
-    running: { text: 'Running', className: 'bg-blue-900/50 text-blue-400 border-blue-700 animate-pulse' },
-    pending: { text: 'Pending', className: 'bg-gray-700 text-gray-400 border-gray-600' },
-    cancelled: { text: 'Cancelled', className: 'bg-gray-700 text-gray-400 border-gray-600' },
+     completed: { text: '已完成', className: 'bg-green-900/50 text-green-400 border-green-700' },
+     failed: { text: '失败', className: 'bg-red-900/50 text-red-400 border-red-700' },
+     running: { text: '运行中', className: 'bg-blue-900/50 text-blue-400 border-blue-700 animate-pulse' },
+     pending: { text: '等待中', className: 'bg-gray-700 text-gray-400 border-gray-600' },
+     cancelled: { text: '已取消', className: 'bg-gray-700 text-gray-400 border-gray-600' },
   };
   
   const { text, className } = config[status] || config.pending;

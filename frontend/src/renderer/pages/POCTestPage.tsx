@@ -1,5 +1,5 @@
 /**
- * POC Test Page - Technical Verification Dashboard
+ * POC Test Page - 技术验证仪表板
  */
 
 import { useState } from 'react';
@@ -34,10 +34,10 @@ export function POCTestPage() {
     <div className="min-h-screen bg-dota-bg p-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-dota-gold mb-2">
-          Technical Verification POC
+          技术验证 POC
         </h1>
         <p className="text-gray-400 mb-6">
-          Verify core technologies before full development
+          全面开发前验证核心技术
         </p>
 
         {/* Tabs */}
@@ -50,7 +50,7 @@ export function POCTestPage() {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            PixiJS Rendering
+            PixiJS 渲染
           </button>
           <button
             onClick={() => setActiveTab('api')}
@@ -60,7 +60,7 @@ export function POCTestPage() {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            Backend API
+            后端 API
           </button>
           <button
             onClick={() => setActiveTab('summary')}
@@ -70,7 +70,7 @@ export function POCTestPage() {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            Summary
+            总结
           </button>
         </div>
 
@@ -80,10 +80,10 @@ export function POCTestPage() {
         {activeTab === 'api' && (
           <div className="bg-dota-surface p-6 rounded-lg">
             <h2 className="text-xl font-bold text-dota-gold mb-4">
-              Backend API Test
+              后端 API 测试
             </h2>
             <p className="text-gray-400 mb-4">
-              Test connection to Python FastAPI backend
+              测试与 Python FastAPI 后端的连接
             </p>
 
             <div className="space-y-4">
@@ -91,7 +91,7 @@ export function POCTestPage() {
               <div className="bg-dota-bg p-4 rounded">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h3 className="font-medium mb-1">Health Check</h3>
+                    <h3 className="font-medium mb-1">健康检查</h3>
                     <code className="text-sm text-gray-400">
                       GET http://localhost:8000/health
                     </code>
@@ -101,7 +101,7 @@ export function POCTestPage() {
                     disabled={isTesting}
                     className="px-4 py-2 bg-dota-primary text-white rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isTesting ? 'Testing...' : 'Test'}
+                    {isTesting ? '测试中...' : '测试'}
                   </button>
                 </div>
 
@@ -116,11 +116,11 @@ export function POCTestPage() {
                         healthResult.success ? 'bg-green-500' : 'bg-red-500'
                       }`}></span>
                       <span className="font-medium">
-                        {healthResult.success ? 'SUCCESS' : 'FAILED'}
+                        {healthResult.success ? '成功' : '失败'}
                       </span>
                       {healthResult.status && (
                         <span className="text-sm text-gray-400">
-                          (Status: {healthResult.status})
+                          (状态: {healthResult.status})
                         </span>
                       )}
                       {healthResult.responseTime && (
@@ -140,7 +140,7 @@ export function POCTestPage() {
               <div className="bg-dota-bg p-4 rounded">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h3 className="font-medium mb-1">List Matches</h3>
+                    <h3 className="font-medium mb-1">比赛列表</h3>
                     <code className="text-sm text-gray-400">
                       GET http://localhost:8000/api/v1/matches
                     </code>
@@ -150,7 +150,7 @@ export function POCTestPage() {
                     disabled={isTesting}
                     className="px-4 py-2 bg-dota-primary text-white rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isTesting ? 'Testing...' : 'Test'}
+                    {isTesting ? '测试中...' : '测试'}
                   </button>
                 </div>
 
@@ -165,11 +165,11 @@ export function POCTestPage() {
                         matchesResult.success ? 'bg-green-500' : 'bg-red-500'
                       }`}></span>
                       <span className="font-medium">
-                        {matchesResult.success ? 'SUCCESS' : 'FAILED'}
+                        {matchesResult.success ? '成功' : '失败'}
                       </span>
                       {matchesResult.status && (
                         <span className="text-sm text-gray-400">
-                          (Status: {matchesResult.status})
+                          (状态: {matchesResult.status})
                         </span>
                       )}
                       {matchesResult.responseTime && (
@@ -187,11 +187,11 @@ export function POCTestPage() {
 
               {/* Instructions */}
               <div className="bg-dota-primary/20 border border-dota-primary p-4 rounded">
-                <h4 className="font-medium mb-2">Backend Status</h4>
+                <h4 className="font-medium mb-2">后端状态</h4>
                 <p className="text-sm text-gray-300">
                   {healthResult?.success 
-                    ? '✅ Backend is running and healthy!' 
-                    : '⚠️ Make sure backend is running with: '}
+                    ? '后端运行正常！' 
+                    : '请确保后端正在运行: '}
                   {!healthResult?.success && (
                     <code className="bg-dota-bg px-2 py-1 rounded ml-1">
                       cd backend && python main.py
@@ -206,14 +206,14 @@ export function POCTestPage() {
         {activeTab === 'summary' && (
           <div className="bg-dota-surface p-6 rounded-lg">
             <h2 className="text-xl font-bold text-dota-gold mb-4">
-              POC Summary
+              POC 总结
             </h2>
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Frontend Tests */}
                 <div className="bg-dota-bg p-4 rounded">
-                  <h3 className="font-medium text-lg mb-3">Frontend</h3>
+                  <h3 className="font-medium text-lg mb-3">前端</h3>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -225,24 +225,24 @@ export function POCTestPage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      PixiJS Rendering
+                      PixiJS 渲染
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                      Electron Integration (dev mode)
+                      Electron 集成 (开发模式)
                     </li>
                   </ul>
                 </div>
 
                 {/* Backend Tests */}
                 <div className="bg-dota-bg p-4 rounded">
-                  <h3 className="font-medium text-lg mb-3">Backend</h3>
+                  <h3 className="font-medium text-lg mb-3">后端</h3>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${
                         healthResult?.success ? 'bg-green-500' : 'bg-gray-500'
                       }`}></span>
-                      FastAPI Server
+                      FastAPI 服务器
                       {healthResult?.success && (
                         <span className="text-xs text-green-400">
                           ({healthResult.responseTime}ms)
@@ -253,22 +253,22 @@ export function POCTestPage() {
                       <span className={`w-2 h-2 rounded-full ${
                         matchesResult?.success ? 'bg-green-500' : 'bg-gray-500'
                       }`}></span>
-                      SQLite Database
+                      SQLite 数据库
                       {matchesResult?.success && (
                         <span className="text-xs text-green-400">
-                          ({matchesResult.data?.total ?? 0} matches)
+                          ({matchesResult.data?.total ?? 0} 场比赛)
                         </span>
                       )}
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                       Parquet + DuckDB
-                      <span className="text-xs text-gray-400">(POC tested)</span>
+                      <span className="text-xs text-gray-400">(POC 已测试)</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      Clarity Parser
-                      <span className="text-xs text-gray-400">(JAR built)</span>
+                      Clarity 解析器
+                      <span className="text-xs text-gray-400">(JAR 已构建)</span>
                     </li>
                   </ul>
                 </div>
@@ -280,22 +280,22 @@ export function POCTestPage() {
                   ? 'bg-green-900/20 border-green-700'
                   : 'bg-yellow-900/20 border-yellow-700'
               }`}>
-                <h4 className="font-medium mb-2">Overall Status</h4>
+                <h4 className="font-medium mb-2">整体状态</h4>
                 <p className="text-sm text-gray-300">
                   {healthResult?.success && matchesResult?.success ? (
                     <>
-                      ✅ All core systems verified and operational!<br />
+                      所有核心系统已验证并正常运行！<br />
                       <span className="text-xs text-gray-400 mt-1 block">
-                        Frontend-Backend communication: OK | 
-                        API response time: ~{((healthResult.responseTime || 0) + (matchesResult.responseTime || 0)) / 2}ms avg
+                        前后端通信: 正常 | 
+                        API 响应时间: ~{((healthResult.responseTime || 0) + (matchesResult.responseTime || 0)) / 2}ms 平均
                       </span>
                     </>
                   ) : (
                     <>
-                      ⚠️ Run backend API tests to verify system status
+                      请运行后端 API 测试以验证系统状态
                       <br />
                       <span className="text-xs text-gray-400 mt-1 block">
-                        Go to "Backend API" tab and click "Test" buttons
+                        前往"后端 API"标签页并点击"测试"按钮
                       </span>
                     </>
                   )}
@@ -304,21 +304,21 @@ export function POCTestPage() {
 
               {/* Next Steps */}
               <div className="bg-dota-primary/20 border border-dota-primary p-4 rounded">
-                <h4 className="font-medium mb-2">Next Steps</h4>
+                <h4 className="font-medium mb-2">下一步</h4>
                 <ol className="list-decimal list-inside text-sm text-gray-300 space-y-1">
                   {!healthResult?.success && (
-                    <li>Test backend API connection (Backend API tab)</li>
+                    <li>测试后端 API 连接 (后端 API 标签页)</li>
                   )}
                   {healthResult?.success && !matchesResult?.success && (
-                    <li>Test matches endpoint (Backend API tab)</li>
+                    <li>测试比赛接口 (后端 API 标签页)</li>
                   )}
                   {healthResult?.success && matchesResult?.success && (
                     <>
-                      <li className="line-through text-gray-500">✓ Backend API verified</li>
-                      <li>Upload and parse demo files (.dem)</li>
-                      <li>Implement 2D map rendering engine</li>
-                      <li>Create match viewer interface</li>
-                      <li>Build timeline playback controls</li>
+                      <li className="line-through text-gray-500">后端 API 已验证</li>
+                      <li>上传并解析录像文件 (.dem)</li>
+                      <li>实现 2D 地图渲染引擎</li>
+                      <li>创建比赛查看器界面</li>
+                      <li>构建时间轴回放控件</li>
                     </>
                   )}
                 </ol>

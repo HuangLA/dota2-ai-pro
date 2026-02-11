@@ -2,11 +2,32 @@ import { useState } from 'react';
 import POCTestPage from './pages/POCTestPage';
 import MapTestPage from './pages/MapTestPage';
 import RealMatchViewer from './pages/RealMatchViewer';
+import { MatchListPage } from './pages/MatchListPage';
 
-type Page = 'home' | 'poc' | 'map' | 'match';
+type Page = 'home' | 'poc' | 'map' | 'match' | 'matchList';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [currentMatchId, setCurrentMatchId] = useState<number | null>(null);
+
+  const handleWatchMatch = (matchId: number) => {
+    setCurrentMatchId(matchId);
+    setCurrentPage('match');
+  };
+
+  if (currentPage === 'matchList') {
+    return (
+      <div>
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50 shadow-lg border border-gray-700"
+        >
+           返回首页
+        </button>
+        <MatchListPage onWatch={handleWatchMatch} />
+      </div>
+    );
+  }
 
   if (currentPage === 'poc') {
     return (
@@ -15,7 +36,7 @@ function App() {
           onClick={() => setCurrentPage('home')}
           className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50"
         >
-          Back to Home
+           返回首页
         </button>
         <POCTestPage />
       </div>
@@ -29,7 +50,7 @@ function App() {
           onClick={() => setCurrentPage('home')}
           className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50"
         >
-          Back to Home
+           返回首页
         </button>
         <MapTestPage />
       </div>
@@ -43,9 +64,9 @@ function App() {
           onClick={() => setCurrentPage('home')}
           className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50"
         >
-          Back to Home
+           返回首页
         </button>
-        <RealMatchViewer />
+        <RealMatchViewer initialMatchId={currentMatchId} />
       </div>
     );
   }
@@ -64,28 +85,37 @@ function App() {
         </p>
         <div className="flex flex-col gap-3">
           <button
-            onClick={() => setCurrentPage('match')}
+            onClick={() => setCurrentPage('matchList')}
+            className="px-4 py-2 bg-dota-gold text-black rounded hover:bg-yellow-500 transition-colors font-bold"
+          >
+             比赛列表
+          </button>
+          <button
+            onClick={() => {
+              setCurrentMatchId(null);
+              setCurrentPage('match');
+            }}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium"
           >
-            Real Match Viewer (NEW!)
+             录像查看器
           </button>
           <button
             onClick={() => setCurrentPage('poc')}
             className="px-4 py-2 bg-dota-accent text-white rounded hover:bg-red-600 transition-colors"
           >
-            POC Test
+             技术验证
           </button>
           <button
             onClick={() => setCurrentPage('map')}
             className="px-4 py-2 bg-dota-primary text-white rounded hover:bg-blue-800 transition-colors"
           >
-            Map Test (Sample Data)
+             地图测试
           </button>
         </div>
       </div>
       <div className="mt-8 text-sm text-gray-500">
-        <p>React + TypeScript + Vite + Tailwind CSS + PixiJS</p>
-        <p>Backend: Python + FastAPI + DuckDB</p>
+         <p>前端: React + TypeScript + Vite + Tailwind CSS + PixiJS</p>
+         <p>后端: Python + FastAPI + DuckDB</p>
       </div>
     </div>
   );
