@@ -8,6 +8,7 @@ import MapViewer from '../components/map/MapViewer';
 import { HeroPosition, Ward } from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
 import backendAPI, { Match, TickData, WardsResponse } from '../api/backend';
+import { getHeroByName } from '../data/heroes';
 
 /** 比赛时间常量 */
 const GAME_DATA_START = 112;
@@ -18,9 +19,13 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-export function RealMatchViewer() {
+export interface RealMatchViewerProps {
+  initialMatchId?: number | null;
+}
+
+export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [selectedMatch, setSelectedMatch] = useState<number | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<number | null>(initialMatchId || null);
   const [matchDuration, setMatchDuration] = useState(DEFAULT_DURATION);
   
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
@@ -39,6 +44,10 @@ export function RealMatchViewer() {
   useEffect(() => {
     loadMatches();
   }, []);
+
+  useEffect(() => {
+    setSelectedMatch(initialMatchId ?? null);
+  }, [initialMatchId]);
 
   const loadMatches = async () => {
     setLoading(true);
@@ -371,11 +380,14 @@ export function RealMatchViewer() {
                         hero.team === 'radiant' ? 'bg-green-900/30' : 'bg-red-900/30'
                       }`}
                     >
-                      <span className="truncate" title={hero.hero_name}>
-                        {hero.hero_name?.replace('npc_dota_hero_', '') || `Hero ${hero.hero_id}`}
-                      </span>
-                      <span className="text-gray-400">
-                        Lv.{hero.level}
+                       <span className="truncate" title={hero.hero_name}>
+                         {(() => {
+                           const heroData = getHeroByName(hero.hero_name || '');
+                           return heroData?.chineseName || hero.hero_name?.replace('npc_dota_hero_', '') || `英雄 ${hero.hero_id}`;
+                         })()}
+                       </span>
+                       <span className="text-gray-400">
+                         Lv.{hero.level}
                       </span>
                     </div>
                   ))}

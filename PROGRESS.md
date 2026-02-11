@@ -427,6 +427,7 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-11 | **完成录像管理系统**: MatchListPage + ReplayUploader + API 搜索功能完整实现 | AI Assistant (Antigravity) |
 | 2026-02-11 | **修复 Hero ID 映射**: 创建 hero_mapping.py 模块，修复所有英雄 ID 数据 | AI Assistant (Antigravity) |
 | 2026-02-11 | **测试验证通过**: 所有搜索功能（Match/Hero/Player）正常工作 | AI Assistant (Antigravity) |
+| 2026-02-11 | **修复 Timeline 时间同步问题**: 拖动/播放共享时间源，避免回跳 | OpenCode |
 
 ---
 
@@ -591,4 +592,3 @@ frontend/
     │   └── backend.ts        # Backend API 服务 (含 playback API)
     └── App.tsx               # 主应用 (含 Real Match 导航)
 ```
-

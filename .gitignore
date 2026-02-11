@@ -26,6 +26,10 @@ Thumbs.db
 *.dem
 logs/
 .env
+backend/data/truesight.db-wal
+backend/data/truesight.db-shm
+backend/data/truesight.db-journal
+backend/data/matches/
 
 # Large Files & Parsers Dependencies
 parsers/jdk17/

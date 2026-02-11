@@ -48,16 +48,20 @@ export function Timeline({
   // 内部时间状态，用于平滑播放
   const [internalTime, setInternalTime] = useState(currentTime);
   
-  const progressRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
-  const lastUpdateRef = useRef<number>(0);
+   const progressRef = useRef<HTMLDivElement>(null);
+   const animationRef = useRef<number | null>(null);
+   const lastUpdateRef = useRef<number>(0);
+   
+   // 用于在动画循环中同步最新时间（解决 skip 按钮在播放时无效的问题）
+   const internalTimeRef = useRef(currentTime);
   
-  // 同步外部时间到内部（仅当不在播放且不在拖动时）
-  useEffect(() => {
-    if (!isPlaying && !isDragging) {
-      setInternalTime(currentTime);
-    }
-  }, [currentTime, isPlaying, isDragging]);
+   // 同步外部时间到内部（仅当不在播放且不在拖动时）
+   useEffect(() => {
+     if (!isPlaying && !isDragging) {
+       setInternalTime(currentTime);
+       internalTimeRef.current = currentTime;
+     }
+   }, [currentTime, isPlaying, isDragging]);
 
   // 计算进度百分比
   const displayTime = isPlaying || isDragging ? internalTime : currentTime;
@@ -75,31 +79,33 @@ export function Timeline({
       return;
     }
 
-    lastUpdateRef.current = performance.now();
-    let localTime = internalTime;
-    let lastCallbackTime = 0; // 上次回调时间
-    const CALLBACK_INTERVAL = 50; // 回调间隔（毫秒），约 20fps 的更新频率
+     lastUpdateRef.current = performance.now();
+     let lastCallbackTime = 0; // 上次回调时间
+     const CALLBACK_INTERVAL = 50; // 回调间隔（毫秒），约 20fps 的更新频率
 
-    const animate = (timestamp: number) => {
-      const deltaTime = (timestamp - lastUpdateRef.current) / 1000;
-      lastUpdateRef.current = timestamp;
+     const animate = (timestamp: number) => {
+       const deltaTime = (timestamp - lastUpdateRef.current) / 1000;
+       lastUpdateRef.current = timestamp;
 
-      localTime = localTime + deltaTime * playbackSpeed;
-      
-      if (localTime >= maxTime) {
-        setInternalTime(maxTime);
-        onTimeChange(maxTime);
-        setIsPlaying(false);
-      } else {
-        setInternalTime(localTime);
-        // 节流回调：每 CALLBACK_INTERVAL 毫秒回调一次，支持平滑动画
-        if (timestamp - lastCallbackTime >= CALLBACK_INTERVAL) {
-          onTimeChange(localTime);
-          lastCallbackTime = timestamp;
-        }
-        animationRef.current = requestAnimationFrame(animate);
-      }
-    };
+       // 从 ref 读取最新时间（skip 按钮会更新 ref），然后累加 delta
+       const localTime = internalTimeRef.current + deltaTime * playbackSpeed;
+       
+       if (localTime >= maxTime) {
+         setInternalTime(maxTime);
+         internalTimeRef.current = maxTime;
+         onTimeChange(maxTime);
+         setIsPlaying(false);
+       } else {
+         setInternalTime(localTime);
+         internalTimeRef.current = localTime;
+         // 节流回调：每 CALLBACK_INTERVAL 毫秒回调一次，支持平滑动画
+         if (timestamp - lastCallbackTime >= CALLBACK_INTERVAL) {
+           onTimeChange(localTime);
+           lastCallbackTime = timestamp;
+         }
+         animationRef.current = requestAnimationFrame(animate);
+       }
+     };
 
     animationRef.current = requestAnimationFrame(animate);
 
@@ -120,6 +126,7 @@ export function Timeline({
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     const newTime = minTime + percentage * (maxTime - minTime);
     setInternalTime(newTime);
+    internalTimeRef.current = newTime;
   }, [disabled, minTime, maxTime]);
 
   // 拖动处理
@@ -143,12 +150,13 @@ export function Timeline({
       const percentage = Math.max(0, Math.min(1, x / rect.width));
       const newTime = minTime + percentage * (maxTime - minTime);
       setInternalTime(newTime);
+      internalTimeRef.current = newTime;
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       // 拖动结束时才通知父组件
-      onTimeChange(internalTime);
+      onTimeChange(internalTimeRef.current);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -171,30 +179,33 @@ export function Timeline({
       }
       
       switch (e.key) {
-        case ' ': // 空格键 - 播放/暂停
-          e.preventDefault();
-          if (internalTime >= maxTime) {
-            setInternalTime(minTime);
-            onTimeChange(minTime);
-          }
-          setIsPlaying(prev => !prev);
-          break;
-        case 'ArrowLeft': // 左箭头 - 后退 5 秒
-          e.preventDefault();
-          {
-            const newTime = Math.max(minTime, internalTime - 5);
-            setInternalTime(newTime);
-            onTimeChange(newTime);
-          }
-          break;
-        case 'ArrowRight': // 右箭头 - 前进 5 秒
-          e.preventDefault();
-          {
-            const newTime = Math.min(maxTime, internalTime + 5);
-            setInternalTime(newTime);
-            onTimeChange(newTime);
-          }
-          break;
+         case ' ': // 空格键 - 播放/暂停
+           e.preventDefault();
+           if (internalTime >= maxTime) {
+             setInternalTime(minTime);
+             internalTimeRef.current = minTime;
+             onTimeChange(minTime);
+           }
+           setIsPlaying(prev => !prev);
+           break;
+         case 'ArrowLeft': // 左箭头 - 后退 5 秒
+           e.preventDefault();
+           {
+             const newTime = Math.max(minTime, internalTime - 5);
+             setInternalTime(newTime);
+             internalTimeRef.current = newTime;
+             onTimeChange(newTime);
+           }
+           break;
+         case 'ArrowRight': // 右箭头 - 前进 5 秒
+           e.preventDefault();
+           {
+             const newTime = Math.min(maxTime, internalTime + 5);
+             setInternalTime(newTime);
+             internalTimeRef.current = newTime;
+             onTimeChange(newTime);
+           }
+           break;
         case 'ArrowUp': // 上箭头 - 加速
           e.preventDefault();
           setPlaybackSpeed(prev => {
@@ -209,16 +220,18 @@ export function Timeline({
             return idx > 0 ? SPEED_OPTIONS[idx - 1] : prev;
           });
           break;
-        case 'Home': // Home 键 - 跳到开始
-          e.preventDefault();
-          setInternalTime(minTime);
-          onTimeChange(minTime);
-          break;
-        case 'End': // End 键 - 跳到结束
-          e.preventDefault();
-          setInternalTime(maxTime);
-          onTimeChange(maxTime);
-          break;
+         case 'Home': // Home 键 - 跳到开始
+           e.preventDefault();
+           setInternalTime(minTime);
+           internalTimeRef.current = minTime;
+           onTimeChange(minTime);
+           break;
+         case 'End': // End 键 - 跳到结束
+           e.preventDefault();
+           setInternalTime(maxTime);
+           internalTimeRef.current = maxTime;
+           onTimeChange(maxTime);
+           break;
       }
     };
 
@@ -226,39 +239,43 @@ export function Timeline({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [disabled, internalTime, minTime, maxTime, onTimeChange]);
 
-  // 播放/暂停按钮
-  const togglePlay = () => {
-    if (disabled) return;
-    
-    // 如果已经到达结尾，重新开始
-    if (internalTime >= maxTime) {
-      setInternalTime(minTime);
-      onTimeChange(minTime);
-    }
-    setIsPlaying(prev => !prev);
-  };
+   // 播放/暂停按钮
+   const togglePlay = () => {
+     if (disabled) return;
+     
+     // 如果已经到达结尾，重新开始
+     if (internalTime >= maxTime) {
+       setInternalTime(minTime);
+       internalTimeRef.current = minTime;
+       onTimeChange(minTime);
+     }
+     setIsPlaying(prev => !prev);
+   };
 
-  // 停止播放
-  const stop = () => {
-    setIsPlaying(false);
-    setInternalTime(minTime);
-    onTimeChange(minTime);
-  };
+   // 停止播放
+   const stop = () => {
+     setIsPlaying(false);
+     setInternalTime(minTime);
+     internalTimeRef.current = minTime;
+     onTimeChange(minTime);
+   };
 
-  // 跳转按钮
-  const skipBackward = () => {
-    if (disabled) return;
-    const newTime = Math.max(minTime, internalTime - 10);
-    setInternalTime(newTime);
-    onTimeChange(newTime);
-  };
+   // 跳转按钮
+   const skipBackward = () => {
+     if (disabled) return;
+     const newTime = Math.max(minTime, internalTime - 10);
+     setInternalTime(newTime);
+     internalTimeRef.current = newTime;
+     onTimeChange(newTime);
+   };
 
-  const skipForward = () => {
-    if (disabled) return;
-    const newTime = Math.min(maxTime, internalTime + 10);
-    setInternalTime(newTime);
-    onTimeChange(newTime);
-  };
+   const skipForward = () => {
+     if (disabled) return;
+     const newTime = Math.min(maxTime, internalTime + 10);
+     setInternalTime(newTime);
+     internalTimeRef.current = newTime;
+     onTimeChange(newTime);
+   };
 
   return (
     <div className="bg-dota-surface rounded-lg p-4">
