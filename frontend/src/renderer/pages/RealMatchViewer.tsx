@@ -8,7 +8,7 @@ import MapViewer from '../components/map/MapViewer';
 import { HeroPosition, Ward } from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
 import backendAPI, { Match, PlaybackTimeBasis, TickData, WardsResponse } from '../api/backend';
-import { getHeroByName } from '../data/heroes';
+import { getHeroByName, getHeroPortraitUrl } from '../data/heroes';
 import {
   createGameClockMapper,
   formatGameClockTime,
@@ -20,6 +20,118 @@ const PRE_GAME_FETCH_SECONDS = 180;
 const POST_GAME_FETCH_BUFFER_SECONDS = 600;
 const DEFAULT_DURATION = 3600;
 const DEFAULT_INITIAL_GAME_CLOCK_SECONDS = -90;
+const DEFAULT_HERO_PORTRAIT_URL = '/assets/dota/heroes/default.png';
+const TEAM_HERO_COUNT = 5;
+
+interface TeamHeroPortrait {
+  key: number;
+  heroName: string;
+  portraitUrl: string;
+  team: 'radiant' | 'dire';
+}
+
+interface TeamLineups {
+  radiant: TeamHeroPortrait[];
+  dire: TeamHeroPortrait[];
+}
+
+interface DeathInterval {
+  startSourceTime: number;
+  endSourceTime: number;
+}
+
+interface HudHeroStatus {
+  isAlive: boolean;
+  respawnRemainingSeconds?: number;
+}
+
+function extractTeamLineups(ticks: TickData[]): TeamLineups {
+  const radiantByHandle = new Map<number, TeamHeroPortrait>();
+  const direByHandle = new Map<number, TeamHeroPortrait>();
+
+  for (const tick of ticks) {
+    for (const hero of tick.heroes) {
+      const team = hero.team === 2 ? 'radiant' : hero.team === 3 ? 'dire' : null;
+      if (!team) {
+        continue;
+      }
+
+      const targetMap = team === 'radiant' ? radiantByHandle : direByHandle;
+      if (targetMap.has(hero.handle) || targetMap.size >= 5) {
+        continue;
+      }
+
+      const heroData = getHeroByName(hero.hero);
+      targetMap.set(hero.handle, {
+        key: hero.handle,
+        heroName: hero.hero,
+        portraitUrl: heroData ? getHeroPortraitUrl(heroData.id) : DEFAULT_HERO_PORTRAIT_URL,
+        team,
+      });
+    }
+
+    if (radiantByHandle.size >= 5 && direByHandle.size >= 5) {
+      break;
+    }
+  }
+
+  return {
+    radiant: Array.from(radiantByHandle.values()).slice(0, TEAM_HERO_COUNT),
+    dire: Array.from(direByHandle.values()).slice(0, TEAM_HERO_COUNT),
+  };
+}
+
+function buildDeathIntervalsByHandle(
+  ticks: TickData[],
+  mapper: Pick<GameClockMapper, 'getSourceTime'>
+): Map<number, DeathInterval[]> {
+  const intervalsByHandle = new Map<number, DeathInterval[]>();
+  const activeDeathStartByHandle = new Map<number, number>();
+  const lastAliveByHandle = new Map<number, boolean>();
+  const sortedTicks = [...ticks].sort((a, b) => mapper.getSourceTime(a) - mapper.getSourceTime(b));
+
+  for (const tick of sortedTicks) {
+    const sourceTime = mapper.getSourceTime(tick);
+    if (!Number.isFinite(sourceTime)) {
+      continue;
+    }
+
+    for (const hero of tick.heroes) {
+      const isAlive = (hero.hp ?? 0) > 0;
+      const hasLastAlive = lastAliveByHandle.has(hero.handle);
+      const lastAlive = lastAliveByHandle.get(hero.handle) ?? isAlive;
+
+      if (!hasLastAlive) {
+        lastAliveByHandle.set(hero.handle, isAlive);
+        if (!isAlive) {
+          activeDeathStartByHandle.set(hero.handle, sourceTime);
+        }
+        continue;
+      }
+
+      if (lastAlive && !isAlive) {
+        activeDeathStartByHandle.set(hero.handle, sourceTime);
+      }
+
+      if (!lastAlive && isAlive) {
+        const deathStart = activeDeathStartByHandle.get(hero.handle);
+        if (deathStart !== undefined && sourceTime > deathStart) {
+          const intervals = intervalsByHandle.get(hero.handle) ?? [];
+          intervals.push({
+            startSourceTime: deathStart,
+            endSourceTime: sourceTime,
+          });
+          intervalsByHandle.set(hero.handle, intervals);
+        }
+        activeDeathStartByHandle.delete(hero.handle);
+      }
+
+      lastAliveByHandle.set(hero.handle, isAlive);
+    }
+  }
+
+  return intervalsByHandle;
+}
 
 /** 线性插值函数 */
 function lerp(a: number, b: number, t: number): number {
@@ -51,10 +163,13 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const [timeBasisSource, setTimeBasisSource] = useState<'game_time' | 'fallback'>('fallback');
   const [timeBasisStrategy, setTimeBasisStrategy] = useState<GameClockMapper['strategy']>('fallback_pre_game_anchor');
   const [timeBasisOffsetSeconds, setTimeBasisOffsetSeconds] = useState(0);
+  const [teamLineups, setTeamLineups] = useState<TeamLineups>({ radiant: [], dire: [] });
+  const [hudHeroStatus, setHudHeroStatus] = useState<Record<number, HudHeroStatus>>({});
   
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
   const gameClockMapperRef = useRef<GameClockMapper>(createGameClockMapper([]));
+  const deathIntervalsRef = useRef<Map<number, DeathInterval[]>>(new Map());
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -92,8 +207,11 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     setTimeBasisSource('fallback');
     setTimeBasisStrategy('fallback_pre_game_anchor');
     setTimeBasisOffsetSeconds(0);
+    setTeamLineups({ radiant: [], dire: [] });
+    setHudHeroStatus({});
     allTicksRef.current = [];
     allWardsRef.current = null;
+    deathIntervalsRef.current = new Map();
     
     try {
       const matchDetail = await backendAPI.getMatchDetail(matchId);
@@ -108,6 +226,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       
       if (fullData?.ticks) {
         allTicksRef.current = fullData.ticks;
+        setTeamLineups(extractTeamLineups(fullData.ticks));
         console.log(`[RealMatchViewer] 已加载 ${fullData.ticks.length} 个 tick`);
       }
       
@@ -135,6 +254,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       ];
       const mapper = createGameClockMapper(mapperRecords, timeBasis);
       gameClockMapperRef.current = mapper;
+      deathIntervalsRef.current = buildDeathIntervalsByHandle(allTicksRef.current, mapper);
       setTimeBasisSource(mapper.timeBasisSource);
       setTimeBasisStrategy(mapper.strategy);
       setTimeBasisOffsetSeconds(mapper.offsetSeconds);
@@ -320,7 +440,36 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       
       setWards(activeWards);
     }
-  }, [findTicksForInterpolation]);
+
+    const currentGameClock = mapper.sourceToGameClock(time);
+    const lineupHeroes = [...teamLineups.radiant, ...teamLineups.dire];
+    const nextHudStatus: Record<number, HudHeroStatus> = {};
+    for (const hero of lineupHeroes) {
+      const intervals = deathIntervalsRef.current.get(hero.key) ?? [];
+      const activeDeath = intervals.find(
+        (interval) => time >= interval.startSourceTime && time < interval.endSourceTime
+      );
+
+      if (!activeDeath) {
+        nextHudStatus[hero.key] = { isAlive: true };
+        continue;
+      }
+
+      const respawnGameClock = mapper.sourceToGameClock(activeDeath.endSourceTime);
+      nextHudStatus[hero.key] = {
+        isAlive: false,
+        respawnRemainingSeconds: Math.max(0, Math.ceil(respawnGameClock - currentGameClock)),
+      };
+    }
+    setHudHeroStatus(nextHudStatus);
+  }, [findTicksForInterpolation, teamLineups]);
+
+  useEffect(() => {
+    if (teamLineups.radiant.length === 0 && teamLineups.dire.length === 0) {
+      return;
+    }
+    updateDisplayForTime(currentTime);
+  }, [teamLineups, updateDisplayForTime]);
 
   const handleTimeChange = useCallback((newTime: number) => {
     setCurrentTime(newTime);
@@ -330,6 +479,60 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const formatTimeDisplay = (seconds: number): string => {
     const gameClockTime = gameClockMapperRef.current.sourceToGameClock(seconds);
     return formatGameClockTime(gameClockTime);
+  };
+
+  const getHeroLabel = (heroName: string, fallbackKey: number): string => {
+    const heroData = getHeroByName(heroName || '');
+    return heroData?.chineseName || heroName?.replace('npc_dota_hero_', '') || `英雄 ${fallbackKey}`;
+  };
+
+  const renderTeamPortraitStrip = (heroes: TeamHeroPortrait[], team: 'radiant' | 'dire') => {
+    const slots = Array.from({ length: TEAM_HERO_COUNT }, (_, index) => heroes[index] ?? null);
+
+    return (
+      <div className="pb-1">
+        <div className={`grid grid-cols-5 gap-1.5 ${team === 'dire' ? 'ml-auto' : ''}`}>
+          {slots.map((hero, index) => {
+            if (!hero) {
+              return (
+                <div
+                  key={`${team}-empty-${index}`}
+                  className="aspect-[16/9] rounded-md border border-gray-700/80 bg-slate-900/70"
+                />
+              );
+            }
+
+            const heroLabel = getHeroLabel(hero.heroName, hero.key);
+            const teamBorderClass = team === 'radiant' ? 'border-emerald-500/70' : 'border-rose-500/70';
+            const heroStatus = hudHeroStatus[hero.key];
+            const isDead = heroStatus ? !heroStatus.isAlive : false;
+
+            return (
+              <div
+                key={hero.key}
+                className="relative pt-2"
+                title={heroLabel}
+              >
+                {isDead && typeof heroStatus?.respawnRemainingSeconds === 'number' && (
+                  <span className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded-full border border-amber-300/65 bg-slate-900/95 px-2 py-[1px] text-[10px] font-semibold text-amber-200 shadow-sm">
+                    {heroStatus.respawnRemainingSeconds}s
+                  </span>
+                )}
+                <div className={`aspect-[16/9] overflow-hidden rounded-md border bg-slate-950/90 shadow-sm ${teamBorderClass}`}>
+                  <img
+                    src={hero.portraitUrl}
+                    alt={heroLabel}
+                    className={`h-full w-full object-contain transition duration-200 ${
+                      isDead ? 'grayscale brightness-75' : 'grayscale-0 brightness-100'
+                    }`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -498,20 +701,44 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                 </div>
               </div>
 
-              {selectedMatch ? (
-                <MapViewer
-                  key={showCalibration ? 'calibration' : 'normal'}
-                  width={900}
-                  height={900}
-                  heroPositions={heroPositions}
-                  wards={wards}
-                  showCalibrationMarkers={showCalibration}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-96 bg-dota-bg rounded">
-                  <p className="text-gray-400">选择一场比赛以查看地图</p>
+              <div className="mx-auto w-full max-w-[900px]">
+                <div className="mb-4 rounded-lg border border-slate-700/80 bg-gradient-to-b from-slate-900/85 to-slate-950/75 px-3 py-3">
+                  <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+                    <div className="min-w-0">{renderTeamPortraitStrip(teamLineups.radiant, 'radiant')}</div>
+
+                    <div className="mx-auto">
+                      <div className="relative overflow-hidden rounded-xl border border-slate-400/25 bg-gradient-to-b from-slate-700/55 to-slate-900/80 px-4 py-2 shadow-[0_0_0_1px_rgba(148,163,184,0.14),0_8px_24px_rgba(2,6,23,0.5)]">
+                        <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-white/10" />
+                        <p className="text-center text-[10px] uppercase tracking-[0.22em] text-slate-300/75">
+                          GAME TIME
+                        </p>
+                        <p className="text-center font-mono text-lg font-semibold tracking-[0.1em] text-slate-100 tabular-nums">
+                          {formatTimeDisplay(currentTime)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="min-w-0">{renderTeamPortraitStrip(teamLineups.dire, 'dire')}</div>
+                  </div>
                 </div>
-              )}
+
+                {selectedMatch ? (
+                  <div className="flex justify-center">
+                    <MapViewer
+                      key={showCalibration ? 'calibration' : 'normal'}
+                      width={900}
+                      height={900}
+                      heroPositions={heroPositions}
+                      wards={wards}
+                      showCalibrationMarkers={showCalibration}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-96 bg-dota-bg rounded">
+                    <p className="text-gray-400">选择一场比赛以查看地图</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {selectedMatch && (
@@ -523,6 +750,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                 isLoading={loading}
                 disabled={!selectedMatch || matches.length === 0}
                 formatTime={formatTimeDisplay}
+                showTimeDisplay={false}
               />
             )}
           </div>

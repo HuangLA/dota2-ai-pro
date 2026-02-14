@@ -15,7 +15,7 @@ from analyzers.path_analyzer import PathAnalyzer
 router = APIRouter()
 
 # Initialize storage and analyzers
-storage = ParquetStorage("data/matches")
+storage = ParquetStorage("backend/data/matches")
 heatmap_analyzer = HeatmapAnalyzer(storage)
 path_analyzer = PathAnalyzer(storage)
 

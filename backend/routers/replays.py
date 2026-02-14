@@ -14,7 +14,7 @@ router = APIRouter()
 
 # Initialize parse service
 parse_service = ParseService(
-    data_dir="data/matches",
+    data_dir="backend/data/matches",
     replays_dir="data/replays"
 )
 

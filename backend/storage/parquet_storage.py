@@ -5,7 +5,7 @@ This module handles storing and retrieving high-frequency replay data
 (positions, events) using Parquet format for efficient storage and querying.
 
 Storage structure:
-    data/matches/{match_id}/
+    backend/data/matches/{match_id}/
         ├── positions.parquet     # Hero position samples
         ├── kills.parquet         # Kill events
         ├── wards.parquet         # Ward placement/destruction
@@ -28,7 +28,7 @@ class ParquetStorage:
     Handles Parquet file storage for replay data.
     
     Usage:
-        storage = ParquetStorage("data/matches")
+        storage = ParquetStorage("backend/data/matches")
         storage.save_parse_result(parse_result)
         
         # Query later
@@ -36,7 +36,7 @@ class ParquetStorage:
         kills_df = storage.get_kills(match_id)
     """
     
-    def __init__(self, base_path: str = "data/matches"):
+    def __init__(self, base_path: str = "backend/data/matches"):
         """
         Initialize Parquet storage.
         

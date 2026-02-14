@@ -488,6 +488,12 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-14 | **修复 replay match_id 与 pause-aware game_time**: `SimpleDemoParser` 元数据改为优先 `fileInfo.match_id`（保留 gamerules 值用于调试），采样时优先 `m_fGameTime - m_flGameStartTime` 并统一 positions/wards 时基；重建 shadowJar 并重解析 8674716612/8676017978 验证通过 | OpenCode |
 | 2026-02-14 | **后端下沉时间轴校正策略**: playback `time_basis` 新增 `offset_seconds/clock_zero_source`，并统一 `ticks/wards` 偏移计算优先级（metadata -> 样本推导 -> fallback） | OpenCode |
 | 2026-02-14 | **时间口径定稿**: 回放查看器统一采用“标准(-1:30起点)”显示口径，移除“原始解析时间”切换；后端保留原始 `game_time` 不做整体平移 | OpenCode |
+| 2026-02-14 | **RealMatchViewer 顶部阵容条**: 新增天辉/夜魇 5 英雄大头像 + 中间当前游戏时间；Timeline 支持隐藏时间显示并在回放页关闭“当前/总时长” | OpenCode |
+| 2026-02-14 | **优化 RealMatchViewer 阵容条视觉**: 头像改为 16:9 卡片 + `object-contain` 完整显示，移动端/桌面 5v5 稳定布局，中间时间改为徽章式精致样式 | OpenCode |
+| 2026-02-14 | **去除 HUD 阵容条横向滚动**: 阵容条改为自适应 5 列网格并略缩头像卡片间距，确保无需滑动即可看到双方全部头像 | OpenCode |
+| 2026-02-14 | **调整 HUD 与地图居中关系**: 为阵容条与地图增加同一 `max-width` 容器并统一水平居中，保证地图相对上方 HUD 视觉居中 | OpenCode |
+| 2026-02-14 | **修正 HUD/地图左偏对齐**: 容器宽度精确收敛到 900 并为 MapViewer 增加 `justify-center` 包裹，确保地图相对 HUD 真正水平居中 | OpenCode |
+| 2026-02-14 | **新增 HUD 阵亡态与复活倒计时**: 英雄阵亡时头像灰度化显示，并在头像上方展示按游戏时钟计算的复活秒数，复活后自动恢复彩色 | OpenCode |
 
 ---
 

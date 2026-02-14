@@ -13,7 +13,7 @@ router = APIRouter()
 
 # Initialize storage
 match_storage = MatchStorage()
-parquet_storage = ParquetStorage("data/matches")
+parquet_storage = ParquetStorage("backend/data/matches")
 
 
 # =========== Models ===========

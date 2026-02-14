@@ -62,7 +62,7 @@ class ParseService:
     
     def __init__(
         self,
-        data_dir: str = "data/matches",
+        data_dir: str = "backend/data/matches",
         replays_dir: str = "data/replays"
     ):
         """

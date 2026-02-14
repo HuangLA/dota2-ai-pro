@@ -26,7 +26,7 @@ def test_path_extraction():
     print("=" * 60)
     
     # Initialize
-    storage = ParquetStorage("data/matches")
+    storage = ParquetStorage("backend/data/matches")
     analyzer = PathAnalyzer(storage)
     
     # Get available matches

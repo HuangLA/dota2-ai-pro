@@ -51,7 +51,7 @@ def test_parquet_storage():
     print(f"     Wards: {len(result.wards)}")
     
     # Test storage
-    storage = ParquetStorage("data/matches")
+    storage = ParquetStorage("backend/data/matches")
     
     print("\nSaving to Parquet...")
     start = time.time()

@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Ensure data directories exist
     data_dirs = [
-        os.getenv("MATCHES_DIR", "data/matches"),
+        os.getenv("MATCHES_DIR", "backend/data/matches"),
         os.getenv("REPLAYS_DIR", "data/replays"),
         "data/logs",
     ]

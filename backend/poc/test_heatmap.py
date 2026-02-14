@@ -22,7 +22,7 @@ def test_heatmap_performance():
     print("=" * 60)
     
     # Initialize
-    storage = ParquetStorage("data/matches")
+    storage = ParquetStorage("backend/data/matches")
     analyzer = HeatmapAnalyzer(storage)
     
     # Get available matches

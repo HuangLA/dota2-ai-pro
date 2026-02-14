@@ -12,7 +12,7 @@ from storage.match_storage import MatchStorage
 router = APIRouter()
 
 # Initialize storage
-parquet_storage = ParquetStorage("data/matches")
+parquet_storage = ParquetStorage("backend/data/matches")
 match_storage = MatchStorage()
 
 

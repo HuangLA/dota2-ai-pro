@@ -20,6 +20,8 @@ export interface TimelineProps {
   disabled?: boolean;
   /** 时间显示格式化 */
   formatTime?: (seconds: number) => string;
+  /** 是否显示中间时间（当前/总时长） */
+  showTimeDisplay?: boolean;
 }
 
 /** 播放速度选项 */
@@ -43,6 +45,7 @@ export function Timeline({
   isLoading = false,
   disabled = false,
   formatTime: formatTimeProp,
+  showTimeDisplay = true,
 }: TimelineProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -371,15 +374,17 @@ export function Timeline({
         </div>
 
         {/* 中间：时间显示 */}
-        <div className="flex items-center gap-2 text-sm font-mono">
-          <span className="text-white min-w-[60px] text-right">
-            {formatLabel(displayTime)}
-          </span>
-          <span className="text-gray-500">/</span>
-          <span className="text-gray-400 min-w-[60px]">
-            {formatLabel(maxTime)}
-          </span>
-        </div>
+        {showTimeDisplay && (
+          <div className="flex items-center gap-2 text-sm font-mono">
+            <span className="text-white min-w-[60px] text-right">
+              {formatLabel(displayTime)}
+            </span>
+            <span className="text-gray-500">/</span>
+            <span className="text-gray-400 min-w-[60px]">
+              {formatLabel(maxTime)}
+            </span>
+          </div>
+        )}
 
         {/* 右侧：速度控制 */}
         <div className="flex items-center gap-2">

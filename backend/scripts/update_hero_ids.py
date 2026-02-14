@@ -29,7 +29,7 @@ def update_hero_ids():
     
     print(f"Found {len(matches)} matches to update")
     
-    parquet_storage = ParquetStorage("data/matches")
+    parquet_storage = ParquetStorage("backend/data/matches")
     
     for match_row in matches:
         match_id = match_row["match_id"]

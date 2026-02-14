@@ -3,7 +3,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 for match_id in [84782020, 86083386]:
-    path = f'data/matches/{match_id}/kills.parquet'
+    path = f'backend/data/matches/{match_id}/kills.parquet'
     try:
         df = pq.read_table(path).to_pandas()
         print(f'Match {match_id}: {len(df)} kills')
