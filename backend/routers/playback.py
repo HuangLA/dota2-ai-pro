@@ -1,6 +1,7 @@
 """Playback data endpoints for map rendering."""
 
-from typing import Optional
+import math
+from typing import Optional, cast
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
@@ -25,6 +26,141 @@ def tick_to_seconds(tick: int, ticks_per_second: int = 30) -> float:
 def seconds_to_tick(seconds: float, ticks_per_second: int = 30) -> int:
     """Convert game time in seconds to tick number."""
     return int(seconds * ticks_per_second)
+
+
+def resolve_game_time(row: pd.Series, tick: int) -> float:
+    """Resolve stable game_time, falling back to tick-based time for legacy data."""
+    if "game_time" in row.index and pd.notna(row["game_time"]):
+        return float(row["game_time"])
+    return tick_to_seconds(tick)
+
+
+def _coerce_float(value: object) -> Optional[float]:
+    """Safely coerce values to float."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        numeric_value = float(value)
+        if math.isnan(numeric_value):
+            return None
+        return numeric_value
+    if isinstance(value, str):
+        try:
+            numeric_value = float(value)
+            if math.isnan(numeric_value):
+                return None
+            return numeric_value
+        except ValueError:
+            return None
+    return None
+
+
+def infer_offset_seconds_from_samples(df: pd.DataFrame) -> Optional[float]:
+    """Infer source->game clock offset from first usable sample."""
+    if df.empty or "game_time" not in df.columns:
+        return None
+
+    valid_rows = df[df["game_time"].notna()]
+    if valid_rows.empty:
+        return None
+
+    if "tick" in valid_rows.columns:
+        valid_rows = valid_rows.sort_values("tick")
+    elif "time" in valid_rows.columns:
+        valid_rows = valid_rows.sort_values("time")
+
+    for _, row in valid_rows.iterrows():
+        game_time = _coerce_float(row.get("game_time"))
+        if game_time is None:
+            continue
+
+        source_time = _coerce_float(row.get("time"))
+        if source_time is None:
+            tick_value = _coerce_float(row.get("tick"))
+            if tick_value is not None:
+                source_time = tick_to_seconds(int(tick_value))
+        if source_time is None:
+            continue
+
+        return source_time - game_time
+
+    return None
+
+
+def has_non_null_game_time(df: pd.DataFrame) -> bool:
+    """Check whether DataFrame carries at least one non-null game_time sample."""
+    return bool(not df.empty and "game_time" in df.columns and df["game_time"].notna().any())
+
+
+def resolve_offset_seconds(
+    metadata: Optional[dict],
+    primary_df: pd.DataFrame,
+    fallback_df: Optional[pd.DataFrame] = None,
+) -> tuple[float, str]:
+    """Resolve offset_seconds and source with unified priority rules."""
+    metadata = metadata or {}
+
+    metadata_offset = _coerce_float(metadata.get("game_start_time"))
+    if metadata_offset is not None:
+        metadata_source = metadata.get("clock_zero_source")
+        if isinstance(metadata_source, str) and metadata_source.strip():
+            return metadata_offset, metadata_source
+        return metadata_offset, "metadata"
+
+    inferred_offset = infer_offset_seconds_from_samples(primary_df)
+    if inferred_offset is not None:
+        return inferred_offset, "sample_inference"
+
+    if fallback_df is not None:
+        inferred_offset = infer_offset_seconds_from_samples(fallback_df)
+        if inferred_offset is not None:
+            return inferred_offset, "sample_inference"
+
+    return 0.0, "fallback"
+
+
+def build_time_basis(
+    metadata: Optional[dict],
+    has_game_time: bool,
+    offset_seconds: float,
+    clock_zero_source: str,
+) -> dict:
+    """Build response-level time mapping metadata.
+
+    Frontend should trust offset_seconds directly:
+    game_time = time - offset_seconds.
+    """
+    metadata = metadata or {}
+    ticks_per_second = metadata.get("ticks_per_second") or 30
+    contract_version = metadata.get("time_contract_version")
+    game_start_time = metadata.get("game_start_time")
+    time_mapping = metadata.get("time_mapping")
+
+    stable_game_start_time = _coerce_float(game_start_time)
+    if stable_game_start_time is None:
+        stable_game_start_time = offset_seconds
+
+    if contract_version:
+        basis = "game_time" if has_game_time else "tick_fallback"
+        return {
+            "basis": basis,
+            "contract_version": contract_version,
+            "ticks_per_second": ticks_per_second,
+            "game_start_time": stable_game_start_time,
+            "offset_seconds": offset_seconds,
+            "clock_zero_source": clock_zero_source,
+            "mapping": time_mapping or "game_time = m_fGameTime - m_flGameStartTime",
+        }
+
+    return {
+        "basis": "tick_fallback",
+        "contract_version": "legacy",
+        "ticks_per_second": ticks_per_second,
+        "game_start_time": stable_game_start_time,
+        "offset_seconds": offset_seconds,
+        "clock_zero_source": clock_zero_source,
+        "mapping": "game_time unavailable; use time = tick / ticks_per_second",
+    }
 
 
 # =========== Endpoints ===========
@@ -68,12 +204,27 @@ async def get_ticks(
     end_tick = seconds_to_tick(end_time) if end_time else None
     
     # Get positions from Parquet
+    meta = parquet_storage.get_metadata(match_id)
     df = parquet_storage.get_positions(
         match_id,
         start_tick=start_tick,
         end_tick=end_tick,
         hero=hero,
         team=team
+    )
+
+    fallback_wards_df: Optional[pd.DataFrame] = None
+    has_game_time = has_non_null_game_time(df)
+    if _coerce_float((meta or {}).get("game_start_time")) is None or not has_game_time:
+        fallback_wards_df = parquet_storage.get_wards(match_id)
+        has_game_time = has_game_time or has_non_null_game_time(fallback_wards_df)
+
+    offset_seconds, clock_zero_source = resolve_offset_seconds(meta, df, fallback_wards_df)
+    time_basis = build_time_basis(
+        meta,
+        has_game_time,
+        offset_seconds,
+        clock_zero_source,
     )
     
     if df.empty:
@@ -83,7 +234,8 @@ async def get_ticks(
             "end_time": end_time,
             "interval": interval,
             "ticks": [],
-            "total_samples": 0
+            "total_samples": 0,
+            "time_basis": time_basis,
         }
     
     # Apply interval sampling if needed
@@ -96,9 +248,12 @@ async def get_ticks(
     # Group by tick and format response
     ticks_data = []
     for tick, group in df.groupby("tick"):
+        tick_int = int(cast(int, tick))
+        first_row = group.iloc[0]
         tick_entry = {
-            "tick": int(tick),
-            "time": tick_to_seconds(tick),
+            "tick": tick_int,
+            "time": tick_to_seconds(tick_int),
+            "game_time": resolve_game_time(first_row, tick_int),
             "heroes": []
         }
         
@@ -137,7 +292,8 @@ async def get_ticks(
         "end_time": end_time,
         "interval": interval,
         "ticks": ticks_data,
-        "total_samples": len(ticks_data)
+        "total_samples": len(ticks_data),
+        "time_basis": time_basis,
     }
 
 
@@ -236,13 +392,29 @@ async def get_wards(
         )
     
     # Get wards from Parquet
+    meta = parquet_storage.get_metadata(match_id)
     wards_df = parquet_storage.get_wards(match_id, ward_type=ward_type, team=team)
+
+    fallback_positions_df: Optional[pd.DataFrame] = None
+    has_game_time = has_non_null_game_time(wards_df)
+    if _coerce_float((meta or {}).get("game_start_time")) is None or not has_game_time:
+        fallback_positions_df = parquet_storage.get_positions(match_id)
+        has_game_time = has_game_time or has_non_null_game_time(fallback_positions_df)
+
+    offset_seconds, clock_zero_source = resolve_offset_seconds(meta, wards_df, fallback_positions_df)
+    time_basis = build_time_basis(
+        meta,
+        has_game_time,
+        offset_seconds,
+        clock_zero_source,
+    )
     
     wards = []
     
     if not wards_df.empty:
         for _, row in wards_df.iterrows():
             ward_tick = row["tick"]
+            ward_tick_int = int(cast(int, ward_tick))
             
             # Apply tick filters
             if start_tick is not None and ward_tick < start_tick:
@@ -253,8 +425,9 @@ async def get_wards(
             ward = {
                 "type": row["type"],  # "placed" or "destroyed"
                 "ward_type": row["ward_type"],  # "observer" or "sentry"
-                "tick": int(ward_tick),
-                "time": tick_to_seconds(ward_tick),
+                "tick": ward_tick_int,
+                "time": tick_to_seconds(ward_tick_int),
+                "game_time": resolve_game_time(row, ward_tick_int),
                 "handle": int(row["handle"]),
             }
             
@@ -279,6 +452,7 @@ async def get_wards(
     return {
         "match_id": match_id,
         "wards": wards,
+        "time_basis": time_basis,
         "summary": {
             "total": len(wards),
             "placed": len(placed),

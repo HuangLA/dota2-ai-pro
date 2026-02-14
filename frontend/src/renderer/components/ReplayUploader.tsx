@@ -16,6 +16,9 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [tasks, setTasks] = useState<ParseTask[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [clearedAtMs, setClearedAtMs] = useState<number>(Date.now());
+  const [dismissedCompletedTaskIds, setDismissedCompletedTaskIds] = useState<Set<string>>(new Set());
+  const [isClearAllConfirming, setIsClearAllConfirming] = useState(false);
   
   // Track previous statuses to trigger onTaskCompleted
   const prevTaskStatusesRef = useRef<Record<string, TaskStatus>>({});
@@ -32,7 +35,10 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
     try {
       // Get recent tasks, maybe limit to 5 or 10
       const response = await replayService.getParseTasks(5, 0);
-      const newTasks = response.tasks;
+      const newTasks = response.tasks.filter((task) => {
+        const createdAtMs = task.created_at > 1e10 ? task.created_at : task.created_at * 1000;
+        return createdAtMs >= clearedAtMs;
+      });
       
       // Check for completions
       let shouldTriggerCompletion = false;
@@ -50,7 +56,11 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
       });
       
       prevTaskStatusesRef.current = currentStatuses;
-      setTasks(newTasks);
+      setTasks(
+        newTasks.filter(
+          (task) => !(task.status === 'completed' && dismissedCompletedTaskIds.has(task.task_id))
+        )
+      );
       
       if (shouldTriggerCompletion && onTaskCompletedRef.current) {
         onTaskCompletedRef.current();
@@ -59,14 +69,46 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
     } catch (err) {
       console.error('Failed to fetch tasks', err);
     }
-  }, []);
+  }, [clearedAtMs, dismissedCompletedTaskIds]);
 
   // Initial fetch and polling
   useEffect(() => {
+    setTasks([]);
+    prevTaskStatusesRef.current = {};
+
     fetchTasks();
     const interval = setInterval(fetchTasks, 2000);
     return () => clearInterval(interval);
   }, [fetchTasks]);
+
+  const clearAllTasks = () => {
+    setTasks([]);
+    setDismissedCompletedTaskIds(new Set());
+    setClearedAtMs(Date.now());
+    prevTaskStatusesRef.current = {};
+    setIsClearAllConfirming(false);
+  };
+
+  const handleClearAllClick = () => {
+    if (isClearAllConfirming) {
+      clearAllTasks();
+      return;
+    }
+    setIsClearAllConfirming(true);
+  };
+
+  const handleCancelClearAll = () => {
+    setIsClearAllConfirming(false);
+  };
+
+  const deleteCompletedTask = (taskId: string) => {
+    setDismissedCompletedTaskIds((prev) => {
+      const next = new Set(prev);
+      next.add(taskId);
+      return next;
+    });
+    setTasks((prev) => prev.filter((task) => task.task_id !== taskId));
+  };
 
   // Handle file upload
   const handleUpload = async (file: File) => {
@@ -188,13 +230,38 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
             <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">
                最近解析任务
             </h3>
-            <span className="text-xs text-gray-500">
-               {tasks.filter(t => t.status === 'running').length} 运行中, {tasks.filter(t => t.status === 'completed').length} 已完成
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">
+                 {tasks.filter(t => t.status === 'running').length} 运行中, {tasks.filter(t => t.status === 'completed').length} 已完成
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClearAllClick}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded border transition-colors",
+                    isClearAllConfirming
+                      ? "border-red-700 text-red-300 bg-red-900/20 hover:bg-red-900/35"
+                      : "border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-white/5"
+                  )}
+                >
+                  {isClearAllConfirming ? '确认清空' : '清空全部'}
+                </button>
+                {isClearAllConfirming && (
+                  <button
+                    type="button"
+                    onClick={handleCancelClearAll}
+                    className="text-xs px-3 py-1.5 rounded border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 hover:bg-white/5 transition-colors"
+                  >
+                    取消
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
           <div className="bg-dota-surface rounded-lg border border-gray-700 divide-y divide-gray-800 shadow-lg">
             {tasks.map((task) => (
-              <TaskItem key={task.task_id} task={task} />
+              <TaskItem key={task.task_id} task={task} onDeleteCompleted={deleteCompletedTask} />
             ))}
           </div>
         </div>
@@ -203,7 +270,7 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
   );
 }
 
-function TaskItem({ task }: { task: ParseTask }) {
+function TaskItem({ task, onDeleteCompleted }: { task: ParseTask; onDeleteCompleted: (taskId: string) => void }) {
    const fileName = task.replay_path.split(/[/\\]/).pop(); // Handle both forward and back slashes
    
    // 后端返回 0.0~1.0 的进度值，需要转换为百分比
@@ -243,7 +310,20 @@ function TaskItem({ task }: { task: ParseTask }) {
       </div>
       
       <div className="ml-4">
-        <StatusBadge status={task.status} />
+        {task.status === 'completed' ? (
+          <button
+            type="button"
+            onClick={() => onDeleteCompleted(task.task_id)}
+            className="group relative text-xs font-semibold px-3 py-1.5 rounded border uppercase tracking-wide bg-green-900/50 text-green-400 border-green-700 hover:bg-red-900/50 hover:text-red-300 hover:border-red-600 transition-colors"
+            aria-label="删除任务"
+            title="删除任务"
+          >
+            <span className="group-hover:hidden">已完成</span>
+            <span className="hidden group-hover:inline">删除</span>
+          </button>
+        ) : (
+          <StatusBadge status={task.status} />
+        )}
       </div>
     </div>
   );

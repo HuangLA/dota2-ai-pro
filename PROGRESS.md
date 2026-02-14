@@ -10,17 +10,56 @@
 | 字段 | 值 |
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
-| 当前阶段 | Phase 3 - MVP 功能开发 🚀 |
-| 最后更新 | 2026-02-06 |
-| 更新者 | AI Assistant (Claude - Frontend) |
+| 当前阶段 | Phase 4 - 数据化回放与职业战队数据库 🚀 |
+| 最后更新 | 2026-02-12 |
+| 更新者 | OpenCode (Orchestrator) |
+
+---
+
+## 快速导航 (Read This First)
+
+### 当前执行基线（优先阅读）
+1. **当前冲刺 (Current Sprint)**：查看 Phase 4 目标与 PH4-1 ~ PH4-7
+2. **下一步计划 (Phase 3 -> Phase 4)**：查看 Phase 4 里程碑和执行顺序
+3. **API 实现状态**：确认当前可调用端点与 Stub 缺口
+
+### 历史内容说明（保留原文，不删除）
+- 文档中仍保留了 Phase 3 时期的任务表、路线图和前端 TODO，作为历史追溯依据。
+- 当历史内容与 Phase 4 计划冲突时，以 `当前冲刺` + `Phase 4 里程碑` 为准。
 
 ---
 
 ## 当前冲刺 (Current Sprint)
 
-### 目标: MVP 核心功能开发
-**截止日期**: 2026-02-06  
+### 目标: Phase 4 核心能力落地（比赛数据库 + 录像下载 + 实时HUD）
+**截止日期**: 2026-02-28  
 **状态**: `IN_PROGRESS` 🚀
+
+| ID | 任务 | 负责方 | 状态 | 备注 |
+|----|------|--------|------|------|
+| PH4-1 | 接入 OpenDota 数据同步（近期比赛/战队/赛事） | Backend | `TODO` | 新增 opendota_service + sync_service |
+| PH4-2 | 完善比赛数据库（Team/Tournament/Match 扩展模型） | Backend | `TODO` | 支持按战队/赛事/时间查询 |
+| PH4-3 | 录像下载系统（按比赛ID + 查询结果下载） | Backend | `TODO` | 任务状态追踪 + 失败重试 |
+| PH4-4 | 前端比赛数据库页面（筛选/分页/跳转） | Frontend | `TODO` | MatchDatabasePage |
+| PH4-5 | 战队归档页（示例：XG 赛事战绩） | Frontend | `TODO` | TeamProfilePage |
+| PH4-6 | 回放实时 HUD（等级/装备/KDA/GPM/XPM/净资产） | Both | `TODO` | 新增 playback HUD API + UI 面板 |
+| PH4-7 | 经济差/经验差实时曲线图 | Both | `TODO` | Gold/XP Advantage 与 Timeline 联动 |
+
+### Option2 执行看板：回放解析重构（进行中）
+**目标**: 以最小风险方式重构解析链路，统一时间契约并为 HUD/曲线扩展铺路。  
+**状态**: `IN_PROGRESS`
+
+| ID | 任务 | 负责方 | 状态 | 验收标准 |
+|----|------|--------|------|----------|
+| RP2-1 | 统一时间契约（parser -> parquet -> playback） | Backend | `DONE` | `ticks/wards` 返回 `game_time` + `time_basis`，语义明确 |
+| RP2-2 | 修复 game_time 计算基准 | Backend | `DONE` | 两场样本 `game_time` 非空且包含负时间，开局样本递增 |
+| RP2-3 | 前端时间轴对齐时间契约 | Frontend | `IN_PROGRESS` | Timeline 以 `game_time` 为主；fallback 有可见提示 |
+| RP2-4 | 时间轴回归测试（2 场比赛） | Both | `TODO` | 86083386/84782020 验证出兵前负时间、出兵 0:00 对齐 |
+| RP2-5 | 事件与 HUD 扩展字段设计 | Both | `TODO` | 明确 kills/networth/gold/xp 的统一时基与字段契约 |
+| RP2-6 | 参考 OpenDota 处理链拆分解析模块 | Backend | `TODO` | 形成 processor 分层（时间层/事件层/统计层）设计草案 |
+
+### 上一冲刺: Phase 3 MVP 核心功能开发 ✅
+**状态**: `DONE` - 核心链路已打通
 
 | ID | 任务 | 负责方 | 状态 | 备注 |
 |----|------|--------|------|------|
@@ -223,7 +262,7 @@
 ## API 实现状态
 
 > **契约文档**: `docs/api_specification.md`  
-> **总计**: 43 个端点 | **已实现**: 15 个 (Stub)
+> **总计**: 43 个端点（历史统计）| **状态**: Phase 4 进行中，端点总数待按新需求重估
 
 ### 录像管理 API ✅ IMPLEMENTED
 | 端点 | 方法 | 后端 | 前端调用 | MVP |
@@ -437,6 +476,18 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-11 | **按指定形状替换眼位图标**: 新增 observer/sentry SVG 资源并接入渲染管线 | OpenCode |
 | 2026-02-11 | **优化眼位可视性**: 增加小地图暗化遮罩与眼位柔和辉光，提升红绿图标在复杂背景下辨识度 | OpenCode |
 | 2026-02-11 | **微调眼位辉光质感**: 改为单层模糊光晕，移除明显分层效果 | OpenCode |
+| 2026-02-12 | **更新项目阶段到 Phase 4**: 纳入比赛数据库、OpenDota 同步、录像下载与实时 HUD/优势曲线需求 | OpenCode |
+| 2026-02-14 | **修复回放时间轴基准**: 统一 game clock 映射（支持负时间显示、0:00 对齐、Timeline/拖动/播放/事件过滤一致） | OpenCode |
+| 2026-02-14 | **前端时间轴映射策略增强**: 优先使用 `game_time`，缺失时回退为“首个 source 时间=-1:30”锚点，保持 Timeline 与事件过滤一致 | OpenCode |
+| 2026-02-14 | **ReplayUploader 清空交互增加二次确认**: 首次点击进入确认态，二次点击才执行清空，并提供取消按钮 | OpenCode |
+| 2026-02-14 | **阶段重构(选项2)-Phase1 启动**: 解析器新增时间契约字段(`time_contract_version`,`game_start_time`)，playback 顶层新增 `time_basis`，并重新解析 84782020/86083386 验证 `game_time` 含负值 | OpenCode |
+| 2026-02-14 | **前端第一阶段落地**: playback `time_basis` 类型对齐 + RealMatchViewer 基于 `game_time`/`time_basis` 映射 + 回退模式 badge 与状态面板可观测性 | OpenCode |
+| 2026-02-14 | **修复解析器 game_time 采样基准**: `SimpleDemoParser` 改为优先 `tick/30 - m_flGameStartTime`（不依赖 `m_fGameTime` 连续更新），并重建 shadowJar + 重解析 84782020/86083386 验证负时间与递增样本 | OpenCode |
+| 2026-02-14 | **二次校准时间轴偏移**: 修复 parser 的 64 位 match_id 保留并切换前端预游戏归一化（将异常早于 -95s 的起始样本校正到 -90s 附近），缓解不同录像的 +10s/+20s 显示偏移 | OpenCode |
+| 2026-02-14 | **修复早期样本时间回填**: `SimpleDemoParser` 在首次读到 `m_flGameStartTime` 后回填已采样 `positions/wards` 的 `game_time`，避免前段正时间与后段负时间混用；重建 shadowJar 并复验 84782020/86083386 首段为负且递增 | OpenCode |
+| 2026-02-14 | **修复 replay match_id 与 pause-aware game_time**: `SimpleDemoParser` 元数据改为优先 `fileInfo.match_id`（保留 gamerules 值用于调试），采样时优先 `m_fGameTime - m_flGameStartTime` 并统一 positions/wards 时基；重建 shadowJar 并重解析 8674716612/8676017978 验证通过 | OpenCode |
+| 2026-02-14 | **后端下沉时间轴校正策略**: playback `time_basis` 新增 `offset_seconds/clock_zero_source`，并统一 `ticks/wards` 偏移计算优先级（metadata -> 样本推导 -> fallback） | OpenCode |
+| 2026-02-14 | **时间口径定稿**: 回放查看器统一采用“标准(-1:30起点)”显示口径，移除“原始解析时间”切换；后端保留原始 `game_time` 不做整体平移 | OpenCode |
 
 ---
 
@@ -446,7 +497,7 @@ print(f"Kill events: {len(result.kills)}")
 | Match ID | 文件 | 时长 | 胜方 | 位置样本 | 击杀 | 眼位 | 备注 |
 |----------|------|------|------|---------|------|------|------|
 | 84782020 | 8674716612.dem | 62:29 | Dire | **36,310** | 52 | 284 | 幻象已过滤 ✅ |
-| 86083386 | 8676017978.dem | 62:08 | Dire | 待重新解析 | - | - | - |
+| 86083386 | 8676017978.dem | 62:08 | Dire | **36,170** | 55 | 214 | 时间契约(v1)已验证 ✅ |
 
 ### API 测试验证
 | 端点 | 状态 | 示例请求 |
@@ -459,9 +510,59 @@ print(f"Kill events: {len(result.kills)}")
 
 ---
 
-## 下一步计划 (Phase 3: MVP 功能开发)
+## 下一步计划 (Phase 3 -> Phase 4)
 
-### 即将进行的任务
+### 执行说明（2026-02-12 起）
+- 本节已升级为 Phase 4 主执行看板。
+- 若与下方历史任务表存在重复或冲突，以 `Phase 4 里程碑拆分` 和 `PH4-*` 任务为准。
+- 历史规划保留用于回溯决策，不作为当前排期唯一依据。
+
+### Phase 4 新增需求（2026-02-12）✅ 已纳入规划
+
+#### 需求 A：Replay 管理系统升级
+1. 建立完整比赛数据库，支持查询近期比赛。
+2. 支持按战队/赛事归类（例如 XG 参加某杯赛的场次与逐场数据）。
+3. 通过 OpenDota API 拉取赛事和比赛数据并入库。
+4. 支持按比赛 ID 直接下载录像。
+5. 支持从查询结果一键下载录像并跟踪下载状态。
+
+#### 需求 B：回放实时信息增强
+1. 回放实时显示英雄装备、等级、击杀、GPM/XPM、净资产。
+2. 显示团队总经济、经济差（Gold Advantage）、经验差（XP Advantage）。
+3. 显示实时经济差/经验差曲线图，并与 Timeline 联动。
+
+### Phase 4 里程碑拆分（建议执行顺序）
+
+| 里程碑 | 任务 | 状态 | 说明 |
+|--------|------|------|------|
+| M1 | 数据模型 + OpenDota 同步 API | `TODO` | teams/tournaments/matches_ext + 同步任务 |
+| M2 | 录像下载任务系统 | `TODO` | by match_id 下载 + 任务状态/重试 |
+| M3 | 前端比赛数据库与战队档案页 | `TODO` | 查询、筛选、分页、跳转回放 |
+| M4 | 回放 HUD + 优势曲线 | `TODO` | 实时指标 + Gold/XP 曲线 |
+
+### Phase 4 任务看板（Canonical）
+
+| ID | 优先级 | 任务 | 负责方 | 状态 | 依赖 | 目标产出 |
+|----|--------|------|--------|------|------|----------|
+| PH4-1 | P0 | OpenDota 数据同步（近期/战队/赛事） | Backend | `TODO` | 无 | 可增量同步的基础数据 |
+| PH4-2 | P0 | 比赛数据库扩展模型（Team/Tournament/Match） | Backend | `TODO` | PH4-1 | 可按战队/赛事/时间查询 |
+| PH4-3 | P0 | 录像下载系统（按 match_id + 查询结果） | Backend | `TODO` | PH4-2 | 下载任务、状态、重试 |
+| PH4-4 | P1 | 前端比赛数据库页面 | Frontend | `TODO` | PH4-1/2 | 查询、筛选、分页、跳转 |
+| PH4-5 | P1 | 战队归档页（XG/赛事维度） | Frontend | `TODO` | PH4-2/4 | 战队场次与逐场数据展示 |
+| PH4-6 | P1 | 回放实时 HUD（等级/装备/KDA/GPM/XPM/净资产） | Both | `TODO` | PH4-2 | 时间点实时数据面板 |
+| PH4-7 | P1 | Gold/XP Advantage 曲线 | Both | `TODO` | PH4-6 | 与 Timeline 联动的曲线图 |
+
+### Phase 3 遗留任务（并入 Phase 4）
+
+| 优先级 | 任务 | 状态 | 备注 |
+|--------|------|------|------|
+| P1 | 前端热力图可视化组件 | `TODO` | 后端 Heatmap API 已完成 |
+| P1 | 前端路径轨迹组件 | `TODO` | 后端 Path API 已完成 |
+| P1 | 地图击杀事件标记 | `TODO` | 与 Timeline 同步显示 |
+| P2 | 眼位聚类分析 (AI) | `TODO` | 依赖 ward 数据完善 |
+| P2 | 异步解析队列 (PARSER-5) | `TODO` | 后端并发下载/解析能力 |
+
+### 历史任务快照（Phase 3 末，保留原文）
 | 优先级 | 任务 | 预计时间 | 依赖 | 负责方 |
 |--------|------|----------|------|--------|
 | ~~P0~~ | ~~前端连接 playback API，渲染真实数据~~ | ~~1 天~~ | ~~后端 API ✅~~ | ~~Frontend~~ | ✅ DONE |
@@ -479,7 +580,7 @@ print(f"Kill events: {len(result.kills)}")
 | ~~P1~~ | ~~加载真实 minimap 图片~~ | ~~0.5 天~~ | ~~地图引擎 ✅~~ | ~~Frontend~~ | ✅ DONE |
 | P2 | 眼位聚类分析 (AI) | 3-5 天 | ward数据 ✅ | Backend |
 
-### 录像管理系统实施规划 (Replay System Roadmap) 🚀
+### 历史规划：录像管理系统实施规划 (Replay System Roadmap) 🚀
 此规划旨在实现完整的录像上传、管理、搜索功能。
 
 #### 阶段一：后端搜索能力增强 (Backend Search)
@@ -501,7 +602,7 @@ print(f"Kill events: {len(result.kills)}")
     *   **拖拽上传区**: 支持 `.dem` 文件拖拽上传。
     *   **任务状态面板**: 轮询 `/tasks` 接口，实时显示解析进度条和状态 (Pending -> Parsing -> Done)。
 
-### 已完成的前后端集成 ✅
+### 历史成果：已完成的前后端集成 ✅
 - RealMatchViewer 页面可显示真实录像数据
 - 英雄位置实时渲染（绿色 Radiant / 红色 Dire）
 - 眼位渲染（Observer 圆形黄心 / Sentry 菱形蓝心）
@@ -519,7 +620,7 @@ print(f"Kill events: {len(result.kills)}")
   - 渲染层插值: PixiJS ticker 使用 LERP 实现 60fps 平滑过渡
   - Timeline 回调频率: 50ms/次 (约 20fps)
 
-### 前端下一步
+### 历史前端下一步（已部分并入 Phase 4）
 1. ~~实现时间轴控件（播放/暂停/拖动）~~ ✅ 已完成
 2. ~~英雄图标显示~~ ✅ 已完成 (127 个英雄图标 + 队伍颜色边框)
 3. ~~加载真实 Dota 2 minimap 图片~~ ✅ 已完成 (从 OpenDota 获取)

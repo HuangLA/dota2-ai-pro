@@ -92,7 +92,7 @@ class ParquetStorage:
             # Create empty file with schema
             df = pd.DataFrame(columns=[
                 "tick", "hero", "handle", "team", "x", "y",
-                "hp", "max_hp", "mana", "max_mana", "level"
+                "hp", "max_hp", "mana", "max_mana", "level", "game_time"
             ])
         else:
             data = []
@@ -108,7 +108,8 @@ class ParquetStorage:
                     "max_hp": pos.max_hp,
                     "mana": pos.mana,
                     "max_mana": pos.max_mana,
-                    "level": pos.level
+                    "level": pos.level,
+                    "game_time": getattr(pos, "game_time", None)
                 })
             df = pd.DataFrame(data)
         
@@ -147,7 +148,7 @@ class ParquetStorage:
         """Save ward events to Parquet."""
         if not wards:
             df = pd.DataFrame(columns=[
-                "type", "ward_type", "tick", "handle", "x", "y", "team"
+                "type", "ward_type", "tick", "handle", "x", "y", "team", "game_time"
             ])
         else:
             data = []
@@ -159,7 +160,8 @@ class ParquetStorage:
                     "handle": ward.handle,
                     "x": ward.x,
                     "y": ward.y,
-                    "team": ward.team
+                    "team": ward.team,
+                    "game_time": getattr(ward, "game_time", None)
                 })
             df = pd.DataFrame(data)
         
@@ -178,6 +180,11 @@ class ParquetStorage:
             "game_winner": result.metadata.game_winner,
             "leagueid": result.metadata.leagueid,
             "duration_seconds": result.metadata.duration_seconds,
+            "time_contract_version": result.metadata.time_contract_version,
+            "game_start_time": result.metadata.game_start_time,
+            "clock_zero_source": result.metadata.clock_zero_source,
+            "ticks_per_second": result.metadata.ticks_per_second,
+            "time_mapping": result.metadata.time_mapping,
             "total_ticks": result.total_ticks,
             "parse_time_ms": result.parse_time_ms,
             "file_size_bytes": result.file_size_bytes,
@@ -250,6 +257,9 @@ class ParquetStorage:
         # Filter by hero (string filter not supported in Parquet)
         if hero and not df.empty:
             df = df[df["hero"] == hero]
+
+        if "game_time" not in df.columns:
+            df["game_time"] = pd.NA
         
         return df
     
@@ -287,6 +297,9 @@ class ParquetStorage:
             df = df[df["ward_type"] == ward_type]
         if team is not None and not df.empty:
             df = df[df["team"] == team]
+
+        if "game_time" not in df.columns:
+            df["game_time"] = pd.NA
         
         return df
     

@@ -243,6 +243,11 @@ class ClarityParser:
             game_winner=raw_meta.get("game_winner") or raw_meta.get("winner"),
             leagueid=raw_meta.get("leagueid"),
             duration_seconds=raw_meta.get("duration_seconds"),
+            time_contract_version=raw_meta.get("time_contract_version"),
+            game_start_time=raw_meta.get("game_start_time"),
+            clock_zero_source=raw_meta.get("clock_zero_source"),
+            ticks_per_second=raw_meta.get("ticks_per_second"),
+            time_mapping=raw_meta.get("time_mapping"),
             picks_bans=picks_bans,
             players=players
         )
@@ -261,7 +266,8 @@ class ClarityParser:
                 max_hp=pos.get("max_hp"),
                 mana=pos.get("mana"),
                 max_mana=pos.get("max_mana"),
-                level=pos.get("level")
+                level=pos.get("level"),
+                game_time=pos.get("game_time")
             ))
         
         # Parse kills
@@ -285,7 +291,8 @@ class ClarityParser:
                 handle=w.get("handle", 0),
                 x=w.get("x"),
                 y=w.get("y"),
-                team=w.get("team")
+                team=w.get("team"),
+                game_time=w.get("game_time")
             ))
         
         # Parse heroes mapping

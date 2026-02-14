@@ -123,9 +123,14 @@ public class SimpleDemoParser {
         
         // Extract metadata from file info
         Map<String, Object> metadata = new HashMap<>();
+        metadata.put("time_contract_version", "v1");
+        metadata.put("ticks_per_second", 30);
+        metadata.put("time_mapping", "game_time = m_fGameTime - clock_zero_time; clock_zero_time priority: m_flGameStartTime - pregame_paused_seconds, then combatlog GAME_STATE=5, then (m_flPreGameStartTime + 90), then m_flGameStartTime; fallback to tick / 30.0 - clock_zero_time");
+        long fileInfoMatchId = 0L;
         if (fileInfo != null && fileInfo.hasGameInfo() && fileInfo.getGameInfo().hasDota()) {
             var dota = fileInfo.getGameInfo().getDota();
-            metadata.put("match_id", dota.getMatchId());
+            fileInfoMatchId = dota.getMatchId();
+            metadata.put("match_id", fileInfoMatchId);
             metadata.put("game_mode", dota.getGameMode());
             metadata.put("game_winner", dota.getGameWinner()); // 2=Radiant, 3=Dire
             metadata.put("leagueid", dota.getLeagueid());
@@ -153,12 +158,31 @@ public class SimpleDemoParser {
             metadata.put("players", players);
         }
         
-        // Use processor data if available
-        if (processor.getMatchId() != 0) {
+        // Keep match_id source stable: file header (64-bit) is authoritative.
+        // Gamerules value is preserved for diagnostics only.
+        if (fileInfoMatchId == 0 && processor.getMatchId() != 0) {
             metadata.put("match_id", processor.getMatchId());
+        } else if (fileInfoMatchId != 0 && processor.getMatchId() != 0 && processor.getMatchId() != fileInfoMatchId) {
+            metadata.put("gamerules_match_id", processor.getMatchId());
         }
         if (processor.getGameTime() > 0) {
             metadata.put("duration_seconds", processor.getGameTime());
+        }
+        if (processor.hasClockZeroTime()) {
+            metadata.put("game_start_time", processor.getClockZeroTime());
+            if (processor.hasPreGameStartTime()) {
+                metadata.put("pregame_start_time", processor.getPreGameStartTime());
+            }
+            if (processor.hasRawGameStartTime()) {
+                metadata.put("raw_game_start_time", processor.getRawGameStartTime());
+            }
+            if (processor.hasCombatLogGameStartTime()) {
+                metadata.put("combatlog_game_start_time", processor.getCombatLogGameStartTime());
+            }
+            if (processor.hasPausedSecondsAtClockZero()) {
+                metadata.put("pregame_paused_seconds", processor.getPausedSecondsAtClockZero());
+            }
+            metadata.put("clock_zero_source", processor.getClockZeroSource());
         }
         if (processor.getWinner() != 0) {
             metadata.put("winner", processor.getWinner());
@@ -206,7 +230,18 @@ public class SimpleDemoParser {
         // Match metadata
         private long matchId = 0;
         private float gameTime = 0;
-        private float gameStartTime = 0; // Time when creeps spawn (game clock = 0:00)
+        private Float currentGameRulesTime = null; // pause-aware gamerules clock snapshot
+        private float rawGameStartTime = 0; // m_flGameStartTime
+        private boolean hasRawGameStartTime = false;
+        private float preGameStartTime = 0; // m_flPreGameStartTime
+        private boolean hasPreGameStartTime = false;
+        private float combatLogGameStartTime = 0; // combatlog GAME_STATE=5 timestamp
+        private boolean hasCombatLogGameStartTime = false;
+        private float pausedSecondsAtClockZero = 0;
+        private boolean hasPausedSecondsAtClockZero = false;
+        private float clockZeroTime = 0; // Source time where game clock should be 0:00
+        private boolean hasClockZeroTime = false;
+        private String clockZeroSource = "unknown";
         private int winner = 0; // 2=Radiant, 3=Dire
         
         // Collected data
@@ -221,6 +256,10 @@ public class SimpleDemoParser {
         // Track which hero+team combinations we've already seen (to filter illusions)
         // Key: "HeroName_Team" (e.g., "Spectre_3"), Value: first entity handle
         private Map<String, Integer> firstHeroHandle = new HashMap<>();
+
+        // Keep per-sample gamerules clock snapshots so we can recompute
+        // all game_time values against one consistent basis later.
+        private IdentityHashMap<Map<String, Object>, Float> gameRulesTimeSnapshots = new IdentityHashMap<>();
         
         public DotaMatchProcessor(boolean minimalMode) {
             this.minimalMode = minimalMode;
@@ -252,7 +291,68 @@ public class SimpleDemoParser {
                 // Try to get game time
                 Object gameTimeObj = getPropertySafe(e, "m_pGameRules.m_fGameTime");
                 if (gameTimeObj != null) {
-                    gameTime = ((Number) gameTimeObj).floatValue();
+                    currentGameRulesTime = ((Number) gameTimeObj).floatValue();
+                    gameTime = hasClockZeroTime
+                            ? currentGameRulesTime - clockZeroTime
+                            : currentGameRulesTime;
+                }
+
+                Object preGameStartTimeObj = getPropertySafe(e, "m_pGameRules.m_flPreGameStartTime");
+                if (preGameStartTimeObj != null) {
+                    preGameStartTime = ((Number) preGameStartTimeObj).floatValue();
+                    hasPreGameStartTime = true;
+                }
+
+                // Try to get creep-spawn anchor (game clock = 0:00)
+                Object gameStartTimeObj = getPropertySafe(e, "m_pGameRules.m_flGameStartTime");
+                if (gameStartTimeObj != null) {
+                    rawGameStartTime = ((Number) gameStartTimeObj).floatValue();
+                    hasRawGameStartTime = true;
+                }
+
+                Object gameStateObj = getPropertySafe(e, "m_pGameRules.m_nGameState");
+                int gameState = gameStateObj != null ? ((Number) gameStateObj).intValue() : 0;
+
+                Object totalPausedTicksObj = getPropertySafe(e, "m_pGameRules.m_nTotalPausedTicks");
+                float totalPausedSeconds = 0.0f;
+                if (totalPausedTicksObj != null) {
+                    totalPausedSeconds = ((Number) totalPausedTicksObj).floatValue() / 30.0f;
+                }
+
+                if (gameState == 5 && !hasPausedSecondsAtClockZero && totalPausedTicksObj != null) {
+                    pausedSecondsAtClockZero = totalPausedSeconds;
+                    hasPausedSecondsAtClockZero = true;
+                }
+
+                float previousClockZeroTime = clockZeroTime;
+                boolean hadClockZeroTime = hasClockZeroTime;
+                if (hasRawGameStartTime && hasPausedSecondsAtClockZero) {
+                    clockZeroTime = rawGameStartTime - pausedSecondsAtClockZero;
+                    hasClockZeroTime = true;
+                    clockZeroSource = "raw_game_start_minus_pregame_pauses";
+                } else if (hasCombatLogGameStartTime) {
+                    clockZeroTime = combatLogGameStartTime;
+                    hasClockZeroTime = true;
+                    clockZeroSource = "combatlog_game_state_5";
+                } else if (hasPreGameStartTime) {
+                    // Dota pregame lasts 90 seconds before creep spawn at 0:00.
+                    clockZeroTime = preGameStartTime + 90.0f;
+                    hasClockZeroTime = true;
+                    clockZeroSource = "pregame_plus_90";
+                } else if (hasRawGameStartTime) {
+                    clockZeroTime = rawGameStartTime;
+                    hasClockZeroTime = true;
+                    clockZeroSource = "raw_game_start";
+                }
+
+                if (hasClockZeroTime) {
+                    boolean firstClockZeroTimeSeen = !hadClockZeroTime;
+                    boolean clockZeroTimeChanged = hadClockZeroTime
+                            && Float.compare(previousClockZeroTime, clockZeroTime) != 0;
+                    if (firstClockZeroTimeSeen || clockZeroTimeChanged) {
+                        recalculateGameTimes(positionSamples);
+                        recalculateGameTimes(wardEvents);
+                    }
                 }
                 
                 // Try to get match ID
@@ -334,7 +434,9 @@ public class SimpleDemoParser {
             wardEvent.put("type", "placed");
             wardEvent.put("ward_type", isObserver ? "observer" : "sentry");
             wardEvent.put("tick", ctx.getTick());
+            wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime));
             wardEvent.put("handle", ward.getHandle());
+            snapshotGameRulesTime(wardEvent, currentGameRulesTime);
             
             // Get position
             float[] pos = getEntityPosition(ward);
@@ -363,7 +465,9 @@ public class SimpleDemoParser {
             wardEvent.put("type", "destroyed");
             wardEvent.put("ward_type", isObserver ? "observer" : "sentry");
             wardEvent.put("tick", ctx.getTick());
+            wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime));
             wardEvent.put("handle", ward.getHandle());
+            snapshotGameRulesTime(wardEvent, currentGameRulesTime);
             
             wardEvents.add(wardEvent);
         }
@@ -393,6 +497,29 @@ public class SimpleDemoParser {
                         killEvents.add(killEvent);
                     }
                 }
+
+                if (cle.getType() == DOTAUserMessages.DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_GAME_STATE
+                        && cle.getValue() == 5) {
+                    float newCombatLogGameStartTime = cle.getTimestamp();
+                    boolean firstSeen = !hasCombatLogGameStartTime;
+                    boolean changed = hasCombatLogGameStartTime
+                            && Float.compare(combatLogGameStartTime, newCombatLogGameStartTime) != 0;
+
+                    combatLogGameStartTime = newCombatLogGameStartTime;
+                    hasCombatLogGameStartTime = true;
+
+                    float previousClockZeroTime = clockZeroTime;
+                    boolean hadClockZeroTime = hasClockZeroTime;
+                    clockZeroTime = combatLogGameStartTime;
+                    hasClockZeroTime = true;
+                    clockZeroSource = "combatlog_game_state_5";
+
+                    if (firstSeen || changed || !hadClockZeroTime
+                            || Float.compare(previousClockZeroTime, clockZeroTime) != 0) {
+                        recalculateGameTimes(positionSamples);
+                        recalculateGameTimes(wardEvents);
+                    }
+                }
             } catch (Exception e) {
                 // Combat log entry access can fail, ignore
             }
@@ -400,6 +527,8 @@ public class SimpleDemoParser {
         
         private void sampleHeroPositions(Context ctx) {
             int tick = ctx.getTick();
+            Float gameRulesTimeSnapshot = currentGameRulesTime;
+            float gameClock = getCurrentGameClock(tick, gameRulesTimeSnapshot);
             
             for (HeroState heroState : trackedHeroes.values()) {
                 try {
@@ -411,6 +540,7 @@ public class SimpleDemoParser {
                     
                     Map<String, Object> sample = new HashMap<>();
                     sample.put("tick", tick);
+                    sample.put("game_time", gameClock);
                     sample.put("hero", heroState.heroName);
                     sample.put("handle", heroState.handle);
                     sample.put("team", heroState.team);
@@ -431,6 +561,7 @@ public class SimpleDemoParser {
                     if (level != null) sample.put("level", ((Number) level).intValue());
                     
                     positionSamples.add(sample);
+                    snapshotGameRulesTime(sample, gameRulesTimeSnapshot);
                     
                 } catch (Exception e) {
                     // Entity access can fail, skip this sample
@@ -483,11 +614,54 @@ public class SimpleDemoParser {
             }
             return null;
         }
+
+        private float getCurrentGameClock(int tick, Float gameRulesTimeSnapshot) {
+            if (gameRulesTimeSnapshot != null) {
+                return hasClockZeroTime
+                        ? gameRulesTimeSnapshot - clockZeroTime
+                        : gameRulesTimeSnapshot;
+            }
+
+            float tickSeconds = tick / 30.0f;
+            if (hasClockZeroTime) {
+                return tickSeconds - clockZeroTime;
+            }
+            return tickSeconds;
+        }
+
+        private void snapshotGameRulesTime(Map<String, Object> sample, Float gameRulesTimeSnapshot) {
+            if (gameRulesTimeSnapshot != null) {
+                gameRulesTimeSnapshots.put(sample, gameRulesTimeSnapshot);
+            }
+        }
+
+        private void recalculateGameTimes(List<Map<String, Object>> samples) {
+            for (Map<String, Object> sample : samples) {
+                Object tickObj = sample.get("tick");
+                if (!(tickObj instanceof Number)) {
+                    continue;
+                }
+                int tick = ((Number) tickObj).intValue();
+                Float gameRulesTimeSnapshot = gameRulesTimeSnapshots.get(sample);
+                sample.put("game_time", getCurrentGameClock(tick, gameRulesTimeSnapshot));
+            }
+        }
         
         // Getters
         public int getTotalTicks() { return totalTicks; }
         public long getMatchId() { return matchId; }
         public float getGameTime() { return gameTime; }
+        public float getClockZeroTime() { return clockZeroTime; }
+        public boolean hasClockZeroTime() { return hasClockZeroTime; }
+        public String getClockZeroSource() { return clockZeroSource; }
+        public float getPreGameStartTime() { return preGameStartTime; }
+        public boolean hasPreGameStartTime() { return hasPreGameStartTime; }
+        public float getRawGameStartTime() { return rawGameStartTime; }
+        public boolean hasRawGameStartTime() { return hasRawGameStartTime; }
+        public float getCombatLogGameStartTime() { return combatLogGameStartTime; }
+        public boolean hasCombatLogGameStartTime() { return hasCombatLogGameStartTime; }
+        public float getPausedSecondsAtClockZero() { return pausedSecondsAtClockZero; }
+        public boolean hasPausedSecondsAtClockZero() { return hasPausedSecondsAtClockZero; }
         public int getWinner() { return winner; }
         public List<Map<String, Object>> getPositionSamples() { return positionSamples; }
         public List<Map<String, Object>> getKillEvents() { return killEvents; }

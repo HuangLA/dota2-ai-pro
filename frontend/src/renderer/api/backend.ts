@@ -43,7 +43,16 @@ export interface HeroData {
 export interface TickData {
   tick: number;
   time: number;
+  game_time?: number;
   heroes: HeroData[];
+}
+
+export interface PlaybackTimeBasis {
+  basis?: string;
+  source?: string;
+  strategy?: string;
+  offset_seconds?: number;
+  game_start_time?: number;
 }
 
 export interface TicksResponse {
@@ -51,6 +60,7 @@ export interface TicksResponse {
   start_time: number;
   end_time: number;
   interval: number;
+  time_basis?: PlaybackTimeBasis;
   ticks: TickData[];
   total_samples: number;
 }
@@ -60,6 +70,7 @@ export interface WardData {
   ward_type: 'observer' | 'sentry';
   tick: number;
   time: number;
+  game_time?: number;
   handle: number;
   x?: number;
   y?: number;
@@ -69,6 +80,7 @@ export interface WardData {
 
 export interface WardsResponse {
   match_id: number;
+  time_basis?: PlaybackTimeBasis;
   wards: WardData[];
   summary: {
     total: number;

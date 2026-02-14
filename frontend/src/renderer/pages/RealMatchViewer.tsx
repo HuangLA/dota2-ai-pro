@@ -7,16 +7,27 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import MapViewer from '../components/map/MapViewer';
 import { HeroPosition, Ward } from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
-import backendAPI, { Match, TickData, WardsResponse } from '../api/backend';
+import backendAPI, { Match, PlaybackTimeBasis, TickData, WardsResponse } from '../api/backend';
 import { getHeroByName } from '../data/heroes';
+import {
+  createGameClockMapper,
+  formatGameClockTime,
+  GameClockMapper,
+} from '../utils/gameClock';
 
-/** 比赛时间常量 */
-const GAME_DATA_START = 112;
+/** 时间范围常量（秒） */
+const PRE_GAME_FETCH_SECONDS = 180;
+const POST_GAME_FETCH_BUFFER_SECONDS = 600;
 const DEFAULT_DURATION = 3600;
+const DEFAULT_INITIAL_GAME_CLOCK_SECONDS = -90;
 
 /** 线性插值函数 */
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 export interface RealMatchViewerProps {
@@ -26,19 +37,24 @@ export interface RealMatchViewerProps {
 export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<number | null>(initialMatchId || null);
-  const [matchDuration, setMatchDuration] = useState(DEFAULT_DURATION);
   
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   
-  const [currentTime, setCurrentTime] = useState(GAME_DATA_START);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [timelineMinTime, setTimelineMinTime] = useState(0);
+  const [timelineMaxTime, setTimelineMaxTime] = useState(DEFAULT_DURATION);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCalibration, setShowCalibration] = useState(false);
+  const [timeBasisSource, setTimeBasisSource] = useState<'game_time' | 'fallback'>('fallback');
+  const [timeBasisStrategy, setTimeBasisStrategy] = useState<GameClockMapper['strategy']>('fallback_pre_game_anchor');
+  const [timeBasisOffsetSeconds, setTimeBasisOffsetSeconds] = useState(0);
   
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
+  const gameClockMapperRef = useRef<GameClockMapper>(createGameClockMapper([]));
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -73,19 +89,21 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     
     setLoading(true);
     setError(null);
+    setTimeBasisSource('fallback');
+    setTimeBasisStrategy('fallback_pre_game_anchor');
+    setTimeBasisOffsetSeconds(0);
     allTicksRef.current = [];
     allWardsRef.current = null;
     
     try {
       const matchDetail = await backendAPI.getMatchDetail(matchId);
       const duration = matchDetail?.duration || DEFAULT_DURATION;
-      setMatchDuration(duration);
       
       console.log(`[RealMatchViewer] 加载比赛 ${matchId} 的完整数据...`);
       const fullData = await backendAPI.getHeroPositions(
         matchId,
-        GAME_DATA_START,
-        duration
+        -PRE_GAME_FETCH_SECONDS,
+        duration + POST_GAME_FETCH_BUFFER_SECONDS
       );
       
       if (fullData?.ticks) {
@@ -95,8 +113,50 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       
       const wardsData = await backendAPI.getWards(matchId);
       allWardsRef.current = wardsData;
-      
-      updateDisplayForTime(GAME_DATA_START);
+
+      const resolveTimeBasis = (
+        ticksBasis?: PlaybackTimeBasis,
+        wardsBasis?: PlaybackTimeBasis
+      ): PlaybackTimeBasis | undefined => {
+        if (ticksBasis) {
+          return ticksBasis;
+        }
+        if (wardsBasis) {
+          return wardsBasis;
+        }
+        return undefined;
+      };
+
+      const timeBasis = resolveTimeBasis(fullData?.time_basis, wardsData?.time_basis);
+
+      const mapperRecords = [
+        ...allTicksRef.current,
+        ...(wardsData?.wards ?? []),
+      ];
+      const mapper = createGameClockMapper(mapperRecords, timeBasis);
+      gameClockMapperRef.current = mapper;
+      setTimeBasisSource(mapper.timeBasisSource);
+      setTimeBasisStrategy(mapper.strategy);
+      setTimeBasisOffsetSeconds(mapper.offsetSeconds);
+
+      if (allTicksRef.current.length > 0) {
+        const tickTimes = allTicksRef.current.map((tick) => mapper.getSourceTime(tick));
+        const rawMinSourceTime = Math.min(...tickTimes);
+        const maxSourceTime = Math.max(...tickTimes);
+        const minSourceTime = mapper.timeBasisSource === 'game_time'
+          ? Math.max(rawMinSourceTime, DEFAULT_INITIAL_GAME_CLOCK_SECONDS)
+          : rawMinSourceTime;
+        setTimelineMinTime(minSourceTime);
+        setTimelineMaxTime(maxSourceTime);
+
+        const gameStartSourceTime = clamp(
+          mapper.gameClockToSource(DEFAULT_INITIAL_GAME_CLOCK_SECONDS),
+          minSourceTime,
+          maxSourceTime
+        );
+        setCurrentTime(gameStartSourceTime);
+        updateDisplayForTime(gameStartSourceTime);
+      }
       
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -111,7 +171,9 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
 
   useEffect(() => {
     if (selectedMatch) {
-      setCurrentTime(GAME_DATA_START);
+      setCurrentTime(0);
+      setTimelineMinTime(0);
+      setTimelineMaxTime(DEFAULT_DURATION);
       loadAllMatchData(selectedMatch);
     }
     
@@ -127,6 +189,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
    */
   const findTicksForInterpolation = useCallback((time: number): { prev: TickData | null; next: TickData | null; t: number } => {
     const ticks = allTicksRef.current;
+    const mapper = gameClockMapperRef.current;
     if (ticks.length === 0) {
       return { prev: null, next: null, t: 0 };
     }
@@ -136,17 +199,17 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     let right = ticks.length - 1;
     
     // 边界情况
-    if (time <= ticks[0].time) {
+    if (time <= mapper.getSourceTime(ticks[0])) {
       return { prev: ticks[0], next: ticks[0], t: 0 };
     }
-    if (time >= ticks[ticks.length - 1].time) {
+    if (time >= mapper.getSourceTime(ticks[ticks.length - 1])) {
       return { prev: ticks[ticks.length - 1], next: ticks[ticks.length - 1], t: 0 };
     }
     
     // 找到 time 之前的最大 tick
     while (left < right) {
       const mid = Math.floor((left + right + 1) / 2);
-      if (ticks[mid].time <= time) {
+      if (mapper.getSourceTime(ticks[mid]) <= time) {
         left = mid;
       } else {
         right = mid - 1;
@@ -157,8 +220,10 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     const nextTick = ticks[Math.min(left + 1, ticks.length - 1)];
     
     // 计算插值系数
-    const timeDiff = nextTick.time - prevTick.time;
-    const t = timeDiff > 0 ? (time - prevTick.time) / timeDiff : 0;
+    const prevTime = mapper.getSourceTime(prevTick);
+    const nextTime = mapper.getSourceTime(nextTick);
+    const timeDiff = nextTime - prevTime;
+    const t = timeDiff > 0 ? (time - prevTime) / timeDiff : 0;
     
     return { prev: prevTick, next: nextTick, t };
   }, []);
@@ -167,6 +232,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
    * 根据时间更新显示，支持插值
    */
   const updateDisplayForTime = useCallback((time: number) => {
+    const mapper = gameClockMapperRef.current;
     const { prev, next, t } = findTicksForInterpolation(time);
     
     if (!prev) {
@@ -235,14 +301,14 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       const activeWards = wardsData.wards
         .filter((ward) => {
           if (ward.type !== 'placed' || !ward.x || !ward.y) return false;
-          if (ward.time > roundedTime) return false;
+          if (mapper.getSourceTime(ward) > roundedTime) return false;
           return true;
         })
         .filter((placedWard) => {
           const destroyedEvent = wardsData.wards.find(
             (w) => w.type === 'destroyed' && w.handle === placedWard.handle
           );
-          return !destroyedEvent || destroyedEvent.time > roundedTime;
+          return !destroyedEvent || mapper.getSourceTime(destroyedEvent) > roundedTime;
         })
         .map((ward) => ({
           type: ward.ward_type as 'observer' | 'sentry',
@@ -262,9 +328,8 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   }, [updateDisplayForTime]);
 
   const formatTimeDisplay = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const gameClockTime = gameClockMapperRef.current.sourceToGameClock(seconds);
+    return formatGameClockTime(gameClockTime);
   };
 
   return (
@@ -331,6 +396,18 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
               <h3 className="text-lg font-medium mb-3">当前状态</h3>
               <div className="text-sm text-gray-400 space-y-2">
                 <div className="flex justify-between">
+                  <span>时间基准来源:</span>
+                  <span className="text-white font-mono">{timeBasisSource}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>映射策略:</span>
+                  <span className="text-white font-mono">{timeBasisStrategy}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>偏移秒数:</span>
+                  <span className="text-white font-mono">{timeBasisOffsetSeconds.toFixed(2)}s</span>
+                </div>
+                <div className="flex justify-between">
                   <span>当前时间:</span>
                   <span className="text-white font-mono">
                     {formatTimeDisplay(currentTime)}
@@ -339,7 +416,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                 <div className="flex justify-between">
                   <span>比赛时长:</span>
                   <span className="text-white font-mono">
-                    {formatTimeDisplay(matchDuration)}
+                    {formatGameClockTime(Math.max(0, gameClockMapperRef.current.sourceToGameClock(timelineMaxTime)))}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -401,6 +478,11 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-medium">地图视图</h2>
                 <div className="flex items-center gap-4">
+                  {timeBasisSource === 'fallback' && (
+                    <span className="px-2 py-1 rounded border border-amber-500/60 bg-amber-900/25 text-amber-300 text-xs">
+                      回退模式
+                    </span>
+                  )}
                   <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                     <input
                       type="checkbox"
@@ -435,11 +517,12 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
             {selectedMatch && (
               <Timeline
                 currentTime={currentTime}
-                minTime={GAME_DATA_START}
-                maxTime={matchDuration}
+                minTime={timelineMinTime}
+                maxTime={timelineMaxTime}
                 onTimeChange={handleTimeChange}
                 isLoading={loading}
                 disabled={!selectedMatch || matches.length === 0}
+                formatTime={formatTimeDisplay}
               />
             )}
           </div>

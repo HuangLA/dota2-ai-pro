@@ -50,6 +50,7 @@ class PositionSample:
     mana: Optional[float] = None
     max_mana: Optional[float] = None
     level: Optional[int] = None
+    game_time: Optional[float] = None  # In-game clock seconds (creep spawn is 0)
     
     @property
     def team_name(self) -> str:
@@ -96,6 +97,7 @@ class WardEvent:
     x: Optional[float] = None
     y: Optional[float] = None
     team: Optional[int] = None  # 2=Radiant, 3=Dire
+    game_time: Optional[float] = None  # In-game clock seconds (creep spawn is 0)
     
     @property
     def team_name(self) -> Optional[str]:
@@ -114,6 +116,11 @@ class MatchMetadata:
     game_winner: Optional[int] = None  # 2=Radiant, 3=Dire
     leagueid: Optional[int] = None
     duration_seconds: Optional[float] = None
+    time_contract_version: Optional[str] = None
+    game_start_time: Optional[float] = None
+    clock_zero_source: Optional[str] = None
+    ticks_per_second: Optional[int] = None
+    time_mapping: Optional[str] = None
     picks_bans: list[PickBan] = field(default_factory=list)
     players: list[PlayerInfo] = field(default_factory=list)
     

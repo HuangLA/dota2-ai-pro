@@ -18,6 +18,8 @@ export interface TimelineProps {
   isLoading?: boolean;
   /** 是否禁用 */
   disabled?: boolean;
+  /** 时间显示格式化 */
+  formatTime?: (seconds: number) => string;
 }
 
 /** 播放速度选项 */
@@ -40,10 +42,12 @@ export function Timeline({
   onTimeChange,
   isLoading = false,
   disabled = false,
+  formatTime: formatTimeProp,
 }: TimelineProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
+  const formatLabel = formatTimeProp ?? formatTime;
   
   // 内部时间状态，用于平滑播放
   const [internalTime, setInternalTime] = useState(currentTime);
@@ -369,11 +373,11 @@ export function Timeline({
         {/* 中间：时间显示 */}
         <div className="flex items-center gap-2 text-sm font-mono">
           <span className="text-white min-w-[60px] text-right">
-            {formatTime(displayTime)}
+            {formatLabel(displayTime)}
           </span>
           <span className="text-gray-500">/</span>
           <span className="text-gray-400 min-w-[60px]">
-            {formatTime(maxTime)}
+            {formatLabel(maxTime)}
           </span>
         </div>
 

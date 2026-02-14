@@ -886,6 +886,32 @@ DELETE /api/v1/matches/8123456789?delete_files=true
 
 ### 4.3 回放数据流 (Playback Engine)
 
+#### 4.3.0 时间语义约定（2026-02-14 起执行）
+
+为避免 Timeline 与游戏时钟错位，回放时序接口统一遵循以下约定：
+
+- `time`: 解析源时间轴（当前实现通常为 `tick / 30`，单调递增）
+- `game_time`: 游戏时钟（出兵时刻为 `0`，出兵前为负数）
+- `time_basis`: 响应顶层时间映射元信息，用于前端无歧义对齐时间轴
+
+`GET /api/v1/playback/{match_id}/ticks` 与 `GET /api/v1/playback/{match_id}/wards` 顶层返回同构 `time_basis`：
+
+```json
+{
+  "time_basis": {
+    "basis": "game_time",
+    "contract_version": "v1",
+    "ticks_per_second": 30,
+    "game_start_time": 218.73334,
+    "offset_seconds": 218.73334,
+    "clock_zero_source": "combatlog",
+    "mapping": "game_time = tick / 30.0 - m_flGameStartTime; fallback to tick / 30.0"
+  }
+}
+```
+
+说明：后端返回的 `game_time` 为解析器原始游戏时钟，不做额外平移。前端统一采用“标准(-1:30 起点)”显示口径进行进度条锚定；不再提供“原始解析时间”切换。
+
 #### 4.3.1 获取时序坐标数据 ❌
 
 **MVP 版本**: v1.0  
