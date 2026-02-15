@@ -892,9 +892,18 @@ export class DotaMapRenderer {
       if (textureByNormalized) {
         return textureByNormalized;
       }
+
+      // 兜底：忽略下划线差异（如 anti_mage <-> antimage）
+      const compactName = normalizedName.replace(/_/g, '');
+      if (compactName && compactName !== normalizedName) {
+        const textureByCompact = this.heroTexturesByName.get(compactName);
+        if (textureByCompact) {
+          return textureByCompact;
+        }
+      }
       
       // 调试: 显示查找失败的信息
-      console.log(`[DotaMapRenderer] Texture not found for hero: ${heroName} (normalized: ${normalizedName}), available names sample:`, 
+      console.log(`[DotaMapRenderer] Texture not found for hero: ${heroName} (normalized: ${normalizedName}, compact: ${compactName}), available names sample:`, 
         Array.from(this.heroTexturesByName.keys()).slice(0, 5));
     }
     

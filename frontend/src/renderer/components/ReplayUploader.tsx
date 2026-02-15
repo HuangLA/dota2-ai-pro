@@ -14,6 +14,8 @@ interface ReplayUploaderProps {
 export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadQueueTotal, setUploadQueueTotal] = useState(0);
+  const [uploadQueueCompleted, setUploadQueueCompleted] = useState(0);
   const [tasks, setTasks] = useState<ParseTask[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [clearedAtMs, setClearedAtMs] = useState<number>(Date.now());
@@ -111,24 +113,52 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
   };
 
   // Handle file upload
-  const handleUpload = async (file: File) => {
-    if (!file.name.endsWith('.dem')) {
-       setError('文件类型无效，请上传 .dem 文件。');
+  const handleUploadFiles = async (files: File[]) => {
+    const validFiles = files.filter((file) => file.name.toLowerCase().endsWith('.dem'));
+    const invalidFiles = files.filter((file) => !file.name.toLowerCase().endsWith('.dem'));
+
+    if (validFiles.length === 0) {
+      setError('文件类型无效，请上传 .dem 文件。');
       return;
     }
 
     setUploading(true);
-    setError(null);
+    setUploadQueueTotal(validFiles.length);
+    setUploadQueueCompleted(0);
+
+    if (invalidFiles.length > 0) {
+      setError(`已跳过 ${invalidFiles.length} 个非 .dem 文件。`);
+    } else {
+      setError(null);
+    }
 
     try {
-      await replayService.uploadReplay(file);
-      // Immediately fetch tasks to show the new one
+      const failedFiles: string[] = [];
+
+      for (let i = 0; i < validFiles.length; i += 1) {
+        const file = validFiles[i];
+        try {
+          await replayService.uploadReplay(file);
+        } catch (uploadError) {
+          console.error('Upload failed', uploadError);
+          failedFiles.push(file.name);
+        } finally {
+          setUploadQueueCompleted(i + 1);
+        }
+      }
+
+      if (failedFiles.length > 0) {
+        const failedPreview = failedFiles.slice(0, 2).join('、');
+        const extra = failedFiles.length > 2 ? ` 等 ${failedFiles.length} 个文件` : '';
+        setError(`部分上传失败：${failedPreview}${extra}。请重试。`);
+      }
+
+      // Immediately fetch tasks to show new tasks
       await fetchTasks();
-    } catch (err) {
-      console.error('Upload failed', err);
-       setError('上传录像失败，请重试。');
     } finally {
       setUploading(false);
+      setUploadQueueTotal(0);
+      setUploadQueueCompleted(0);
     }
   };
 
@@ -148,16 +178,18 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleUpload(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleUploadFiles(Array.from(e.dataTransfer.files));
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      handleUpload(e.target.files[0]);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length > 0) {
+      handleUploadFiles(files);
     }
+    e.target.value = '';
   };
 
   return (
@@ -182,6 +214,7 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
           type="file"
           className="hidden"
           accept=".dem"
+          multiple
           onChange={handleChange}
           disabled={uploading}
         />
@@ -206,13 +239,13 @@ export function ReplayUploader({ onTaskCompleted }: ReplayUploaderProps) {
           </div>
           
           <div className="text-xl font-semibold text-gray-200">
-             {uploading ? '正在上传录像...' : dragActive ? '松开鼠标上传' : '上传录像文件'}
+             {uploading ? `正在上传录像... (${uploadQueueCompleted}/${uploadQueueTotal})` : dragActive ? '松开鼠标上传' : '上传录像文件'}
           </div>
           <div className="text-sm text-gray-400">
-             {uploading ? '请稍候...' : '拖拽 .dem 文件到此处，或点击选择文件'}
+             {uploading ? '请稍候，正在处理上传队列...' : '拖拽 .dem 文件到此处，或点击选择多个文件'}
           </div>
           <div className="text-xs text-gray-500 mt-1">
-             支持格式: Dota 2 录像文件 (.dem)
+             支持格式: Dota 2 录像文件 (.dem)，可一次上传多个
           </div>
         </div>
 

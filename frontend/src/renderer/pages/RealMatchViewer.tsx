@@ -43,6 +43,9 @@ interface DeathInterval {
 interface HudHeroStatus {
   isAlive: boolean;
   respawnRemainingSeconds?: number;
+  hp?: number;
+  maxHp?: number;
+  hpRatio?: number;
 }
 
 function extractTeamLineups(ticks: TickData[]): TeamLineups {
@@ -500,16 +503,38 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     const pauseActive = pauseActiveFromSamples || mapper.isPausedAtSourceTime(time);
     setCurrentDisplayGameTime(currentGameClock);
     setIsPauseActive(pauseActive);
+    const prevHeroesByHandle = new Map(prev.heroes.map((hero) => [hero.handle, hero]));
+    const nextHeroesByHandle = new Map((next?.heroes ?? []).map((hero) => [hero.handle, hero]));
     const lineupHeroes = [...teamLineups.radiant, ...teamLineups.dire];
     const nextHudStatus: Record<number, HudHeroStatus> = {};
     for (const hero of lineupHeroes) {
+      const prevHero = prevHeroesByHandle.get(hero.key);
+      const nextHero = nextHeroesByHandle.get(hero.key) ?? prevHero;
+      const hpInterpolationFactor = !next || prev === next ? 0 : t;
+      const interpolatedHp = Math.max(
+        0,
+        Math.round(lerp(prevHero?.hp ?? 0, nextHero?.hp ?? prevHero?.hp ?? 0, hpInterpolationFactor))
+      );
+      const interpolatedMaxHp = Math.max(
+        0,
+        Math.round(lerp(prevHero?.max_hp ?? 0, nextHero?.max_hp ?? prevHero?.max_hp ?? 0, hpInterpolationFactor))
+      );
+      const hpRatio = interpolatedMaxHp > 0
+        ? clamp(interpolatedHp / interpolatedMaxHp, 0, 1)
+        : 0;
+
       const intervals = deathIntervalsRef.current.get(hero.key) ?? [];
       const activeDeath = intervals.find(
         (interval) => time >= interval.startSourceTime && time < interval.endSourceTime
       );
 
       if (!activeDeath) {
-        nextHudStatus[hero.key] = { isAlive: true };
+        nextHudStatus[hero.key] = {
+          isAlive: true,
+          hp: interpolatedHp,
+          maxHp: interpolatedMaxHp,
+          hpRatio,
+        };
         continue;
       }
 
@@ -517,6 +542,9 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       nextHudStatus[hero.key] = {
         isAlive: false,
         respawnRemainingSeconds: Math.max(0, Math.ceil(respawnGameClock - currentGameClock)),
+        hp: 0,
+        maxHp: interpolatedMaxHp,
+        hpRatio: 0,
       };
     }
     setHudHeroStatus(nextHudStatus);
@@ -589,19 +617,27 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
             const teamBorderClass = team === 'radiant' ? 'border-emerald-500/70' : 'border-rose-500/70';
             const heroStatus = hudHeroStatus[hero.key];
             const isDead = heroStatus ? !heroStatus.isAlive : false;
+            const healthPercent = Math.round(
+              clamp(heroStatus?.hpRatio ?? (isDead ? 0 : 1), 0, 1) * 100
+            );
+            const healthCurrent = Math.max(0, Math.round(heroStatus?.hp ?? 0));
+            const healthMax = Math.max(0, Math.round(heroStatus?.maxHp ?? 0));
+            const healthValueLabel = `${healthCurrent}/${healthMax}`;
 
             return (
               <div
                 key={hero.key}
                 className="relative pt-2"
-                title={heroLabel}
               >
                 {isDead && typeof heroStatus?.respawnRemainingSeconds === 'number' && (
                   <span className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded-full border border-amber-300/65 bg-slate-900/95 px-2 py-[1px] text-[10px] font-semibold text-amber-200 shadow-sm">
                     {heroStatus.respawnRemainingSeconds}s
                   </span>
                 )}
-                <div className={`aspect-[16/9] overflow-hidden rounded-md border bg-slate-950/90 shadow-sm ${teamBorderClass}`}>
+                <div
+                  className={`aspect-[16/9] overflow-hidden rounded-md border bg-slate-950/90 shadow-sm ${teamBorderClass}`}
+                  title={heroLabel}
+                >
                   <img
                     src={hero.portraitUrl}
                     alt={heroLabel}
@@ -609,6 +645,17 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                       isDead ? 'grayscale brightness-75' : 'grayscale-0 brightness-100'
                     }`}
                   />
+                </div>
+                <div className="group relative mt-1.5">
+                  <div className="h-2.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90 transition-[border-color,box-shadow] duration-150 group-hover:border-slate-500/90 group-hover:shadow-[0_0_0_1px_rgba(148,163,184,0.3),0_0_10px_rgba(15,23,42,0.55)]">
+                    <div
+                      className={`h-full transition-[width,filter,opacity] duration-150 ${team === 'radiant' ? 'bg-emerald-400/95' : 'bg-rose-400/95'} ${isDead ? 'opacity-60' : ''} group-hover:brightness-110`}
+                      style={{ width: `${healthPercent}%` }}
+                    />
+                  </div>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-slate-500/70 bg-slate-950/95 px-1.5 py-[1px] text-[10px] font-semibold text-slate-100 opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
+                    {healthValueLabel}
+                  </span>
                 </div>
               </div>
             );

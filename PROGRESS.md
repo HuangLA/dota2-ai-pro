@@ -509,6 +509,11 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-15 | **修复比赛详情时长来源**: `GET /matches/{id}` 优先读取 Parquet metadata `duration_seconds` 覆盖 SQLite 值，避免列表/详情显示旧时长 58:59 | OpenCode |
 | 2026-02-15 | **统一 HUD 计时基准并补全前端 pause 推断**: 回放页当前时钟与复活倒计时统一使用同一 `mapper` 基准；当后端未返回 `pause_intervals` 时由 `ticks.game_time` 冻结段自动推断暂停区间，修复“暂停显示有但时间轴/复活倒计时错位” | OpenCode |
 | 2026-02-15 | **进一步缩小时轴偏差**: 回放页时间显示与复活倒计时改为基于相邻 tick 的 `game_time` 插值（而非仅依赖 source->offset 映射），降低终局关键事件约 2~3 秒漂移 | OpenCode |
+| 2026-02-15 | **DONE: 比赛管理上传支持多文件**: ReplayUploader 扩展为文件选择与拖拽均可一次上传多个 `.dem`，并增加批量上传进度与错误汇总提示 | OpenCode |
+| 2026-02-15 | **DONE: 修复小地图 antimage 头像加载**: 地图渲染增加英雄名紧凑匹配（忽略下划线差异），修复 `anti_mage`/`antimage` 映射失败并覆盖同类命名差异 | OpenCode |
+| 2026-02-15 | **DONE: 回放 HUD 英雄头像下方新增实时血条**: 复用 tick `hp/max_hp` 数据在阵容栏渲染动态血量条，兼容桌面与移动端布局并保持现有视觉风格 | OpenCode |
+| 2026-02-15 | **DONE: RealMatchViewer HUD 血条交互增强**: 血条加粗并增加 hover 高亮/阴影效果，悬停显示实时血量数值（当前/最大），兼容阵亡态显示 | OpenCode |
+| 2026-02-15 | **DONE: 修复 RealMatchViewer HUD 血条 hover 双提示**: 移除血条区域 `title` 原生 tooltip，并将英雄名称 tooltip 限定到头像容器以保留名称提示且不干扰自定义血量浮层 | OpenCode |
 
 ---
 
