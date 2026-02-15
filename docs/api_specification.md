@@ -886,15 +886,16 @@ DELETE /api/v1/matches/8123456789?delete_files=true
 
 ### 4.3 回放数据流 (Playback Engine)
 
-#### 4.3.0 时间语义约定（2026-02-14 起执行）
+#### 4.3.0 时间语义约定（pause-aware，2026-02-14 起执行）
 
 为避免 Timeline 与游戏时钟错位，回放时序接口统一遵循以下约定：
 
-- `time`: 解析源时间轴（当前实现通常为 `tick / 30`，单调递增）
-- `game_time`: 游戏时钟（出兵时刻为 `0`，出兵前为负数）
+- `time`: 解析源时间轴（当前实现通常为 `tick / 30`，始终单调递增，不因暂停冻结）
+- `game_time`: 游戏时钟（出兵时刻为 `0`，出兵前为负数，暂停期间保持不变）
 - `time_basis`: 响应顶层时间映射元信息，用于前端无歧义对齐时间轴
+- `pause_intervals`: 暂停区间映射（replay 时间域），用于前端在暂停区间显示“暂停中”并冻结 game clock
 
-`GET /api/v1/playback/{match_id}/ticks` 与 `GET /api/v1/playback/{match_id}/wards` 顶层返回同构 `time_basis`：
+`GET /api/v1/playback/{match_id}/ticks` 与 `GET /api/v1/playback/{match_id}/wards` 顶层返回同构 `time_basis`，并在顶层冗余返回 `pause_intervals`（便于兼容旧前端解析路径）：
 
 ```json
 {
@@ -905,12 +906,31 @@ DELETE /api/v1/matches/8123456789?delete_files=true
     "game_start_time": 218.73334,
     "offset_seconds": 218.73334,
     "clock_zero_source": "combatlog",
-    "mapping": "game_time = tick / 30.0 - m_flGameStartTime; fallback to tick / 30.0"
-  }
+    "pause_intervals": [
+      {
+        "replay_start_time": 1662.0,
+        "replay_end_time": 1680.0,
+        "game_time": 1443.2666,
+        "duration_seconds": 18.0
+      }
+    ],
+    "mapping": "game_time = source_time - offset_seconds; source_time 通常为 tick/30，pause_intervals 表示 source_time 增长但 game_time 冻结区间"
+  },
+  "pause_intervals": [
+    {
+      "replay_start_time": 1662.0,
+      "replay_end_time": 1680.0,
+      "game_time": 1443.2666,
+      "duration_seconds": 18.0
+    }
+  ]
 }
 ```
 
-说明：后端返回的 `game_time` 为解析器原始游戏时钟，不做额外平移。前端统一采用“标准(-1:30 起点)”显示口径进行进度条锚定；不再提供“原始解析时间”切换。
+说明：
+- 后端返回的 `game_time` 为解析器原始游戏时钟，不做额外平移。
+- `pause_intervals` 允许前端在 replay 时间持续前进时冻结 game clock 展示。
+- 无暂停数据时 `pause_intervals` 返回空数组，保持与既有行为兼容。
 
 #### 4.3.1 获取时序坐标数据 ❌
 

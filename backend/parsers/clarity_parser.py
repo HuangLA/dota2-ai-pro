@@ -248,6 +248,7 @@ class ClarityParser:
             clock_zero_source=raw_meta.get("clock_zero_source"),
             ticks_per_second=raw_meta.get("ticks_per_second"),
             time_mapping=raw_meta.get("time_mapping"),
+            pause_intervals=raw_meta.get("pause_intervals", []),
             picks_bans=picks_bans,
             players=players
         )

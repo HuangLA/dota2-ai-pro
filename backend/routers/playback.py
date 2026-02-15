@@ -1,6 +1,8 @@
 """Playback data endpoints for map rendering."""
 
 import math
+import os
+from pathlib import Path
 from typing import Optional, cast
 
 import pandas as pd
@@ -11,8 +13,18 @@ from storage.match_storage import MatchStorage
 
 router = APIRouter()
 
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_backend_path(env_key: str, default_relative: str) -> str:
+    configured = os.getenv(env_key, default_relative)
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        candidate = BACKEND_ROOT / candidate
+    return str(candidate)
+
 # Initialize storage
-parquet_storage = ParquetStorage("backend/data/matches")
+parquet_storage = ParquetStorage(_resolve_backend_path("MATCHES_DIR", "data/matches"))
 match_storage = MatchStorage()
 
 
@@ -92,6 +104,125 @@ def has_non_null_game_time(df: pd.DataFrame) -> bool:
     return bool(not df.empty and "game_time" in df.columns and df["game_time"].notna().any())
 
 
+def normalize_pause_intervals(raw_intervals: object) -> list[dict[str, float]]:
+    """Normalize pause intervals from metadata into a stable list."""
+    if not isinstance(raw_intervals, list):
+        return []
+
+    normalized: list[dict[str, float]] = []
+    for item in raw_intervals:
+        if not isinstance(item, dict):
+            continue
+        start = _coerce_float(item.get("replay_start_time"))
+        end = _coerce_float(item.get("replay_end_time"))
+        game_time = _coerce_float(item.get("game_time"))
+        if start is None or end is None or game_time is None:
+            continue
+        if end <= start:
+            continue
+        duration = _coerce_float(item.get("duration_seconds"))
+        if duration is None:
+            duration = end - start
+        normalized.append(
+            {
+                "replay_start_time": start,
+                "replay_end_time": end,
+                "game_time": game_time,
+                "duration_seconds": duration,
+            }
+        )
+    return normalized
+
+
+def infer_pause_intervals_from_df(df: pd.DataFrame) -> list[dict[str, float]]:
+    """Infer replay pause intervals using per-tick game_time freezes."""
+    if df.empty or "tick" not in df.columns or "game_time" not in df.columns:
+        return []
+
+    valid_rows = df[df["game_time"].notna()].copy()
+    if valid_rows.empty:
+        return []
+
+    tick_game_time: dict[int, float] = {}
+    for _, row in valid_rows.sort_values("tick").iterrows():
+        tick_value = _coerce_float(row.get("tick"))
+        game_time = _coerce_float(row.get("game_time"))
+        if tick_value is None or game_time is None:
+            continue
+        tick_game_time.setdefault(int(tick_value), game_time)
+
+    if len(tick_game_time) < 2:
+        return []
+
+    ticks = sorted(tick_game_time)
+    epsilon = 1e-4
+    intervals: list[dict[str, float]] = []
+    active: Optional[dict[str, float]] = None
+
+    for idx in range(1, len(ticks)):
+        prev_tick = ticks[idx - 1]
+        curr_tick = ticks[idx]
+        prev_replay_time = tick_to_seconds(prev_tick)
+        curr_replay_time = tick_to_seconds(curr_tick)
+        if curr_replay_time <= prev_replay_time:
+            continue
+
+        prev_game_time = tick_game_time[prev_tick]
+        curr_game_time = tick_game_time[curr_tick]
+        is_paused = abs(curr_game_time - prev_game_time) <= epsilon
+
+        if is_paused:
+            if active is None:
+                active = {
+                    "replay_start_time": prev_replay_time,
+                    "replay_end_time": curr_replay_time,
+                    "game_time": prev_game_time,
+                }
+            else:
+                same_game_time = abs(active["game_time"] - prev_game_time) <= epsilon
+                contiguous = abs(active["replay_end_time"] - prev_replay_time) <= epsilon
+                if same_game_time and contiguous:
+                    active["replay_end_time"] = curr_replay_time
+                else:
+                    active["duration_seconds"] = active["replay_end_time"] - active["replay_start_time"]
+                    intervals.append(active)
+                    active = {
+                        "replay_start_time": prev_replay_time,
+                        "replay_end_time": curr_replay_time,
+                        "game_time": prev_game_time,
+                    }
+        elif active is not None:
+            active["duration_seconds"] = active["replay_end_time"] - active["replay_start_time"]
+            intervals.append(active)
+            active = None
+
+    if active is not None:
+        active["duration_seconds"] = active["replay_end_time"] - active["replay_start_time"]
+        intervals.append(active)
+
+    return intervals
+
+
+def resolve_pause_intervals(
+    metadata: Optional[dict],
+    primary_df: pd.DataFrame,
+    fallback_df: Optional[pd.DataFrame] = None,
+) -> list[dict[str, float]]:
+    """Resolve pause intervals from metadata first, then infer from samples."""
+    metadata_intervals = normalize_pause_intervals((metadata or {}).get("pause_intervals"))
+    if metadata_intervals:
+        return metadata_intervals
+
+    inferred = infer_pause_intervals_from_df(primary_df)
+    if inferred:
+        return inferred
+
+    if fallback_df is not None:
+        return infer_pause_intervals_from_df(fallback_df)
+
+    return []
+
+
 def resolve_offset_seconds(
     metadata: Optional[dict],
     primary_df: pd.DataFrame,
@@ -124,6 +255,7 @@ def build_time_basis(
     has_game_time: bool,
     offset_seconds: float,
     clock_zero_source: str,
+    pause_intervals: list[dict[str, float]],
 ) -> dict:
     """Build response-level time mapping metadata.
 
@@ -149,6 +281,7 @@ def build_time_basis(
             "game_start_time": stable_game_start_time,
             "offset_seconds": offset_seconds,
             "clock_zero_source": clock_zero_source,
+            "pause_intervals": pause_intervals,
             "mapping": time_mapping or "game_time = m_fGameTime - m_flGameStartTime",
         }
 
@@ -159,6 +292,7 @@ def build_time_basis(
         "game_start_time": stable_game_start_time,
         "offset_seconds": offset_seconds,
         "clock_zero_source": clock_zero_source,
+        "pause_intervals": pause_intervals,
         "mapping": "game_time unavailable; use time = tick / ticks_per_second",
     }
 
@@ -220,11 +354,13 @@ async def get_ticks(
         has_game_time = has_game_time or has_non_null_game_time(fallback_wards_df)
 
     offset_seconds, clock_zero_source = resolve_offset_seconds(meta, df, fallback_wards_df)
+    pause_intervals = resolve_pause_intervals(meta, df, fallback_wards_df)
     time_basis = build_time_basis(
         meta,
         has_game_time,
         offset_seconds,
         clock_zero_source,
+        pause_intervals,
     )
     
     if df.empty:
@@ -236,6 +372,7 @@ async def get_ticks(
             "ticks": [],
             "total_samples": 0,
             "time_basis": time_basis,
+            "pause_intervals": pause_intervals,
         }
     
     # Apply interval sampling if needed
@@ -294,6 +431,7 @@ async def get_ticks(
         "ticks": ticks_data,
         "total_samples": len(ticks_data),
         "time_basis": time_basis,
+        "pause_intervals": pause_intervals,
     }
 
 
@@ -402,11 +540,13 @@ async def get_wards(
         has_game_time = has_game_time or has_non_null_game_time(fallback_positions_df)
 
     offset_seconds, clock_zero_source = resolve_offset_seconds(meta, wards_df, fallback_positions_df)
+    pause_intervals = resolve_pause_intervals(meta, wards_df, fallback_positions_df)
     time_basis = build_time_basis(
         meta,
         has_game_time,
         offset_seconds,
         clock_zero_source,
+        pause_intervals,
     )
     
     wards = []
@@ -453,6 +593,7 @@ async def get_wards(
         "match_id": match_id,
         "wards": wards,
         "time_basis": time_basis,
+        "pause_intervals": pause_intervals,
         "summary": {
             "total": len(wards),
             "placed": len(placed),

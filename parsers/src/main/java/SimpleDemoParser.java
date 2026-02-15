@@ -125,7 +125,7 @@ public class SimpleDemoParser {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("time_contract_version", "v1");
         metadata.put("ticks_per_second", 30);
-        metadata.put("time_mapping", "game_time = m_fGameTime - clock_zero_time; clock_zero_time priority: m_flGameStartTime - pregame_paused_seconds, then combatlog GAME_STATE=5, then (m_flPreGameStartTime + 90), then m_flGameStartTime; fallback to tick / 30.0 - clock_zero_time");
+        metadata.put("time_mapping", "replay_time = (m_fGameTime or tick/30); game_time = replay_time - clock_zero_time - max(total_paused_seconds - pregame_paused_seconds, 0); clock_zero_time priority: m_flGameStartTime - pregame_paused_seconds, then combatlog GAME_STATE=5, then (m_flPreGameStartTime + 90), then m_flGameStartTime");
         long fileInfoMatchId = 0L;
         if (fileInfo != null && fileInfo.hasGameInfo() && fileInfo.getGameInfo().hasDota()) {
             var dota = fileInfo.getGameInfo().getDota();
@@ -165,8 +165,15 @@ public class SimpleDemoParser {
         } else if (fileInfoMatchId != 0 && processor.getMatchId() != 0 && processor.getMatchId() != fileInfoMatchId) {
             metadata.put("gamerules_match_id", processor.getMatchId());
         }
-        if (processor.getGameTime() > 0) {
-            metadata.put("duration_seconds", processor.getGameTime());
+        float durationSeconds = processor.hasFinalGameTime()
+                ? processor.getFinalGameTime()
+                : processor.getGameTime();
+        if (durationSeconds > 0) {
+            metadata.put("duration_seconds", durationSeconds);
+        }
+        if (processor.hasFinalGameTime()) {
+            metadata.put("final_whistle_game_time", processor.getFinalGameTime());
+            metadata.put("final_whistle_source", processor.getFinalGameTimeSource());
         }
         if (processor.hasClockZeroTime()) {
             metadata.put("game_start_time", processor.getClockZeroTime());
@@ -187,6 +194,7 @@ public class SimpleDemoParser {
         if (processor.getWinner() != 0) {
             metadata.put("winner", processor.getWinner());
         }
+        metadata.put("pause_intervals", processor.getPauseIntervals());
         
         result.put("metadata", metadata);
         
@@ -231,6 +239,8 @@ public class SimpleDemoParser {
         private long matchId = 0;
         private float gameTime = 0;
         private Float currentGameRulesTime = null; // pause-aware gamerules clock snapshot
+        private float currentTotalPausedSeconds = 0;
+        private boolean currentGamePaused = false;
         private float rawGameStartTime = 0; // m_flGameStartTime
         private boolean hasRawGameStartTime = false;
         private float preGameStartTime = 0; // m_flPreGameStartTime
@@ -243,6 +253,15 @@ public class SimpleDemoParser {
         private boolean hasClockZeroTime = false;
         private String clockZeroSource = "unknown";
         private int winner = 0; // 2=Radiant, 3=Dire
+        private float finalGameTime = 0;
+        private boolean hasFinalGameTime = false;
+        private float finalGameStateTime = 0;
+        private boolean hasFinalGameStateTime = false;
+        private float finalWinnerTime = 0;
+        private boolean hasFinalWinnerTime = false;
+        private Integer lastWinnerState = null;
+        private int lastGameState = 0;
+        private String finalGameTimeSource = "";
         
         // Collected data
         private List<Map<String, Object>> positionSamples = new ArrayList<>();
@@ -260,6 +279,16 @@ public class SimpleDemoParser {
         // Keep per-sample gamerules clock snapshots so we can recompute
         // all game_time values against one consistent basis later.
         private IdentityHashMap<Map<String, Object>, Float> gameRulesTimeSnapshots = new IdentityHashMap<>();
+        private IdentityHashMap<Map<String, Object>, Float> totalPausedSecondsSnapshots = new IdentityHashMap<>();
+        private IdentityHashMap<Map<String, Object>, Boolean> gamePausedSnapshots = new IdentityHashMap<>();
+
+        // Pause intervals in replay-time domain.
+        private List<Map<String, Object>> pauseIntervals = new ArrayList<>();
+        private boolean pauseIntervalActive = false;
+        private float pauseIntervalStartReplayTime = 0;
+        private float pauseIntervalStartGameTime = 0;
+        private float lastObservedReplayTime = 0;
+        private Float previousTotalPausedSeconds = null;
         
         public DotaMatchProcessor(boolean minimalMode) {
             this.minimalMode = minimalMode;
@@ -268,6 +297,7 @@ public class SimpleDemoParser {
         @OnTickStart
         public void onTickStart(Context ctx, boolean synthetic) {
             totalTicks++;
+            lastObservedReplayTime = getReplayTime(ctx.getTick(), currentGameRulesTime);
             
             // Sample hero positions at regular intervals
             if (!minimalMode && (totalTicks - lastSampledTick) >= POSITION_SAMPLE_INTERVAL) {
@@ -278,23 +308,20 @@ public class SimpleDemoParser {
         
         @OnEntityCreated(classPattern = "CDOTAGamerulesProxy")
         public void onGameRulesCreated(Context ctx, Entity e) {
-            updateGameRules(e);
+            updateGameRules(ctx, e);
         }
         
         @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
         public void onGameRulesUpdated(Context ctx, Entity e, FieldPath[] changedPaths, int numChanges) {
-            updateGameRules(e);
+            updateGameRules(ctx, e);
         }
         
-        private void updateGameRules(Entity e) {
+        private void updateGameRules(Context ctx, Entity e) {
             try {
                 // Try to get game time
                 Object gameTimeObj = getPropertySafe(e, "m_pGameRules.m_fGameTime");
                 if (gameTimeObj != null) {
                     currentGameRulesTime = ((Number) gameTimeObj).floatValue();
-                    gameTime = hasClockZeroTime
-                            ? currentGameRulesTime - clockZeroTime
-                            : currentGameRulesTime;
                 }
 
                 Object preGameStartTimeObj = getPropertySafe(e, "m_pGameRules.m_flPreGameStartTime");
@@ -314,9 +341,19 @@ public class SimpleDemoParser {
                 int gameState = gameStateObj != null ? ((Number) gameStateObj).intValue() : 0;
 
                 Object totalPausedTicksObj = getPropertySafe(e, "m_pGameRules.m_nTotalPausedTicks");
-                float totalPausedSeconds = 0.0f;
+                float totalPausedSeconds = currentTotalPausedSeconds;
                 if (totalPausedTicksObj != null) {
                     totalPausedSeconds = ((Number) totalPausedTicksObj).floatValue() / 30.0f;
+                }
+                currentTotalPausedSeconds = totalPausedSeconds;
+
+                Object gamePausedObj = getPropertySafe(e, "m_pGameRules.m_bGamePaused");
+                if (gamePausedObj != null) {
+                    if (gamePausedObj instanceof Boolean) {
+                        currentGamePaused = (Boolean) gamePausedObj;
+                    } else {
+                        currentGamePaused = ((Number) gamePausedObj).intValue() != 0;
+                    }
                 }
 
                 if (gameState == 5 && !hasPausedSecondsAtClockZero && totalPausedTicksObj != null) {
@@ -354,6 +391,18 @@ public class SimpleDemoParser {
                         recalculateGameTimes(wardEvents);
                     }
                 }
+
+                int tick = ctx != null ? ctx.getTick() : totalTicks;
+                float replayTime = getReplayTime(tick, currentGameRulesTime);
+                lastObservedReplayTime = replayTime;
+                gameTime = getCurrentGameClock(tick, currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused);
+                updatePauseIntervals(replayTime, gameTime, currentGamePaused, currentTotalPausedSeconds);
+
+                if (!hasFinalGameStateTime && lastGameState == 5 && gameState > 5) {
+                    finalGameStateTime = gameTime;
+                    hasFinalGameStateTime = true;
+                }
+                lastGameState = gameState;
                 
                 // Try to get match ID
                 Object matchIdObj = getPropertySafe(e, "m_pGameRules.m_unMatchID64");
@@ -364,7 +413,24 @@ public class SimpleDemoParser {
                 // Try to get winner
                 Object winnerObj = getPropertySafe(e, "m_pGameRules.m_nGameWinner");
                 if (winnerObj != null) {
-                    winner = ((Number) winnerObj).intValue();
+                    int newWinner = ((Number) winnerObj).intValue();
+                    winner = newWinner;
+                    if ((newWinner == 2 || newWinner == 3)
+                            && (lastWinnerState == null || lastWinnerState <= 1)) {
+                        finalWinnerTime = gameTime;
+                        hasFinalWinnerTime = true;
+                    }
+                    lastWinnerState = newWinner;
+                }
+
+                if (hasFinalWinnerTime) {
+                    finalGameTime = finalWinnerTime;
+                    hasFinalGameTime = true;
+                    finalGameTimeSource = "winner_transition";
+                } else if (hasFinalGameStateTime) {
+                    finalGameTime = finalGameStateTime;
+                    hasFinalGameTime = true;
+                    finalGameTimeSource = "game_state_transition";
                 }
             } catch (Exception ex) {
                 // Property access can fail, ignore
@@ -434,9 +500,9 @@ public class SimpleDemoParser {
             wardEvent.put("type", "placed");
             wardEvent.put("ward_type", isObserver ? "observer" : "sentry");
             wardEvent.put("tick", ctx.getTick());
-            wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime));
+            wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused));
             wardEvent.put("handle", ward.getHandle());
-            snapshotGameRulesTime(wardEvent, currentGameRulesTime);
+            snapshotTimingState(wardEvent, currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused);
             
             // Get position
             float[] pos = getEntityPosition(ward);
@@ -465,9 +531,9 @@ public class SimpleDemoParser {
             wardEvent.put("type", "destroyed");
             wardEvent.put("ward_type", isObserver ? "observer" : "sentry");
             wardEvent.put("tick", ctx.getTick());
-            wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime));
+            wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused));
             wardEvent.put("handle", ward.getHandle());
-            snapshotGameRulesTime(wardEvent, currentGameRulesTime);
+            snapshotTimingState(wardEvent, currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused);
             
             wardEvents.add(wardEvent);
         }
@@ -528,7 +594,9 @@ public class SimpleDemoParser {
         private void sampleHeroPositions(Context ctx) {
             int tick = ctx.getTick();
             Float gameRulesTimeSnapshot = currentGameRulesTime;
-            float gameClock = getCurrentGameClock(tick, gameRulesTimeSnapshot);
+            float totalPausedSecondsSnapshot = currentTotalPausedSeconds;
+            boolean gamePausedSnapshot = currentGamePaused;
+            float gameClock = getCurrentGameClock(tick, gameRulesTimeSnapshot, totalPausedSecondsSnapshot, gamePausedSnapshot);
             
             for (HeroState heroState : trackedHeroes.values()) {
                 try {
@@ -561,7 +629,7 @@ public class SimpleDemoParser {
                     if (level != null) sample.put("level", ((Number) level).intValue());
                     
                     positionSamples.add(sample);
-                    snapshotGameRulesTime(sample, gameRulesTimeSnapshot);
+                    snapshotTimingState(sample, gameRulesTimeSnapshot, totalPausedSecondsSnapshot, gamePausedSnapshot);
                     
                 } catch (Exception e) {
                     // Entity access can fail, skip this sample
@@ -615,24 +683,48 @@ public class SimpleDemoParser {
             return null;
         }
 
-        private float getCurrentGameClock(int tick, Float gameRulesTimeSnapshot) {
+        private float getReplayTime(int tick, Float gameRulesTimeSnapshot) {
             if (gameRulesTimeSnapshot != null) {
-                return hasClockZeroTime
-                        ? gameRulesTimeSnapshot - clockZeroTime
-                        : gameRulesTimeSnapshot;
+                return gameRulesTimeSnapshot;
             }
 
             float tickSeconds = tick / 30.0f;
-            if (hasClockZeroTime) {
-                return tickSeconds - clockZeroTime;
-            }
             return tickSeconds;
         }
 
-        private void snapshotGameRulesTime(Map<String, Object> sample, Float gameRulesTimeSnapshot) {
+        private float getCurrentGameClock(
+                int tick,
+                Float gameRulesTimeSnapshot,
+                float totalPausedSecondsSnapshot,
+                boolean gamePausedSnapshot) {
+            float replayTime = getReplayTime(tick, gameRulesTimeSnapshot);
+            if (hasClockZeroTime) {
+                float postGamePausedSeconds = getPausedDurationAtReplayTime(replayTime);
+                if (gamePausedSnapshot && pauseIntervalActive && replayTime > pauseIntervalStartReplayTime) {
+                    postGamePausedSeconds += replayTime - pauseIntervalStartReplayTime;
+                }
+
+                if (postGamePausedSeconds <= 0.0f) {
+                    float fallbackPostGamePausedSeconds = hasPausedSecondsAtClockZero
+                            ? Math.max(0.0f, totalPausedSecondsSnapshot - pausedSecondsAtClockZero)
+                            : Math.max(0.0f, totalPausedSecondsSnapshot);
+                    postGamePausedSeconds = fallbackPostGamePausedSeconds;
+                }
+                return replayTime - clockZeroTime - postGamePausedSeconds;
+            }
+            return replayTime;
+        }
+
+        private void snapshotTimingState(
+                Map<String, Object> sample,
+                Float gameRulesTimeSnapshot,
+                float totalPausedSecondsSnapshot,
+                boolean gamePausedSnapshot) {
             if (gameRulesTimeSnapshot != null) {
                 gameRulesTimeSnapshots.put(sample, gameRulesTimeSnapshot);
             }
+            totalPausedSecondsSnapshots.put(sample, totalPausedSecondsSnapshot);
+            gamePausedSnapshots.put(sample, gamePausedSnapshot);
         }
 
         private void recalculateGameTimes(List<Map<String, Object>> samples) {
@@ -643,7 +735,101 @@ public class SimpleDemoParser {
                 }
                 int tick = ((Number) tickObj).intValue();
                 Float gameRulesTimeSnapshot = gameRulesTimeSnapshots.get(sample);
-                sample.put("game_time", getCurrentGameClock(tick, gameRulesTimeSnapshot));
+                Float totalPausedSecondsSnapshot = totalPausedSecondsSnapshots.get(sample);
+                Boolean gamePausedSnapshot = gamePausedSnapshots.get(sample);
+                float pausedSeconds = totalPausedSecondsSnapshot != null ? totalPausedSecondsSnapshot : currentTotalPausedSeconds;
+                boolean pausedFlag = gamePausedSnapshot != null ? gamePausedSnapshot : false;
+                sample.put("game_time", getCurrentGameClock(tick, gameRulesTimeSnapshot, pausedSeconds, pausedFlag));
+            }
+        }
+
+        private float getPausedDurationAtReplayTime(float replayTime) {
+            float paused = 0.0f;
+            for (Map<String, Object> interval : pauseIntervals) {
+                Object startObj = interval.get("replay_start_time");
+                Object endObj = interval.get("replay_end_time");
+                if (!(startObj instanceof Number) || !(endObj instanceof Number)) {
+                    continue;
+                }
+                float start = ((Number) startObj).floatValue();
+                float end = ((Number) endObj).floatValue();
+                if (replayTime <= start) {
+                    continue;
+                }
+                if (replayTime >= end) {
+                    paused += end - start;
+                } else {
+                    paused += replayTime - start;
+                }
+            }
+            return paused;
+        }
+
+        private void updatePauseIntervals(
+                float replayTime,
+                float gameClock,
+                boolean isGamePaused,
+                float totalPausedSeconds) {
+            if (!hasClockZeroTime || replayTime < clockZeroTime) {
+                if (pauseIntervalActive) {
+                    pauseIntervalActive = false;
+                }
+                previousTotalPausedSeconds = totalPausedSeconds;
+                return;
+            }
+
+            if (!isGamePaused && !pauseIntervalActive && previousTotalPausedSeconds != null) {
+                float deltaPaused = totalPausedSeconds - previousTotalPausedSeconds;
+                if (deltaPaused > 0.25f) {
+                    float replayStart = replayTime - deltaPaused;
+                    if (replayStart < clockZeroTime) {
+                        replayStart = clockZeroTime;
+                    }
+                    float duration = replayTime - replayStart;
+                    if (duration > 1e-3f) {
+                        Map<String, Object> interval = new HashMap<>();
+                        interval.put("replay_start_time", replayStart);
+                        interval.put("replay_end_time", replayTime);
+                        interval.put("duration_seconds", duration);
+                        interval.put("game_time", gameClock);
+                        pauseIntervals.add(interval);
+                    }
+                }
+            }
+
+            if (isGamePaused && !pauseIntervalActive) {
+                pauseIntervalActive = true;
+                pauseIntervalStartReplayTime = replayTime;
+                pauseIntervalStartGameTime = gameClock;
+                previousTotalPausedSeconds = totalPausedSeconds;
+                return;
+            }
+
+            if (!isGamePaused && pauseIntervalActive) {
+                closePauseInterval(replayTime);
+            }
+            previousTotalPausedSeconds = totalPausedSeconds;
+        }
+
+        private void closePauseInterval(float replayEndTime) {
+            float duration = replayEndTime - pauseIntervalStartReplayTime;
+            if (duration <= 1e-3f) {
+                pauseIntervalActive = false;
+                return;
+            }
+
+            Map<String, Object> interval = new HashMap<>();
+            interval.put("replay_start_time", pauseIntervalStartReplayTime);
+            interval.put("replay_end_time", replayEndTime);
+            interval.put("duration_seconds", duration);
+            interval.put("game_time", pauseIntervalStartGameTime);
+            pauseIntervals.add(interval);
+            pauseIntervalActive = false;
+        }
+
+        private void finalizePauseIntervals() {
+            if (pauseIntervalActive) {
+                closePauseInterval(lastObservedReplayTime);
             }
         }
         
@@ -663,6 +849,13 @@ public class SimpleDemoParser {
         public float getPausedSecondsAtClockZero() { return pausedSecondsAtClockZero; }
         public boolean hasPausedSecondsAtClockZero() { return hasPausedSecondsAtClockZero; }
         public int getWinner() { return winner; }
+        public float getFinalGameTime() { return finalGameTime; }
+        public boolean hasFinalGameTime() { return hasFinalGameTime; }
+        public String getFinalGameTimeSource() { return finalGameTimeSource; }
+        public List<Map<String, Object>> getPauseIntervals() {
+            finalizePauseIntervals();
+            return pauseIntervals;
+        }
         public List<Map<String, Object>> getPositionSamples() { return positionSamples; }
         public List<Map<String, Object>> getKillEvents() { return killEvents; }
         public List<Map<String, Object>> getWardEvents() { return wardEvents; }

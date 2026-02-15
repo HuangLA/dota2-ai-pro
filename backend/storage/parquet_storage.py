@@ -23,6 +23,18 @@ import pyarrow.parquet as pq
 from parsers.models import ParseResult, PositionSample, KillEvent, WardEvent
 
 
+def _coerce_float(value: object) -> Optional[float]:
+    """Coerce values to float, preserving None for invalid input."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if pd.isna(numeric):
+            return None
+        return numeric
+    return None
+
+
 class ParquetStorage:
     """
     Handles Parquet file storage for replay data.
@@ -36,14 +48,20 @@ class ParquetStorage:
         kills_df = storage.get_kills(match_id)
     """
     
-    def __init__(self, base_path: str = "backend/data/matches"):
+    def __init__(self, base_path: str = "data/matches"):
         """
         Initialize Parquet storage.
         
         Args:
             base_path: Base directory for match data storage
         """
-        self.base_path = Path(base_path)
+        backend_root = Path(__file__).resolve().parents[1]
+        candidate = Path(base_path)
+        if not candidate.is_absolute():
+            normalized = Path(*candidate.parts[1:]) if candidate.parts and candidate.parts[0] == "backend" else candidate
+            candidate = backend_root / normalized
+
+        self.base_path = candidate
         self.base_path.mkdir(parents=True, exist_ok=True)
     
     def get_match_dir(self, match_id: int) -> Path:
@@ -174,6 +192,10 @@ class ParquetStorage:
     
     def _save_metadata(self, match_dir: Path, result: ParseResult) -> None:
         """Save match metadata as JSON."""
+        pause_intervals = result.metadata.pause_intervals
+        if not pause_intervals:
+            pause_intervals = self._infer_pause_intervals(result.positions, result.wards)
+
         meta = {
             "match_id": result.metadata.match_id,
             "game_mode": result.metadata.game_mode,
@@ -185,6 +207,7 @@ class ParquetStorage:
             "clock_zero_source": result.metadata.clock_zero_source,
             "ticks_per_second": result.metadata.ticks_per_second,
             "time_mapping": result.metadata.time_mapping,
+            "pause_intervals": pause_intervals,
             "total_ticks": result.total_ticks,
             "parse_time_ms": result.parse_time_ms,
             "file_size_bytes": result.file_size_bytes,
@@ -210,6 +233,81 @@ class ParquetStorage:
         
         with open(match_dir / "meta.json", "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
+
+    def _infer_pause_intervals(
+        self,
+        positions: list[PositionSample],
+        wards: list[WardEvent],
+    ) -> list[dict[str, float]]:
+        """Infer pause intervals from replay_time/game_time deltas."""
+        per_tick_game_time: dict[int, float] = {}
+
+        for sample in positions:
+            game_time = _coerce_float(getattr(sample, "game_time", None))
+            if game_time is None:
+                continue
+            per_tick_game_time.setdefault(sample.tick, game_time)
+
+        if not per_tick_game_time:
+            for event in wards:
+                game_time = _coerce_float(getattr(event, "game_time", None))
+                if game_time is None:
+                    continue
+                per_tick_game_time.setdefault(event.tick, game_time)
+
+        if len(per_tick_game_time) < 2:
+            return []
+
+        ticks = sorted(per_tick_game_time)
+        intervals: list[dict[str, float]] = []
+        active: Optional[dict[str, float]] = None
+        epsilon = 1e-4
+
+        for idx in range(1, len(ticks)):
+            prev_tick = ticks[idx - 1]
+            curr_tick = ticks[idx]
+            prev_replay_time = prev_tick / 30.0
+            curr_replay_time = curr_tick / 30.0
+            if curr_replay_time <= prev_replay_time:
+                continue
+
+            prev_game_time = per_tick_game_time[prev_tick]
+            curr_game_time = per_tick_game_time[curr_tick]
+            game_delta = curr_game_time - prev_game_time
+            is_paused = abs(game_delta) <= epsilon
+
+            if is_paused:
+                if active is None:
+                    active = {
+                        "replay_start_time": prev_replay_time,
+                        "replay_end_time": curr_replay_time,
+                        "game_time": prev_game_time,
+                    }
+                else:
+                    same_game_time = abs(active["game_time"] - prev_game_time) <= epsilon
+                    contiguous = abs(active["replay_end_time"] - prev_replay_time) <= epsilon
+                    if same_game_time and contiguous:
+                        active["replay_end_time"] = curr_replay_time
+                    else:
+                        active["duration_seconds"] = (
+                            active["replay_end_time"] - active["replay_start_time"]
+                        )
+                        intervals.append(active)
+                        active = {
+                            "replay_start_time": prev_replay_time,
+                            "replay_end_time": curr_replay_time,
+                            "game_time": prev_game_time,
+                        }
+            elif active is not None:
+                active["duration_seconds"] = active["replay_end_time"] - active["replay_start_time"]
+                intervals.append(active)
+                active = None
+
+        if active is not None:
+            active["duration_seconds"] = active["replay_end_time"] - active["replay_start_time"]
+            intervals.append(active)
+
+        return intervals
     
     # =========== Query Methods ===========
     

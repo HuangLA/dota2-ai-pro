@@ -13,7 +13,7 @@ router = APIRouter()
 
 # Initialize storage
 match_storage = MatchStorage()
-parquet_storage = ParquetStorage("backend/data/matches")
+parquet_storage = ParquetStorage("data/matches")
 
 
 # =========== Models ===========
@@ -144,10 +144,17 @@ async def get_match(match_id: int) -> MatchResponse:
             detail=f"Match {match_id} not found"
         )
     
+    duration = match.duration
+    meta = parquet_storage.get_metadata(match_id)
+    if meta:
+        duration_seconds = meta.get("duration_seconds")
+        if isinstance(duration_seconds, (int, float)) and duration_seconds > 0:
+            duration = int(duration_seconds)
+
     return MatchResponse(
         match_id=match.match_id,
         start_time=match.start_time,
-        duration=match.duration,
+        duration=duration,
         winner_team=match.winner_team,
         winner_name="Radiant" if match.winner_team == 2 else "Dire" if match.winner_team == 3 else None,
         radiant_score=match.radiant_score,

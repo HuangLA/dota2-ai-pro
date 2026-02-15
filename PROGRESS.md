@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4 - 数据化回放与职业战队数据库 🚀 |
-| 最后更新 | 2026-02-12 |
+| 最后更新 | 2026-02-14 |
 | 更新者 | OpenCode (Orchestrator) |
 
 ---
@@ -57,6 +57,7 @@
 | RP2-4 | 时间轴回归测试（2 场比赛） | Both | `TODO` | 86083386/84782020 验证出兵前负时间、出兵 0:00 对齐 |
 | RP2-5 | 事件与 HUD 扩展字段设计 | Both | `TODO` | 明确 kills/networth/gold/xp 的统一时基与字段契约 |
 | RP2-6 | 参考 OpenDota 处理链拆分解析模块 | Backend | `TODO` | 形成 processor 分层（时间层/事件层/统计层）设计草案 |
+| RP2-7 | Pause-aware 双时基时间轴改造（replay_time/game_time） | Both | `IN_PROGRESS` | 暂停时显示“暂停中”并冻结 game_time，保障眼位/事件统计口径稳定 |
 
 ### 上一冲刺: Phase 3 MVP 核心功能开发 ✅
 **状态**: `DONE` - 核心链路已打通
@@ -494,6 +495,20 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-14 | **调整 HUD 与地图居中关系**: 为阵容条与地图增加同一 `max-width` 容器并统一水平居中，保证地图相对上方 HUD 视觉居中 | OpenCode |
 | 2026-02-14 | **修正 HUD/地图左偏对齐**: 容器宽度精确收敛到 900 并为 MapViewer 增加 `justify-center` 包裹，确保地图相对 HUD 真正水平居中 | OpenCode |
 | 2026-02-14 | **新增 HUD 阵亡态与复活倒计时**: 英雄阵亡时头像灰度化显示，并在头像上方展示按游戏时钟计算的复活秒数，复活后自动恢复彩色 | OpenCode |
+| 2026-02-14 | **启动 RP2-7**: 制定 pause-aware 双时基方案并分派前后端子智能体并行实现（解析/透传/前端冻结显示） | OpenCode (Orchestrator) |
+| 2026-02-14 | **RP2-7 后端链路增强**: playback 返回 `pause_intervals`（含 `time_basis` 内冗余）、Parquet metadata 持久化 pause 区间并补充回归测试（无暂停/有暂停/过滤稳定） | OpenCode |
+| 2026-02-14 | **RP2-7 前端冻结显示落地**: 回放推进统一基于 `replay_time`，game clock 在 pause 区间冻结并显示“暂停中”；补充 `gameClock` 单测覆盖 pause/非 pause 映射 | OpenCode |
+| 2026-02-15 | **修复 RP2-7 时间偏移回归**: `gameClock` 在存在样本 `game_time` 时优先使用样本推导 offset（不被 `time_basis.offset_seconds` 覆盖），修正多场比赛慢 10~26 秒问题 | OpenCode |
+| 2026-02-15 | **恢复标准开局锚点显示**: 对异常早于 -95s 的 `game_time` 自动做 -1:30 归一化显示（仅显示口径），修复 8676017978/8689397081/8674716612 的 +17/+26/+10 秒偏移 | OpenCode |
+| 2026-02-15 | **修复 parser 暂停时钟冻结与区间输出**: `SimpleDemoParser` 以 Gamerules 暂停状态冻结 `game_time`，并在 metadata 输出 `pause_intervals`（replay_start/end/duration/game_time）供后端与前端透传消费 | OpenCode |
+| 2026-02-15 | **修复前端 pause_intervals 键兼容**: `gameClock` 兼容后端字段 `replay_start_time/replay_end_time`（此前仅识别 `start_replay_time/end_replay_time` 导致暂停区间失效） | OpenCode |
+| 2026-02-15 | **修复比赛时长口径**: 解析器新增终场锚点（`game_state` 转换/`winner` 首次确定）并将 `duration_seconds` 对齐有效比赛时长，剔除暂停与赛后尾段 | OpenCode |
+| 2026-02-15 | **修复 backend 路径漂移根因**: `playback`/`ParseService`/`main` 统一以 `backend/` 目录为基准解析 `data/*` 路径，避免从不同 cwd 启动导致读写到错误目录（如 `backend/backend/data`） | OpenCode |
+| 2026-02-15 | **彻底收敛 matches 路径配置**: `replays/matches/visualization` 路由与 `ParquetStorage` 默认路径统一为 `data/matches`（并兼容历史 `backend/data/matches` 入参），确保“解析写入”和“回放读取”同目录 | OpenCode |
+| 2026-02-15 | **增加前端暂停兜底显示**: RealMatchViewer 在相邻 tick `game_time` 持平时强制判定暂停并冻结显示，避免 pause_intervals 元数据异常时 UI 仍走表 | OpenCode |
+| 2026-02-15 | **修复比赛详情时长来源**: `GET /matches/{id}` 优先读取 Parquet metadata `duration_seconds` 覆盖 SQLite 值，避免列表/详情显示旧时长 58:59 | OpenCode |
+| 2026-02-15 | **统一 HUD 计时基准并补全前端 pause 推断**: 回放页当前时钟与复活倒计时统一使用同一 `mapper` 基准；当后端未返回 `pause_intervals` 时由 `ticks.game_time` 冻结段自动推断暂停区间，修复“暂停显示有但时间轴/复活倒计时错位” | OpenCode |
+| 2026-02-15 | **进一步缩小时轴偏差**: 回放页时间显示与复活倒计时改为基于相邻 tick 的 `game_time` 插值（而非仅依赖 source->offset 映射），降低终局关键事件约 2~3 秒漂移 | OpenCode |
 
 ---
 

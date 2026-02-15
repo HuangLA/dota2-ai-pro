@@ -31,20 +31,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     print("Starting True Sight Backend...")
     
+    backend_root = Path(__file__).resolve().parent
+
+    def resolve_path(env_key: str, default_relative: str) -> Path:
+        configured = os.getenv(env_key, default_relative)
+        candidate = Path(configured)
+        if not candidate.is_absolute():
+            candidate = backend_root / candidate
+        return candidate
+
     # Initialize database
-    # Use consistent path relative to backend directory
-    db_path = os.getenv("DATABASE_PATH", "data/truesight.db")
-    init_database(db_path)
+    db_path = resolve_path("DATABASE_PATH", "data/truesight.db")
+    init_database(str(db_path))
     print(f"Database initialized: {db_path}")
     
     # Ensure data directories exist
     data_dirs = [
-        os.getenv("MATCHES_DIR", "backend/data/matches"),
-        os.getenv("REPLAYS_DIR", "data/replays"),
-        "data/logs",
+        resolve_path("MATCHES_DIR", "data/matches"),
+        resolve_path("REPLAYS_DIR", "data/replays"),
+        resolve_path("LOGS_DIR", "data/logs"),
     ]
     for dir_path in data_dirs:
-        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        dir_path.mkdir(parents=True, exist_ok=True)
     
     yield
     

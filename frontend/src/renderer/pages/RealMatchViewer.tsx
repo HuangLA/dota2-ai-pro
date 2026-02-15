@@ -142,6 +142,27 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function getTickGameTime(tick: TickData): number | null {
+  return typeof tick.game_time === 'number' && Number.isFinite(tick.game_time)
+    ? tick.game_time
+    : null;
+}
+
+function getGameClockDisplayShift(mapper: GameClockMapper, ticks: TickData[]): number {
+  if (ticks.length === 0) {
+    return 0;
+  }
+
+  const firstTick = ticks[0];
+  const firstRawGameTime = getTickGameTime(firstTick);
+  if (firstRawGameTime === null) {
+    return 0;
+  }
+
+  const firstSourceTime = mapper.getSourceTime(firstTick);
+  return mapper.sourceToGameClock(firstSourceTime) - firstRawGameTime;
+}
+
 export interface RealMatchViewerProps {
   initialMatchId?: number | null;
 }
@@ -165,6 +186,8 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const [timeBasisOffsetSeconds, setTimeBasisOffsetSeconds] = useState(0);
   const [teamLineups, setTeamLineups] = useState<TeamLineups>({ radiant: [], dire: [] });
   const [hudHeroStatus, setHudHeroStatus] = useState<Record<number, HudHeroStatus>>({});
+  const [isPauseActive, setIsPauseActive] = useState(false);
+  const [currentDisplayGameTime, setCurrentDisplayGameTime] = useState(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
   
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
@@ -209,6 +232,8 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     setTimeBasisOffsetSeconds(0);
     setTeamLineups({ radiant: [], dire: [] });
     setHudHeroStatus({});
+    setIsPauseActive(false);
+    setCurrentDisplayGameTime(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
     allTicksRef.current = [];
     allWardsRef.current = null;
     deathIntervalsRef.current = new Map();
@@ -353,6 +378,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
    */
   const updateDisplayForTime = useCallback((time: number) => {
     const mapper = gameClockMapperRef.current;
+    const gameClockDisplayShift = getGameClockDisplayShift(mapper, allTicksRef.current);
     const { prev, next, t } = findTicksForInterpolation(time);
     
     if (!prev) {
@@ -441,7 +467,39 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       setWards(activeWards);
     }
 
-    const currentGameClock = mapper.sourceToGameClock(time);
+    const resolveGameClockAtSourceTime = (sourceTime: number): number => {
+      const { prev: clockPrev, next: clockNext, t: clockT } = findTicksForInterpolation(sourceTime);
+      if (!clockPrev) {
+        return mapper.sourceToGameClock(sourceTime);
+      }
+
+      const prevGameTime = getTickGameTime(clockPrev);
+      if (!clockNext || clockPrev === clockNext) {
+        if (prevGameTime === null) {
+          return mapper.sourceToGameClock(sourceTime);
+        }
+        return prevGameTime + gameClockDisplayShift;
+      }
+
+      const nextGameTime = getTickGameTime(clockNext);
+      if (prevGameTime === null || nextGameTime === null) {
+        return mapper.sourceToGameClock(sourceTime);
+      }
+
+      return lerp(prevGameTime, nextGameTime, clockT) + gameClockDisplayShift;
+    };
+
+    const currentGameClock = resolveGameClockAtSourceTime(time);
+
+    const prevGameTime = getTickGameTime(prev);
+    const nextGameTime = next ? getTickGameTime(next) : null;
+
+    const pauseActiveFromSamples = prevGameTime !== null
+      && nextGameTime !== null
+      && Math.abs(nextGameTime - prevGameTime) <= 1e-4;
+    const pauseActive = pauseActiveFromSamples || mapper.isPausedAtSourceTime(time);
+    setCurrentDisplayGameTime(currentGameClock);
+    setIsPauseActive(pauseActive);
     const lineupHeroes = [...teamLineups.radiant, ...teamLineups.dire];
     const nextHudStatus: Record<number, HudHeroStatus> = {};
     for (const hero of lineupHeroes) {
@@ -455,7 +513,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
         continue;
       }
 
-      const respawnGameClock = mapper.sourceToGameClock(activeDeath.endSourceTime);
+      const respawnGameClock = resolveGameClockAtSourceTime(activeDeath.endSourceTime);
       nextHudStatus[hero.key] = {
         isAlive: false,
         respawnRemainingSeconds: Math.max(0, Math.ceil(respawnGameClock - currentGameClock)),
@@ -477,9 +535,34 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   }, [updateDisplayForTime]);
 
   const formatTimeDisplay = (seconds: number): string => {
-    const gameClockTime = gameClockMapperRef.current.sourceToGameClock(seconds);
+    const { prev, next, t } = findTicksForInterpolation(seconds);
+    const mapper = gameClockMapperRef.current;
+    const gameClockDisplayShift = getGameClockDisplayShift(mapper, allTicksRef.current);
+
+    if (!prev) {
+      return formatGameClockTime(mapper.sourceToGameClock(seconds));
+    }
+
+    const prevGameTime = getTickGameTime(prev);
+    if (!next || prev === next) {
+      if (prevGameTime === null) {
+        return formatGameClockTime(mapper.sourceToGameClock(seconds));
+      }
+      return formatGameClockTime(prevGameTime + gameClockDisplayShift);
+    }
+
+    const nextGameTime = getTickGameTime(next);
+    if (prevGameTime === null || nextGameTime === null) {
+      return formatGameClockTime(mapper.sourceToGameClock(seconds));
+    }
+
+    const gameClockTime = lerp(prevGameTime, nextGameTime, t) + gameClockDisplayShift;
     return formatGameClockTime(gameClockTime);
   };
+
+  const currentGameClockLabel = isPauseActive
+    ? `暂停中 · ${formatGameClockTime(currentDisplayGameTime)}`
+    : formatGameClockTime(currentDisplayGameTime);
 
   const getHeroLabel = (heroName: string, fallbackKey: number): string => {
     const heroData = getHeroByName(heroName || '');
@@ -613,7 +696,13 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                 <div className="flex justify-between">
                   <span>当前时间:</span>
                   <span className="text-white font-mono">
-                    {formatTimeDisplay(currentTime)}
+                    {currentGameClockLabel}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>暂停状态:</span>
+                  <span className={`font-medium ${isPauseActive ? 'text-amber-300' : 'text-emerald-300'}`}>
+                    {isPauseActive ? '暂停中' : '进行中'}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -713,7 +802,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                           GAME TIME
                         </p>
                         <p className="text-center font-mono text-lg font-semibold tracking-[0.1em] text-slate-100 tabular-nums">
-                          {formatTimeDisplay(currentTime)}
+                          {currentGameClockLabel}
                         </p>
                       </div>
                     </div>

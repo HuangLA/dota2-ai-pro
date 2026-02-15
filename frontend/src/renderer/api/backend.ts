@@ -53,6 +53,18 @@ export interface PlaybackTimeBasis {
   strategy?: string;
   offset_seconds?: number;
   game_start_time?: number;
+  pause_intervals?: PauseInterval[];
+}
+
+export interface PauseInterval {
+  start_time?: number;
+  end_time?: number;
+  start_source_time?: number;
+  end_source_time?: number;
+  start_replay_time?: number;
+  end_replay_time?: number;
+  start_game_time?: number;
+  end_game_time?: number;
 }
 
 export interface TicksResponse {

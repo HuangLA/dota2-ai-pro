@@ -11,6 +11,7 @@ This service coordinates:
 import sqlite3
 import time
 import uuid
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -62,7 +63,7 @@ class ParseService:
     
     def __init__(
         self,
-        data_dir: str = "backend/data/matches",
+        data_dir: str = "data/matches",
         replays_dir: str = "data/replays"
     ):
         """
@@ -72,10 +73,19 @@ class ParseService:
             data_dir: Directory for Parquet storage
             replays_dir: Directory for replay files
         """
+        backend_root = Path(__file__).resolve().parents[1]
+
+        def resolve_path(path_value: str, env_key: str) -> Path:
+            configured = os.getenv(env_key, path_value)
+            candidate = Path(configured)
+            if not candidate.is_absolute():
+                candidate = backend_root / candidate
+            return candidate
+
         self.parser = ClarityParser()
-        self.parquet_storage = ParquetStorage(data_dir)
+        self.parquet_storage = ParquetStorage(str(resolve_path(data_dir, "MATCHES_DIR")))
         self.match_storage = MatchStorage()
-        self.replays_dir = Path(replays_dir)
+        self.replays_dir = resolve_path(replays_dir, "REPLAYS_DIR")
         self.replays_dir.mkdir(parents=True, exist_ok=True)
     
     def parse_replay(self, replay_path: str) -> ParseResult:

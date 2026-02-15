@@ -121,6 +121,7 @@ class MatchMetadata:
     clock_zero_source: Optional[str] = None
     ticks_per_second: Optional[int] = None
     time_mapping: Optional[str] = None
+    pause_intervals: list[dict[str, float]] = field(default_factory=list)
     picks_bans: list[PickBan] = field(default_factory=list)
     players: list[PlayerInfo] = field(default_factory=list)
     
