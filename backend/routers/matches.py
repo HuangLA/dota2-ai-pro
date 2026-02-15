@@ -16,6 +16,20 @@ match_storage = MatchStorage()
 parquet_storage = ParquetStorage("data/matches")
 
 
+def _resolve_duration_seconds(meta: Optional[dict], fallback_duration: int) -> int:
+    """Resolve match duration from metadata with SQLite fallback."""
+    if not meta:
+        return fallback_duration
+
+    duration_seconds = meta.get("duration_seconds")
+    if isinstance(duration_seconds, bool):
+        return fallback_duration
+    if isinstance(duration_seconds, (int, float)) and duration_seconds > 0:
+        return int(duration_seconds)
+
+    return fallback_duration
+
+
 # =========== Models ===========
 
 class MatchResponse(BaseModel):
@@ -107,12 +121,15 @@ async def list_matches(
         team_id=team_id,
     )
     
-    return MatchListResponse(
-        matches=[
+    response_matches: list[MatchResponse] = []
+    for m in matches:
+        meta = parquet_storage.get_metadata(m.match_id)
+        duration = _resolve_duration_seconds(meta, m.duration)
+        response_matches.append(
             MatchResponse(
                 match_id=m.match_id,
                 start_time=m.start_time,
-                duration=m.duration,
+                duration=duration,
                 winner_team=m.winner_team,
                 winner_name="Radiant" if m.winner_team == 2 else "Dire" if m.winner_team == 3 else None,
                 radiant_score=m.radiant_score,
@@ -123,10 +140,12 @@ async def list_matches(
                 replay_path=m.replay_path,
                 parse_status=m.parse_status,
                 created_at=m.created_at,
-                updated_at=m.updated_at
+                updated_at=m.updated_at,
             )
-            for m in matches
-        ],
+        )
+
+    return MatchListResponse(
+        matches=response_matches,
         total=total,
         limit=limit,
         offset=offset
@@ -144,12 +163,8 @@ async def get_match(match_id: int) -> MatchResponse:
             detail=f"Match {match_id} not found"
         )
     
-    duration = match.duration
     meta = parquet_storage.get_metadata(match_id)
-    if meta:
-        duration_seconds = meta.get("duration_seconds")
-        if isinstance(duration_seconds, (int, float)) and duration_seconds > 0:
-            duration = int(duration_seconds)
+    duration = _resolve_duration_seconds(meta, match.duration)
 
     return MatchResponse(
         match_id=match.match_id,
