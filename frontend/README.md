@@ -1,42 +1,52 @@
-# Frontend
+# Frontend (React + Vite)
 
-Electron + React 前端应用
+前端负责比赛管理、回放可视化、地图渲染与时间轴交互。
 
-## 目录结构
-
-```
-src/
-├── main/              # Electron Main Process
-│   ├── index.ts       # 主进程入口
-│   └── ipc/           # IPC 通信处理
-├── renderer/          # React 渲染进程
-│   ├── components/    # 可复用组件
-│   ├── pages/         # 页面组件
-│   ├── hooks/         # 自定义 Hooks
-│   ├── utils/         # 工具函数
-│   └── App.tsx        # 应用入口
-└── assets/            # 静态资源
-    ├── images/
-    └── styles/
-```
-
-## 开发
+## 开发命令
 
 ```bash
-# 安装依赖
 npm install
-
-# 开发模式
 npm run dev
-
-# 构建
-npm run build
 ```
 
-## 技术栈
+常用脚本：
+- `npm run build`
+- `npm run test`
+- `npm run lint`
 
-- **框架**: React 18 + TypeScript
-- **UI**: Tailwind CSS
-- **地图渲染**: PixiJS
-- **状态管理**: Zustand
-- **构建工具**: Vite
+## 当前页面
+
+- Home：入口导航
+- Match List (`MatchListPage`)：比赛管理 + 上传 + 搜索 + 删除 + 跳转回放
+- Real Match Viewer (`RealMatchViewer`)：真实回放渲染
+- POC / Map Test：联调与渲染测试页
+
+## 本次对齐的已实现能力
+
+- 比赛管理页支持多文件上传：
+  - 点击选择和拖拽都支持一次传多个 `.dem`
+  - 以前端队列顺序上传，展示批量进度和失败汇总
+  - 后端接口仍为单文件 `POST /api/v1/replays/upload`
+- 小地图英雄图标映射增强：
+  - 英雄名标准化 + 别名映射
+  - 兼容下划线差异（如 `anti_mage` <-> `antimage`）
+- RealMatchViewer HUD 血条：
+  - 阵容头像下方实时血条（基于 tick `hp/max_hp`）
+  - hover 显示即时血量数值（当前/最大）
+  - 去除血条区域原生 `title`，避免与自定义浮层形成双 tooltip
+
+## 目录（关键路径）
+
+```text
+src/renderer/
+├── api/
+├── components/
+│   ├── map/
+│   ├── timeline/
+│   └── ReplayUploader.tsx
+├── data/
+├── pages/
+│   ├── MatchListPage.tsx
+│   └── RealMatchViewer.tsx
+└── utils/
+```

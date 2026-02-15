@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4 - 数据化回放与职业战队数据库 🚀 |
-| 最后更新 | 2026-02-14 |
+| 最后更新 | 2026-02-16 |
 | 更新者 | OpenCode (Orchestrator) |
 
 ---
@@ -514,6 +514,10 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-15 | **DONE: 回放 HUD 英雄头像下方新增实时血条**: 复用 tick `hp/max_hp` 数据在阵容栏渲染动态血量条，兼容桌面与移动端布局并保持现有视觉风格 | OpenCode |
 | 2026-02-15 | **DONE: RealMatchViewer HUD 血条交互增强**: 血条加粗并增加 hover 高亮/阴影效果，悬停显示实时血量数值（当前/最大），兼容阵亡态显示 | OpenCode |
 | 2026-02-15 | **DONE: 修复 RealMatchViewer HUD 血条 hover 双提示**: 移除血条区域 `title` 原生 tooltip，并将英雄名称 tooltip 限定到头像容器以保留名称提示且不干扰自定义血量浮层 | OpenCode |
+| 2026-02-15 | **DONE: 全量文档更新并对齐当前实现状态**: 覆盖更新根文档、前后端/数据 README、API 规范、技术设计与 Replay 管理计划，修正文档实现状态与过时端点清单 | OpenCode |
+| 2026-02-15 | **修复 matches 列表时长口径**: `GET /matches` 与 `GET /matches/{id}` 统一优先使用 Parquet metadata `duration_seconds`，缺失时回退 SQLite `duration`，未解析比赛保持兼容 | OpenCode |
+| 2026-02-16 | **DONE: Timeline 悬停预览与暂停区间可视化**: 时间轴新增 hover 时间 tooltip（含“暂停中/进行中”状态）并叠加暂停区间橙色标记，复用现有 gameClock pause 映射逻辑 | OpenCode |
+| 2026-02-16 | **DONE: 修复 Timeline hover 文案换行**: 优化悬停 tooltip 排版并增加 `whitespace-nowrap`，避免进度条尾端“进行中”被折行为两行 | OpenCode |
 
 ---
 

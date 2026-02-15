@@ -1,42 +1,34 @@
-# Data Directory
+# Data 目录说明
 
-存储所有应用数据
+本仓库存在两套 data 路径：
 
-## 目录说明
+- `backend/data/`：当前后端运行时实际读写路径（主路径）
+- `data/`：历史/实验数据目录（保留，不作为主路径）
 
-### database/
-存储 SQLite 数据库文件
-- `matches.db` - 主数据库（比赛索引、选手信息、战队数据）
+## 当前主数据结构（`backend/data/`）
 
-### matches/
-存储 Parquet 格式的时序数据，每场比赛一个子目录
-```
-matches/
-└── {match_id}/
-    ├── ticks.parquet       # 核心时序数据
-    ├── wards.parquet       # 眼位数据
-    ├── combat_log.parquet  # 战斗日志
-    └── smokes.parquet      # 开雾数据
-```
-
-### replays/
-存储原始 `.dem` 录像文件
-```
-replays/
-└── {match_id}.dem
+```text
+backend/data/
+├── matches/
+│   └── {match_id}/
+│       ├── positions.parquet
+│       ├── kills.parquet
+│       ├── wards.parquet
+│       └── meta.json
+├── replays/
+│   └── *.dem
+├── logs/
+└── truesight.db
 ```
 
-## 数据大小估算
+## 字段口径要点
 
-单场 45 分钟比赛:
-- `ticks.parquet`: ~32 MB (压缩后)
-- `wards.parquet`: ~50 KB
-- `combat_log.parquet`: ~2-10 MB
-- `smokes.parquet`: ~10 KB
-- `.dem` 文件: ~100-200 MB
+- `positions.parquet`：英雄位置和状态（含 `hp/max_hp/mana/level/game_time`）
+- `kills.parquet`：击杀事件（`time`, `killer`, `victim`, `x`, `y`）
+- `wards.parquet`：真假眼放置/摧毁事件（含 `ward_type`, `team`, `game_time`）
+- `meta.json`：比赛元数据、时间契约信息（`time_contract_version`, `game_start_time`, `pause_intervals` 等）
 
-50 场比赛总计: ~2-3 GB
+## 说明
 
-## 注意事项
-
-⚠️ 此目录已添加到 `.gitignore`，不会提交到版本控制
+- 前端多文件上传是队列逐个调用单文件上传 API，数据仍按单场比赛落盘
+- 本目录与 `backend/data/` 通常在 `.gitignore` 范围内，不建议提交真实回放与产物数据

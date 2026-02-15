@@ -1,50 +1,60 @@
-# Backend
+# Backend (FastAPI)
 
-Python 后端服务，负责数据解析、分析和查询
+True Sight 后端负责 `.dem` 解析、任务管理、比赛元数据查询、回放时序数据读取和可视化数据生成。
 
-## 目录结构
-
-```
-backend/
-├── main.py              # FastAPI 应用入口
-├── parsers/             # 录像解析模块
-│   └── manta_parser.py
-├── analyzers/           # 数据分析模块
-│   ├── ward_analyzer.py
-│   ├── smoke_analyzer.py
-│   └── heatmap_generator.py
-├── database/            # 数据库操作
-│   ├── sqlite_manager.py
-│   └── duckdb_manager.py
-└── requirements.txt     # Python 依赖
-```
-
-## 开发
+## 运行
 
 ```bash
-# 安装依赖
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
-
-# 运行开发服务器
 python main.py
-
-# 或使用 uvicorn
-uvicorn main:app --reload --port 8000
 ```
 
-## 技术栈
+API 文档：`http://localhost:8000/docs`
 
-- **框架**: FastAPI
-- **数据处理**: Pandas, NumPy
-- **机器学习**: scikit-learn
-- **数据库**: SQLite, DuckDB, PyArrow (Parquet)
+## 当前模块
 
-## API 文档
+```text
+backend/
+├── main.py
+├── routers/
+│   ├── health.py
+│   ├── replays.py
+│   ├── matches.py
+│   ├── playback.py
+│   └── visualization.py
+├── services/
+│   └── parse_service.py
+├── storage/
+│   ├── match_storage.py
+│   └── parquet_storage.py
+├── database/
+│   └── sqlite_db.py
+├── parsers/
+│   └── clarity_parser.py
+└── data/
+    ├── matches/
+    ├── replays/
+    └── truesight.db
+```
 
-启动服务后访问: http://localhost:8000/docs
+## API 实现状态摘要
 
-## 时间字段语义
+- 已实现：`replays` / `matches` / `playback` / `visualization` 主流程端点
+- Stub/部分实现：
+  - `GET /api/v1/playback/{match_id}/smokes`（返回空数组 + 说明）
+  - `POST /api/v1/visualization/aggregate/heatmap`（当前仅基于首场 match）
+  - `POST /api/v1/visualization/aggregate/ward-clusters`（占位返回）
 
-- `time`: 基于回放 `tick` 的时间，计算方式为 `tick / 30`。
-- `game_time`: 游戏内时钟（0 对应兵线出兵），优先使用解析器输出 `m_fGameTime - m_flGameStartTime`。
-- 兼容旧数据: 当历史数据没有 `game_time` 时，后端会回退到 `time`，并在 playback 响应顶层返回 `time_basis` 说明当前映射来源。
+## 时间语义（pause-aware）
+
+- `time`：回放源时间，默认等价 `tick / 30`，单调递增
+- `game_time`：游戏时钟（出兵为 `0`，出兵前可为负）
+- `time_basis`：ticks/wards 响应顶层返回，标记时基策略与偏移
+- `pause_intervals`：暂停区间信息，用于前端冻结 game clock 显示
+
+## 上传能力说明
+
+- 后端上传端点 `POST /api/v1/replays/upload` 当前仍是单文件（`file`）
+- 前端已支持多文件上传，采用队列方式逐个调用该端点

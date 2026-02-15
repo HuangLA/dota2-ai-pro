@@ -5,6 +5,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+interface PauseSegment {
+  startSourceTime: number;
+  endSourceTime: number;
+}
+
 export interface TimelineProps {
   /** 当前时间（秒） */
   currentTime: number;
@@ -22,6 +27,10 @@ export interface TimelineProps {
   formatTime?: (seconds: number) => string;
   /** 是否显示中间时间（当前/总时长） */
   showTimeDisplay?: boolean;
+  /** 暂停区间（source/replay time） */
+  pauseSegments?: PauseSegment[];
+  /** 指定时间是否处于暂停中 */
+  isPausedAtTime?: (time: number) => boolean;
 }
 
 /** 播放速度选项 */
@@ -46,6 +55,8 @@ export function Timeline({
   disabled = false,
   formatTime: formatTimeProp,
   showTimeDisplay = true,
+  pauseSegments = [],
+  isPausedAtTime,
 }: TimelineProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -54,6 +65,7 @@ export function Timeline({
   
   // 内部时间状态，用于平滑播放
   const [internalTime, setInternalTime] = useState(currentTime);
+  const [hoverPreview, setHoverPreview] = useState<{ time: number; x: number } | null>(null);
   
    const progressRef = useRef<HTMLDivElement>(null);
    const animationRef = useRef<number | null>(null);
@@ -124,17 +136,43 @@ export function Timeline({
     };
   }, [isPlaying, playbackSpeed, disabled, maxTime]); // 移除 currentTime 和 internalTime 依赖
 
+  const resolveTimeFromClientX = useCallback((clientX: number): { time: number; x: number } | null => {
+    if (!progressRef.current || maxTime <= minTime) {
+      return null;
+    }
+    const rect = progressRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const time = minTime + percentage * (maxTime - minTime);
+    return { time, x };
+  }, [maxTime, minTime]);
+
   // 处理进度条点击/拖动
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (disabled || !progressRef.current) return;
+    if (disabled) return;
 
-    const rect = progressRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const newTime = minTime + percentage * (maxTime - minTime);
+    const resolved = resolveTimeFromClientX(e.clientX);
+    if (!resolved) {
+      return;
+    }
+
+    const newTime = resolved.time;
     setInternalTime(newTime);
     internalTimeRef.current = newTime;
-  }, [disabled, minTime, maxTime]);
+  }, [disabled, resolveTimeFromClientX]);
+
+  const handleProgressMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const resolved = resolveTimeFromClientX(e.clientX);
+    if (!resolved) {
+      setHoverPreview(null);
+      return;
+    }
+    setHoverPreview(resolved);
+  }, [resolveTimeFromClientX]);
+
+  const handleProgressMouseLeave = useCallback(() => {
+    setHoverPreview(null);
+  }, []);
 
   // 拖动处理
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -151,13 +189,12 @@ export function Timeline({
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!progressRef.current) return;
-      const rect = progressRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const percentage = Math.max(0, Math.min(1, x / rect.width));
-      const newTime = minTime + percentage * (maxTime - minTime);
+      const resolved = resolveTimeFromClientX(e.clientX);
+      if (!resolved) return;
+      const newTime = resolved.time;
       setInternalTime(newTime);
       internalTimeRef.current = newTime;
+      setHoverPreview(resolved);
     };
 
     const handleMouseUp = () => {
@@ -173,7 +210,7 @@ export function Timeline({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, minTime, maxTime, onTimeChange, internalTime]);
+  }, [isDragging, onTimeChange, resolveTimeFromClientX]);
 
   // 快捷键支持
   useEffect(() => {
@@ -276,13 +313,35 @@ export function Timeline({
      onTimeChange(newTime);
    };
 
-   const skipForward = () => {
+  const skipForward = () => {
      if (disabled) return;
      const newTime = Math.min(maxTime, internalTime + 10);
      setInternalTime(newTime);
      internalTimeRef.current = newTime;
-     onTimeChange(newTime);
-   };
+    onTimeChange(newTime);
+  };
+
+  const normalizedPauseSegments = pauseSegments
+    .filter((segment) => segment.endSourceTime > segment.startSourceTime)
+    .map((segment) => {
+      const clampedStart = Math.max(minTime, Math.min(maxTime, segment.startSourceTime));
+      const clampedEnd = Math.max(minTime, Math.min(maxTime, segment.endSourceTime));
+      return {
+        start: clampedStart,
+        end: clampedEnd,
+      };
+    })
+    .filter((segment) => segment.end > segment.start);
+
+  const hoverPreviewLabel = hoverPreview ? formatLabel(hoverPreview.time) : '';
+  const hoverIsPaused = hoverPreview
+    ? (isPausedAtTime
+      ? isPausedAtTime(hoverPreview.time)
+      : normalizedPauseSegments.some(
+        (segment) => hoverPreview.time >= segment.start && hoverPreview.time < segment.end
+      ))
+    : false;
+
 
   return (
     <div className="bg-dota-surface rounded-lg p-4">
@@ -293,12 +352,40 @@ export function Timeline({
           disabled ? 'opacity-50 cursor-not-allowed' : ''
         }`}
         onMouseDown={handleMouseDown}
+        onMouseMove={handleProgressMouseMove}
+        onMouseLeave={handleProgressMouseLeave}
       >
+        {/* 暂停区间标记 */}
+        {normalizedPauseSegments.map((segment, index) => {
+          const startPercent = ((segment.start - minTime) / (maxTime - minTime)) * 100;
+          const widthPercent = ((segment.end - segment.start) / (maxTime - minTime)) * 100;
+          return (
+            <div
+              key={`${segment.start}-${segment.end}-${index}`}
+              className="absolute top-0 h-full bg-amber-500/45"
+              style={{ left: `${startPercent}%`, width: `${widthPercent}%` }}
+            />
+          );
+        })}
+
         {/* 已播放进度 */}
         <div
           className="absolute top-0 left-0 h-full bg-dota-accent rounded-full"
           style={{ width: `${progress}%` }}
         />
+
+        {/* Hover 预览 */}
+        {hoverPreview && (
+          <div
+            className="pointer-events-none absolute -top-14 z-20 -translate-x-1/2 rounded border border-slate-500/70 bg-slate-950/95 px-2 py-1 text-center text-[11px] leading-tight text-slate-100 shadow-lg"
+            style={{ left: `${Math.max(20, Math.min(hoverPreview.x, (progressRef.current?.clientWidth ?? 0) - 20))}px` }}
+          >
+            <div className="font-mono tabular-nums whitespace-nowrap">{hoverPreviewLabel}</div>
+            <div className={`whitespace-nowrap ${hoverIsPaused ? 'text-amber-300' : 'text-slate-300'}`}>
+              {hoverIsPaused ? '暂停中' : '进行中'}
+            </div>
+          </div>
+        )}
         
         {/* 拖动手柄 */}
         <div
@@ -414,6 +501,12 @@ export function Timeline({
         <span>← →: ±5秒</span>
         <span>↑ ↓: 调整速度</span>
       </div>
+
+      {normalizedPauseSegments.length > 0 && (
+        <div className="mt-2 text-center text-xs text-amber-300/85">
+          橙色区段表示暂停区间
+        </div>
+      )}
     </div>
   );
 }

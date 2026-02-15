@@ -1,46 +1,57 @@
-# Replay Management System - Implementation Plan
+# Replay Management Plan (Status-Aligned)
 
-## 1. Current Status Analysis
-- **Backend**: 
-  - Upload/Parse APIs are fully functional (`routers/replays.py`).
-  - Match APIs (List/Delete) are functional (`routers/matches.py`).
-  - Database Schema (`sqlite_db.py`) already has tables and indexes for `player_matches` and `teams`, supporting future search requirements.
-- **Frontend**:
-  - `RealMatchViewer` exists for viewing single matches.
-  - **Missing**: Replay Upload UI, Match List UI, Delete functionality.
+> 更新日期: 2026-02-15
+> 基线: `PROGRESS.md` 已完成项
 
-## 2. Implementation Roadmap
+## 1. 当前已实现 (DONE)
 
-### Phase 1: Backend Enhancements (Search Prep)
-Although the schema supports it, the current `GET /api/v1/matches` endpoint only filters by `status` and `league_id`.
-- **Task B1**: Update `backend/storage/match_storage.py` -> `list_matches` to accept `player_id` and `team_id`.
-- **Task B2**: Update `backend/routers/matches.py` -> `list_matches` to expose these query parameters.
+### 1.1 Upload + Parse 主流程
 
-### Phase 2: Frontend - Match List & Management
-Create a dashboard to view and manage parsed matches.
-- **Task F1**: Create `api/matchService.ts` (Client for new endpoints).
-- **Task F2**: Create `MatchListPage` (`/matches`).
-  - **Components**: 
-    - Data Grid (Match ID, Winner, Duration, Played At).
-    - "Delete" button with confirmation (Calls `DELETE /matches/{id}`).
-    - "Watch" button (Navigates to `/match/{id}`).
-    - Filter inputs (future hookup for Player/Team search).
+- `POST /api/v1/replays/upload`：上传 `.dem` 并创建解析任务
+- `POST /api/v1/replays/parse`：指定路径创建后台任务
+- `POST /api/v1/replays/parse/sync`：同步解析
+- `GET /api/v1/replays/tasks` / `GET /tasks/{id}` / `POST /tasks/{id}/cancel`
 
-### Phase 3: Frontend - Replay Upload & Parsing
-Create a streamlined workflow for adding new matches.
-- **Task F3**: Create `ReplayUpload` component.
-  - Drag & Drop zone for `.dem` files.
-  - Calls `POST /api/v1/replays/upload`.
-- **Task F4**: Create `ParseStatus` component.
-  - Polls `GET /api/v1/replays/tasks`.
-  - Shows progress bars for active parsing tasks.
-  - Auto-refreshes Match List upon completion.
+### 1.2 前端比赛管理页
 
-## 3. Future Search Features (Planned)
-Since Phase 1 adds the backend support:
-- **UI**: Add "Search by Player ID" and "Search by Team ID" inputs to the `MatchListPage` filter bar.
+- `MatchListPage` 已提供：
+  - 比赛列表展示
+  - 按 Match ID / Player(account_id) / Hero(hero_id) 搜索
+  - 删除比赛
+  - 跳转回放
 
-## 4. Execution Order
-1. **Backend**: Add search filters (Quick win).
-2. **Frontend**: Build Match List (allows verifying backend data).
-3. **Frontend**: Build Upload/Parse UI (completes the loop).
+### 1.3 多文件上传能力（本次重点）
+
+- `ReplayUploader` 支持拖拽与文件选择的多文件上传
+- 前端执行批处理队列，逐个调用单文件上传 API
+- UI 提供：
+  - 批量进度（completed/total）
+  - 失败文件汇总提示
+  - 最近任务轮询面板
+
+## 2. 当前实现边界
+
+- 后端上传 API 仍为单文件模式（`file: UploadFile`）
+- 暂无按 match_id 自动下载 replay 接口
+- 任务重试、批量删除等管理型接口尚未实现
+
+## 3. 下一步计划（Phase 4）
+
+1. OpenDota/Stratz 数据同步（近期比赛、战队、赛事）
+2. 扩展比赛数据库模型（team/tournament 维度）
+3. 录像下载任务系统（按 match_id + 状态跟踪 + 重试）
+4. 前端比赛数据库页与战队归档页联动
+
+## 4. API 规划与状态对照
+
+- 已实现：见 `docs/api_specification.md` 的 replays/matches 实现清单
+- 未实现但仍计划：
+  - `POST /api/v1/replays/fetch`
+  - `POST /api/v1/replays/tasks/{task_id}/retry`
+  - `DELETE /api/v1/replays/batch`
+
+## 5. 风险与约束
+
+- 多文件上传对 API 层仍是高频单请求，后端无并发队列管理时需关注峰值负载
+- replay 下载能力依赖外部服务可用性（OpenDota/Stratz）
+- 解析任务当前为进程内状态管理，后续可评估持久化任务队列

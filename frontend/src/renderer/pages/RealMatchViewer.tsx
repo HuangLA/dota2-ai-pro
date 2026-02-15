@@ -887,6 +887,8 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                 disabled={!selectedMatch || matches.length === 0}
                 formatTime={formatTimeDisplay}
                 showTimeDisplay={false}
+                pauseSegments={gameClockMapperRef.current.pauseIntervals}
+                isPausedAtTime={(time) => gameClockMapperRef.current.isPausedAtSourceTime(time)}
               />
             )}
           </div>
