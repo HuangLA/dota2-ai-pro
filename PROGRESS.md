@@ -11,8 +11,8 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4 - 数据化回放与职业战队数据库 🚀 |
-| 最后更新 | 2026-02-16 |
-| 更新者 | OpenCode (Orchestrator) |
+| 最后更新 | 2026-02-20 |
+| 更新者 | OpenCode |
 
 ---
 
@@ -518,6 +518,7 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-15 | **修复 matches 列表时长口径**: `GET /matches` 与 `GET /matches/{id}` 统一优先使用 Parquet metadata `duration_seconds`，缺失时回退 SQLite `duration`，未解析比赛保持兼容 | OpenCode |
 | 2026-02-16 | **DONE: Timeline 悬停预览与暂停区间可视化**: 时间轴新增 hover 时间 tooltip（含“暂停中/进行中”状态）并叠加暂停区间橙色标记，复用现有 gameClock pause 映射逻辑 | OpenCode |
 | 2026-02-16 | **DONE: 修复 Timeline hover 文案换行**: 优化悬停 tooltip 排版并增加 `whitespace-nowrap`，避免进度条尾端“进行中”被折行为两行 | OpenCode |
+| 2026-02-20 | **DONE: 更新根 README 启动文档**: 补充本地启动流程、环境版本要求（Node/Python/Java）与服务验证步骤 | OpenCode |
 
 ---
 
