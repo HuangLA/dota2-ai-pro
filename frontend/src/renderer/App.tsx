@@ -3,16 +3,77 @@ import POCTestPage from './pages/POCTestPage';
 import MapTestPage from './pages/MapTestPage';
 import RealMatchViewer from './pages/RealMatchViewer';
 import { MatchListPage } from './pages/MatchListPage';
+import TeamProfilePage from './pages/TeamProfilePage';
+import MatchDatabasePage, {
+  MatchDatabaseReplayContext,
+  MatchDatabaseViewState,
+} from './pages/MatchDatabasePage';
+import { ReplayEntryContext, TeamProfileReplayContext } from './types/replayContext';
+import { TeamProfileViewState } from './pages/TeamProfilePage';
 
-type Page = 'home' | 'poc' | 'map' | 'match' | 'matchList';
+type Page = 'home' | 'poc' | 'map' | 'match' | 'matchList' | 'matchDatabase' | 'teamProfile';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [currentMatchId, setCurrentMatchId] = useState<number | null>(null);
+  const [matchDatabaseViewState, setMatchDatabaseViewState] = useState<MatchDatabaseViewState | undefined>(
+    undefined
+  );
+  const [teamProfileViewState, setTeamProfileViewState] = useState<TeamProfileViewState | undefined>(
+    undefined
+  );
+  const [replayEntryContext, setReplayEntryContext] = useState<ReplayEntryContext | null>(null);
 
   const handleWatchMatch = (matchId: number) => {
     setCurrentMatchId(matchId);
+    setReplayEntryContext(null);
     setCurrentPage('match');
+  };
+
+  const handleOpenReplayFromMatchDatabase = (context: MatchDatabaseReplayContext) => {
+    setCurrentMatchId(context.matchId);
+    setReplayEntryContext(context);
+    setCurrentPage('match');
+  };
+
+  const handleOpenReplayFromTeamProfile = (context: TeamProfileReplayContext) => {
+    setCurrentMatchId(context.matchId);
+    setReplayEntryContext(context);
+    setCurrentPage('match');
+  };
+
+  const handleOpenMatchDatabaseFromTeamProfile = (context: {
+    teamId: number;
+    leagueId?: number;
+    hasDownload?: boolean;
+  }) => {
+    const nextFilters = {
+      teamId: String(context.teamId),
+      leagueId: context.leagueId !== undefined ? String(context.leagueId) : '',
+      startTimeFrom: '',
+      startTimeTo: '',
+      hasDownload: context.hasDownload ? ('true' as const) : ('all' as const),
+      professionalOnly: true,
+    };
+
+    setMatchDatabaseViewState({
+      filters: nextFilters,
+      appliedFilters: nextFilters,
+      offset: 0,
+    });
+    setCurrentPage('matchDatabase');
+  };
+
+  const handleBackFromReplayViewer = () => {
+    if (replayEntryContext?.source === 'match_database') {
+      setCurrentPage('matchDatabase');
+      return;
+    }
+    if (replayEntryContext?.source === 'team_profile') {
+      setCurrentPage('teamProfile');
+      return;
+    }
+    setCurrentPage('home');
   };
 
   if (currentPage === 'matchList') {
@@ -26,6 +87,36 @@ function App() {
         </button>
         <MatchListPage onWatch={handleWatchMatch} />
       </div>
+    );
+  }
+
+  if (currentPage === 'matchDatabase') {
+    return (
+      <div>
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50 shadow-lg border border-gray-700"
+        >
+           返回首页
+        </button>
+        <MatchDatabasePage
+          initialViewState={matchDatabaseViewState}
+          onViewStateChange={setMatchDatabaseViewState}
+          onOpenReplay={handleOpenReplayFromMatchDatabase}
+        />
+      </div>
+    );
+  }
+
+  if (currentPage === 'teamProfile') {
+    return (
+      <TeamProfilePage
+        onBackHome={() => setCurrentPage('home')}
+        onOpenMatchDatabase={handleOpenMatchDatabaseFromTeamProfile}
+        onOpenReplay={handleOpenReplayFromTeamProfile}
+        initialViewState={teamProfileViewState}
+        onViewStateChange={setTeamProfileViewState}
+      />
     );
   }
 
@@ -61,12 +152,16 @@ function App() {
     return (
       <div>
         <button
-          onClick={() => setCurrentPage('home')}
+          onClick={handleBackFromReplayViewer}
           className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50"
         >
-           返回首页
+           {replayEntryContext?.source === 'match_database'
+              ? '返回比赛数据库'
+              : replayEntryContext?.source === 'team_profile'
+                ? '返回战队档案'
+                : '返回首页'}
         </button>
-        <RealMatchViewer initialMatchId={currentMatchId} />
+        <RealMatchViewer initialMatchId={currentMatchId} replayEntryContext={replayEntryContext} />
       </div>
     );
   }
@@ -93,11 +188,24 @@ function App() {
           <button
             onClick={() => {
               setCurrentMatchId(null);
+              setReplayEntryContext(null);
               setCurrentPage('match');
             }}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium"
           >
              录像查看器
+          </button>
+          <button
+            onClick={() => setCurrentPage('matchDatabase')}
+            className="px-4 py-2 bg-cyan-700 text-white rounded hover:bg-cyan-800 transition-colors font-medium"
+          >
+             比赛数据库
+          </button>
+          <button
+            onClick={() => setCurrentPage('teamProfile')}
+            className="px-4 py-2 bg-teal-700 text-white rounded hover:bg-teal-800 transition-colors font-medium"
+          >
+             战队档案
           </button>
           <button
             onClick={() => setCurrentPage('poc')}

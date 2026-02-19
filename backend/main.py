@@ -22,7 +22,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database.sqlite_db import init_database
-from routers import health, matches, playback, replays, visualization
+from routers import admin, health, matches, playback, replays, visualization
 
 
 @asynccontextmanager
@@ -85,6 +85,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router, tags=["Health"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(replays.router, prefix="/api/v1/replays", tags=["Replays"])
 app.include_router(matches.router, prefix="/api/v1/matches", tags=["Matches"])
 app.include_router(playback.router, prefix="/api/v1/playback", tags=["Playback"])

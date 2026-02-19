@@ -9,8 +9,16 @@ This module provides:
 
 from .parquet_storage import ParquetStorage
 from .match_storage import MatchStorage
+from .opendota_match_storage import OpenDotaMatchStorage
+from .opendota_reference_storage import OpenDotaReferenceStorage
+from .replay_download_storage import ReplayDownloadStorage
+from .match_database_storage import MatchDatabaseStorage
 
 __all__ = [
     "ParquetStorage",
     "MatchStorage",
+    "OpenDotaMatchStorage",
+    "OpenDotaReferenceStorage",
+    "ReplayDownloadStorage",
+    "MatchDatabaseStorage",
 ]

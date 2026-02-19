@@ -164,6 +164,60 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
             parser_compatible INTEGER DEFAULT 1
         )
     """)
+
+    # OpenDota recent matches cache/sync table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS opendota_matches (
+            match_id INTEGER PRIMARY KEY,
+            start_time INTEGER NOT NULL DEFAULT 0,
+            duration INTEGER NOT NULL DEFAULT 0,
+            radiant_team_id INTEGER,
+            dire_team_id INTEGER,
+            leagueid INTEGER,
+            last_synced_at INTEGER NOT NULL
+        )
+    """)
+
+    # OpenDota teams reference table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS opendota_teams (
+            team_id INTEGER PRIMARY KEY,
+            name TEXT,
+            tag TEXT,
+            wins INTEGER NOT NULL DEFAULT 0,
+            losses INTEGER NOT NULL DEFAULT 0,
+            last_synced_at INTEGER NOT NULL
+        )
+    """)
+
+    # OpenDota leagues reference table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS opendota_leagues (
+            leagueid INTEGER PRIMARY KEY,
+            name TEXT,
+            tier TEXT,
+            last_synced_at INTEGER NOT NULL
+        )
+    """)
+
+    # Replay download tasks table (Phase 4-3)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS replay_download_tasks (
+            task_id TEXT PRIMARY KEY,
+            match_id INTEGER NOT NULL,
+            status TEXT NOT NULL
+                CHECK(status IN ('pending', 'prepared', 'downloading', 'completed', 'failed')),
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            replay_url TEXT,
+            download_path TEXT,
+            error_code TEXT,
+            error_message TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+    """)
+
+    _ensure_replay_download_task_columns(cursor)
     
     # Create indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_match_time ON matches(start_time DESC)")
@@ -174,6 +228,15 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_player_hero ON player_matches(hero_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_player_match ON player_matches(match_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON parse_tasks(status)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_opendota_matches_start_time ON opendota_matches(start_time DESC)"
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_teams_name ON opendota_teams(name)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_leagues_name ON opendota_leagues(name)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_replay_download_tasks_status ON replay_download_tasks(status)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_replay_download_tasks_created_at ON replay_download_tasks(created_at DESC)"
+    )
 
 
 def close_database() -> None:
@@ -182,3 +245,76 @@ def close_database() -> None:
     if _connection:
         _connection.close()
         _connection = None
+
+
+def _ensure_replay_download_task_columns(cursor: sqlite3.Cursor) -> None:
+    """Ensure replay download task schema is upgraded in-place."""
+    cursor.execute("PRAGMA table_info(replay_download_tasks)")
+    columns = {str(row["name"]) for row in cursor.fetchall()}
+
+    if "attempt_count" not in columns:
+        cursor.execute(
+            "ALTER TABLE replay_download_tasks ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0"
+        )
+
+    if "download_path" not in columns:
+        cursor.execute("ALTER TABLE replay_download_tasks ADD COLUMN download_path TEXT")
+
+    if "error_code" not in columns:
+        cursor.execute("ALTER TABLE replay_download_tasks ADD COLUMN error_code TEXT")
+
+    cursor.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'replay_download_tasks'"
+    )
+    row = cursor.fetchone()
+    table_sql = str(row["sql"]).lower() if row and row["sql"] else ""
+    supports_new_statuses = "downloading" in table_sql and "completed" in table_sql
+
+    if not supports_new_statuses:
+        cursor.execute("ALTER TABLE replay_download_tasks RENAME TO replay_download_tasks_legacy")
+        cursor.execute(
+            """
+            CREATE TABLE replay_download_tasks (
+                task_id TEXT PRIMARY KEY,
+                match_id INTEGER NOT NULL,
+                status TEXT NOT NULL
+                    CHECK(status IN ('pending', 'prepared', 'downloading', 'completed', 'failed')),
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                replay_url TEXT,
+                download_path TEXT,
+                error_code TEXT,
+                error_message TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        cursor.execute(
+            """
+            INSERT INTO replay_download_tasks (
+                task_id,
+                match_id,
+                status,
+                attempt_count,
+                replay_url,
+                download_path,
+                error_code,
+                error_message,
+                created_at,
+                updated_at
+            )
+            SELECT
+                task_id,
+                match_id,
+                status,
+                COALESCE(attempt_count, 0),
+                replay_url,
+                download_path,
+                NULL,
+                error_message,
+                created_at,
+                updated_at
+            FROM replay_download_tasks_legacy
+            """
+        )
+        cursor.execute("DROP TABLE replay_download_tasks_legacy")

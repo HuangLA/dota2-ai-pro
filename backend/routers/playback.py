@@ -2,6 +2,7 @@
 
 import math
 import os
+import re
 from pathlib import Path
 from typing import Optional, cast
 
@@ -45,6 +46,112 @@ def resolve_game_time(row: pd.Series, tick: int) -> float:
     if "game_time" in row.index and pd.notna(row["game_time"]):
         return float(row["game_time"])
     return tick_to_seconds(tick)
+
+
+def normalize_hero_key(hero_name: object) -> str:
+    """Normalize hero identifiers across positions and kill events."""
+    if not isinstance(hero_name, str):
+        return ""
+
+    normalized = hero_name.strip().lower()
+    if normalized.startswith("npc_dota_hero_"):
+        normalized = normalized.replace("npc_dota_hero_", "", 1)
+
+    return re.sub(r"[^a-z0-9]", "", normalized)
+
+
+def resolve_hud_snapshot_tick(
+    positions_df: pd.DataFrame,
+    requested_tick: Optional[int],
+    requested_game_time: Optional[float],
+) -> tuple[int, float]:
+    """Resolve target snapshot tick/game_time for HUD queries."""
+    if positions_df.empty:
+        return 0, 0.0
+
+    tick_df = positions_df[["tick", "game_time"]].dropna(subset=["tick"]).copy()
+    if tick_df.empty:
+        return 0, 0.0
+
+    tick_df["tick"] = tick_df["tick"].astype(int)
+    tick_df = tick_df.sort_values("tick").drop_duplicates(subset=["tick"], keep="last")
+
+    selected_row = tick_df.iloc[-1]
+
+    if requested_tick is not None:
+        candidate_df = tick_df[tick_df["tick"] <= requested_tick]
+        if candidate_df.empty:
+            selected_row = tick_df.iloc[0]
+        else:
+            selected_row = candidate_df.iloc[-1]
+    elif requested_game_time is not None:
+        game_time_df = tick_df[tick_df["game_time"].notna()]
+        if not game_time_df.empty:
+            candidate_df = game_time_df[game_time_df["game_time"] <= requested_game_time]
+            if candidate_df.empty:
+                selected_row = game_time_df.iloc[0]
+            else:
+                selected_row = candidate_df.iloc[-1]
+
+    selected_tick = int(selected_row["tick"])
+    selected_game_time = resolve_game_time(selected_row, selected_tick)
+    return selected_tick, selected_game_time
+
+
+def build_hud_heroes(
+    positions_df: pd.DataFrame,
+    kills_df: pd.DataFrame,
+    target_tick: int,
+    target_game_time: float,
+) -> list[dict]:
+    """Build hero HUD rows for a single snapshot."""
+    if positions_df.empty:
+        return []
+
+    snapshot_df = positions_df[positions_df["tick"] <= target_tick]
+    if snapshot_df.empty:
+        snapshot_df = positions_df
+
+    snapshot_df = snapshot_df.sort_values("tick").drop_duplicates(subset=["hero", "team"], keep="last")
+
+    kill_counts: dict[str, int] = {}
+    death_counts: dict[str, int] = {}
+
+    if not kills_df.empty and "time" in kills_df.columns:
+        kill_events_df = kills_df[kills_df["time"] <= target_game_time]
+        for _, event in kill_events_df.iterrows():
+            killer_key = normalize_hero_key(event.get("killer"))
+            victim_key = normalize_hero_key(event.get("victim"))
+
+            if killer_key:
+                kill_counts[killer_key] = kill_counts.get(killer_key, 0) + 1
+            if victim_key:
+                death_counts[victim_key] = death_counts.get(victim_key, 0) + 1
+
+    heroes: list[dict] = []
+    for _, row in snapshot_df.sort_values(["team", "hero"]).iterrows():
+        hero_name = str(row["hero"])
+        hero_key = normalize_hero_key(hero_name)
+
+        team_value = int(row["team"]) if pd.notna(row.get("team")) else 0
+        level_value = int(row["level"]) if pd.notna(row.get("level")) else 0
+
+        heroes.append(
+            {
+                "hero": hero_name,
+                "team": team_value,
+                "level": level_value,
+                "kills": kill_counts.get(hero_key, 0),
+                "deaths": death_counts.get(hero_key, 0),
+                "assists": 0,
+                "net_worth": 0,
+                "gpm": 0,
+                "xpm": 0,
+                "items": [],
+            }
+        )
+
+    return heroes
 
 
 def _coerce_float(value: object) -> Optional[float]:
@@ -651,6 +758,50 @@ async def get_heroes(match_id: int) -> dict:
         "radiant": radiant,
         "dire": dire,
         "total": len(heroes)
+    }
+
+
+@router.get("/{match_id}/hud")
+async def get_hud(
+    match_id: int,
+    game_time: Optional[float] = Query(None, description="Target game_time (seconds)"),
+    tick: Optional[int] = Query(None, ge=0, description="Target tick"),
+) -> dict:
+    """Get real-time HUD metrics snapshot for all heroes."""
+    if game_time is not None and tick is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide only one of game_time or tick.",
+        )
+
+    if not parquet_storage.match_exists(match_id):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Match {match_id} not found or not parsed",
+        )
+
+    positions_df = parquet_storage.get_positions(match_id)
+    if positions_df.empty:
+        return {
+            "status": "ok",
+            "match_id": match_id,
+            "game_time": game_time,
+            "tick": tick,
+            "heroes": [],
+            "message": "No position samples available for HUD snapshot.",
+        }
+
+    target_tick, target_game_time = resolve_hud_snapshot_tick(positions_df, tick, game_time)
+    kills_df = parquet_storage.get_kills(match_id)
+    heroes = build_hud_heroes(positions_df, kills_df, target_tick, target_game_time)
+
+    return {
+        "status": "ok",
+        "match_id": match_id,
+        "game_time": target_game_time,
+        "tick": target_tick,
+        "heroes": heroes,
+        "message": "items/net_worth/gpm/xpm currently use fallback values ([], 0).",
     }
 
 
