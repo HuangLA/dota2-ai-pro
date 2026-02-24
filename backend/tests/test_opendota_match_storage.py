@@ -205,3 +205,152 @@ def test_list_recent_matches_filters_by_league_and_time_range() -> None:
     assert total == 1
     assert len(page) == 1
     assert page[0]["match_id"] == 502
+
+
+def test_upsert_recent_matches_persists_name_fields_and_tracks_name_updates() -> None:
+    storage = OpenDotaMatchStorage()
+    inserted, updated = storage.upsert_recent_matches(
+        [
+            {
+                "match_id": 701,
+                "start_time": 1700000701,
+                "duration": 2100,
+                "radiant_team": 15,
+                "dire_team": 2163,
+                "leagueid": 15475,
+                "radiant_name": "Team Liquid",
+                "dire_name": "Team Falcons",
+                "league_name": "DreamLeague S26",
+            }
+        ]
+    )
+    assert (inserted, updated) == (1, 0)
+
+    inserted_2, updated_2 = storage.upsert_recent_matches(
+        [
+            {
+                "match_id": 701,
+                "start_time": 1700000701,
+                "duration": 2100,
+                "radiant_team": 15,
+                "dire_team": 2163,
+                "leagueid": 15475,
+                "radiant_name": "Team Liquid Updated",
+                "dire_name": "Team Falcons",
+                "league_name": "DreamLeague S26",
+            }
+        ]
+    )
+    assert (inserted_2, updated_2) == (0, 1)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT radiant_team_name, dire_team_name, league_name
+        FROM opendota_matches
+        WHERE match_id = 701
+        """
+    )
+    row = cursor.fetchone()
+    assert row["radiant_team_name"] == "Team Liquid Updated"
+    assert row["dire_team_name"] == "Team Falcons"
+    assert row["league_name"] == "DreamLeague S26"
+
+
+def test_upsert_match_detail_extracts_nested_team_and_league_names() -> None:
+    storage = OpenDotaMatchStorage()
+
+    inserted, updated = storage.upsert_match_detail(
+        {
+            "match_id": 702,
+            "start_time": 1700000702,
+            "duration": 2200,
+            "radiant_team_id": 15,
+            "dire_team_id": 2163,
+            "leagueid": 15475,
+            "radiant_team": {"name": "Team Liquid"},
+            "dire_team": {"name": "Team Falcons"},
+            "league": {"name": "DreamLeague Season 26"},
+        }
+    )
+
+    assert (inserted, updated) == (1, 0)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT radiant_team_name, dire_team_name, league_name
+        FROM opendota_matches
+        WHERE match_id = 702
+        """
+    )
+    row = cursor.fetchone()
+    assert row["radiant_team_name"] == "Team Liquid"
+    assert row["dire_team_name"] == "Team Falcons"
+    assert row["league_name"] == "DreamLeague Season 26"
+
+
+def test_upsert_recent_matches_tracks_source_and_icon_urls() -> None:
+    storage = OpenDotaMatchStorage()
+
+    inserted, updated = storage.upsert_recent_matches(
+        [
+            {
+                "match_id": 801,
+                "start_time": 1700000801,
+                "duration": 2100,
+                "radiant_team": {"name": "R", "logo_url": "r.png"},
+                "dire_team": {"name": "D", "logo_url": "d.png"},
+                "league": {"name": "L", "image_url": "l.png"},
+            }
+        ],
+        source="public",
+    )
+    assert (inserted, updated) == (1, 0)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT source, radiant_logo_url, dire_logo_url, league_icon_url
+        FROM opendota_matches
+        WHERE match_id = 801
+        """
+    )
+    row = cursor.fetchone()
+    assert row["source"] == "public"
+    assert row["radiant_logo_url"] == "r.png"
+    assert row["dire_logo_url"] == "d.png"
+    assert row["league_icon_url"] == "l.png"
+
+
+def test_list_recent_matches_filters_by_source_flags() -> None:
+    storage = OpenDotaMatchStorage()
+    storage.upsert_recent_matches(
+        [{"match_id": 901, "start_time": 1, "duration": 1}],
+        source="pro",
+    )
+    storage.upsert_recent_matches(
+        [{"match_id": 902, "start_time": 2, "duration": 1}],
+        source="public",
+    )
+
+    total_pro, records_pro = storage.list_recent_matches(
+        limit=10,
+        offset=0,
+        include_pro=True,
+        include_public=False,
+    )
+    assert total_pro == 1
+    assert [row["match_id"] for row in records_pro] == [901]
+
+    total_public, records_public = storage.list_recent_matches(
+        limit=10,
+        offset=0,
+        include_pro=False,
+        include_public=True,
+    )
+    assert total_public == 1
+    assert [row["match_id"] for row in records_public] == [902]

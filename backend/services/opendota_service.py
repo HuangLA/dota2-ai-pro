@@ -69,7 +69,7 @@ class OpenDotaService:
             )
 
         return (
-            f"https://replay{cluster_value}.valve.net/570/"
+            f"http://replay{cluster_value}.valve.net/570/"
             f"{match_id}_{replay_salt_value}.dem.bz2"
         )
 

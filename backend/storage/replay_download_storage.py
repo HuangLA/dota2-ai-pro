@@ -154,6 +154,21 @@ class ReplayDownloadStorage:
             error_message=None,
         )
 
+    def clear_download_path(self, task_id: str) -> dict[str, Any]:
+        """Clear download path after replay files are removed from disk."""
+        task = self.get_task(task_id)
+        if task is None:
+            raise ValueError(f"Replay download task not found: {task_id}")
+
+        return self._update_task(
+            task_id=task_id,
+            status=str(task["status"]),
+            replay_url=_UNSET,
+            download_path=None,
+            error_code=None,
+            error_message=None,
+        )
+
     def list_tasks(
         self,
         *,

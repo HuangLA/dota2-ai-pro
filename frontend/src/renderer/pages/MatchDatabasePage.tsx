@@ -105,7 +105,7 @@ function getTeamLabel(name: string | null | undefined, teamId: number | null | u
   }
 
   if (teamId !== undefined && teamId !== null) {
-    return `战队 ${teamId}`;
+    return `未知战队（ID: ${teamId}）`;
   }
 
   return '未知战队';
@@ -117,7 +117,7 @@ function getLeagueLabel(name: string | null | undefined, leagueId: number | null
   }
 
   if (leagueId !== undefined && leagueId !== null) {
-    return `联赛 ${leagueId}`;
+    return `未知联赛（ID: ${leagueId}）`;
   }
 
   return '未知联赛';
@@ -148,6 +148,7 @@ export function MatchDatabasePage({
   const [presetName, setPresetName] = useState('');
   const [filterPresets, setFilterPresets] = useState<FilterPreset[]>([]);
   const [selectedPresetName, setSelectedPresetName] = useState('');
+  const [selectedMatchIds, setSelectedMatchIds] = useState<number[]>([]);
 
   const [filters, setFilters] = useState<FilterFormState>(
     normalizeFilters(initialViewState?.filters)
@@ -198,7 +199,21 @@ export function MatchDatabasePage({
     [matches]
   );
 
-  const batchActionsDisabled = loading || activeActionMatchId !== null || actionableMatches.length === 0;
+  const allCurrentPageMatchIds = useMemo(
+    () => actionableMatches.map((match) => match.match_id),
+    [actionableMatches]
+  );
+
+  const selectedMatchCount = selectedMatchIds.length;
+  const isAllCurrentPageSelected =
+    allCurrentPageMatchIds.length > 0 && selectedMatchCount === allCurrentPageMatchIds.length;
+  const isSomeCurrentPageSelected =
+    selectedMatchCount > 0 && selectedMatchCount < allCurrentPageMatchIds.length;
+  const batchActionsDisabled =
+    loading ||
+    activeActionMatchId !== null ||
+    allCurrentPageMatchIds.length === 0 ||
+    selectedMatchCount === 0;
 
   const failedItemsText = useMemo(() => {
     if (lastBatchFailures.length === 0) {
@@ -211,6 +226,11 @@ export function MatchDatabasePage({
   useEffect(() => {
     fetchMatches();
   }, [fetchMatches]);
+
+  useEffect(() => {
+    const currentPageIds = new Set(allCurrentPageMatchIds);
+    setSelectedMatchIds((current) => current.filter((matchId) => currentPageIds.has(matchId)));
+  }, [allCurrentPageMatchIds]);
 
   useEffect(() => {
     if (!onViewStateChange) {
@@ -360,7 +380,7 @@ export function MatchDatabasePage({
     }
   };
 
-  const handleAction = async (matchId: number, mode: MatchDatabaseActionMode) => {
+  const handleAction = async (matchId: number) => {
     if (activeBatchMode || batchActionInFlightRef.current) {
       return;
     }
@@ -369,7 +389,7 @@ export function MatchDatabasePage({
     setFeedback(null);
 
     try {
-      const result = await matchDatabaseService.triggerDownloadAction(matchId, mode);
+      const result = await matchDatabaseService.triggerDownloadAction(matchId, 'prepare_and_execute');
 
       if (result.status === 'ok') {
         setFeedback({
@@ -403,23 +423,28 @@ export function MatchDatabasePage({
     }
   };
 
-  const handleBatchAction = async (mode: MatchDatabaseActionMode) => {
+  const handleBatchAction = async () => {
     if (activeBatchMode || batchActionsDisabled || batchActionInFlightRef.current) {
       return;
     }
 
     batchActionInFlightRef.current = true;
-    setActiveBatchMode(mode);
+    setActiveBatchMode('prepare_and_execute');
     setFeedback(null);
 
     const failures: BatchFailureItem[] = [];
     let successCount = 0;
     let withTaskIdCount = 0;
     let lastTaskIdFromBatch: string | null = null;
+    const selectedIdSet = new Set(selectedMatchIds);
+    const selectedMatches = actionableMatches.filter((match) => selectedIdSet.has(match.match_id));
 
-    for (const match of actionableMatches) {
+    for (const match of selectedMatches) {
       try {
-        const result = await matchDatabaseService.triggerDownloadAction(match.match_id, mode);
+        const result = await matchDatabaseService.triggerDownloadAction(
+          match.match_id,
+          'prepare_and_execute'
+        );
         if (result.task?.task_id) {
           lastTaskIdFromBatch = result.task.task_id;
         }
@@ -445,12 +470,9 @@ export function MatchDatabasePage({
       }
     }
 
-    const totalCount = actionableMatches.length;
+    const totalCount = selectedMatches.length;
     const failedCount = failures.length;
-    const summaryPrefix =
-      mode === 'prepare'
-        ? '批量准备完成。'
-        : '批量准备并执行完成。';
+    const summaryPrefix = '勾选批量下载完成。';
     const failurePreview = failures
       .slice(0, 3)
       .map((item) => `${item.matchId}: ${item.message}`)
@@ -475,6 +497,53 @@ export function MatchDatabasePage({
       setActiveBatchMode(null);
       batchActionInFlightRef.current = false;
     }
+  };
+
+  const handleDeleteReplay = async (matchId: number) => {
+    if (activeBatchMode || batchActionInFlightRef.current) {
+      return;
+    }
+
+    setActiveActionMatchId(matchId);
+    setFeedback(null);
+
+    try {
+      const result = await matchDatabaseService.deleteReplay(matchId);
+      setFeedback({
+        type: result.status === 'ok' ? 'success' : 'error',
+        message: `比赛 ${matchId}：${result.message}`,
+      });
+      await fetchMatches();
+    } catch (deleteError) {
+      console.error('Failed to delete replay files:', deleteError);
+      setFeedback({
+        type: 'error',
+        message: `比赛 ${matchId}：删除录像失败。`,
+      });
+    } finally {
+      setActiveActionMatchId(null);
+    }
+  };
+
+  const handleToggleMatchSelection = (matchId: number) => {
+    setSelectedMatchIds((current) => {
+      if (current.includes(matchId)) {
+        return current.filter((id) => id !== matchId);
+      }
+
+      return [...current, matchId];
+    });
+  };
+
+  const handleToggleSelectAllCurrentPage = () => {
+    setSelectedMatchIds((current) => {
+      if (isAllCurrentPageSelected) {
+        return current.filter((id) => !allCurrentPageMatchIds.includes(id));
+      }
+
+      const union = new Set([...current, ...allCurrentPageMatchIds]);
+      return Array.from(union);
+    });
   };
 
   useEffect(() => {
@@ -684,31 +753,24 @@ export function MatchDatabasePage({
               >
                 清空
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleBatchAction('prepare');
-                }}
-                disabled={batchActionsDisabled || activeBatchMode !== null}
-                className="bg-blue-700 hover:bg-blue-600 text-white px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {activeBatchMode === 'prepare'
-                  ? '正在批量准备（当前页）...'
-                  : '批量准备（当前页）'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleBatchAction('prepare_and_execute');
-                }}
-                disabled={batchActionsDisabled || activeBatchMode !== null}
-                className="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {activeBatchMode === 'prepare_and_execute'
-                  ? '正在批量准备并执行（当前页）...'
-                  : '批量准备并执行（当前页）'}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleBatchAction();
+                  }}
+                  disabled={batchActionsDisabled || activeBatchMode !== null}
+                  className="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {activeBatchMode === 'prepare_and_execute' ? '正在批量下载（勾选项）...' : '批量下载（勾选项）'}
+                </button>
+                <span className="text-sm text-gray-300">
+                  {allCurrentPageMatchIds.length === 0
+                    ? '当前页无可选比赛。'
+                    : selectedMatchCount === 0
+                      ? '请先勾选要批量下载的比赛。'
+                      : `已勾选 ${selectedMatchCount} 场比赛`}
+                </span>
+              </div>
             <div className="grid grid-cols-1 md:grid-cols-[1.2fr_auto_1fr_auto] gap-2 xl:col-span-6">
               <input
                 aria-label="预设名称"
@@ -782,7 +844,7 @@ export function MatchDatabasePage({
               导出失败项（.txt）
             </button>
             <span className="text-xs text-gray-400">
-              失败项：<span className="text-gray-200">{lastBatchFailures.length}</span>
+              本次勾选批量失败项：<span className="text-gray-200">{lastBatchFailures.length}</span>
             </span>
           </div>
         </div>
@@ -796,6 +858,22 @@ export function MatchDatabasePage({
             <table className="min-w-[980px] w-full text-left">
               <thead className="bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 text-sm uppercase">
                 <tr>
+                  <th className="px-4 py-3 font-semibold">
+                    <input
+                      aria-label="全选当前页"
+                      type="checkbox"
+                      checked={isAllCurrentPageSelected}
+                      ref={(element) => {
+                        if (!element) {
+                          return;
+                        }
+                        element.indeterminate = isSomeCurrentPageSelected;
+                      }}
+                      onChange={handleToggleSelectAllCurrentPage}
+                      disabled={allCurrentPageMatchIds.length === 0 || activeBatchMode !== null}
+                      className="h-4 w-4 accent-dota-primary disabled:opacity-40"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-semibold">比赛 ID</th>
                   <th className="px-4 py-3 font-semibold">开始时间</th>
                   <th className="px-4 py-3 font-semibold">时长</th>
@@ -810,13 +888,13 @@ export function MatchDatabasePage({
               <tbody className="divide-y divide-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                       加载中...
                     </td>
                   </tr>
                 ) : matches.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                       未找到记录。
                     </td>
                   </tr>
@@ -830,6 +908,16 @@ export function MatchDatabasePage({
                           : 'hover:bg-white/5'
                       }`}
                     >
+                      <td className="px-4 py-3">
+                        <input
+                          aria-label={`选择比赛 ${match.match_id}`}
+                          type="checkbox"
+                          checked={selectedMatchIds.includes(match.match_id)}
+                          onChange={() => handleToggleMatchSelection(match.match_id)}
+                          disabled={activeBatchMode !== null}
+                          className="h-4 w-4 accent-dota-primary disabled:opacity-40"
+                        />
+                      </td>
                       <td className="px-4 py-3 font-mono text-dota-gold font-semibold">{match.match_id}</td>
                       <td
                         className="px-4 py-3 text-gray-300"
@@ -884,18 +972,7 @@ export function MatchDatabasePage({
                              任务详情
                           </button>
                           <button
-                            onClick={() => handleAction(match.match_id, 'prepare')}
-                            disabled={
-                              activeActionMatchId === match.match_id ||
-                              activeBatchMode !== null ||
-                              batchActionInFlightRef.current
-                            }
-                            className="text-blue-300 hover:text-blue-200 border border-blue-700/50 hover:border-blue-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-50"
-                          >
-                             准备下载
-                          </button>
-                          <button
-                            onClick={() => handleAction(match.match_id, 'prepare_and_execute')}
+                            onClick={() => handleAction(match.match_id)}
                             disabled={
                               activeActionMatchId === match.match_id ||
                               activeBatchMode !== null ||
@@ -903,7 +980,21 @@ export function MatchDatabasePage({
                             }
                             className="text-green-300 hover:text-green-200 border border-green-700/50 hover:border-green-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-50"
                           >
-                             准备并执行
+                             下载录像
+                          </button>
+                          <button
+                            onClick={() => {
+                              void handleDeleteReplay(match.match_id);
+                            }}
+                            disabled={
+                              activeActionMatchId === match.match_id ||
+                              activeBatchMode !== null ||
+                              batchActionInFlightRef.current ||
+                              normalizeDownloadStatus(match.download_status) !== 'completed'
+                            }
+                            className="text-red-300 hover:text-red-200 border border-red-700/50 hover:border-red-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-50"
+                          >
+                             删除录像
                           </button>
                         </div>
                       </td>

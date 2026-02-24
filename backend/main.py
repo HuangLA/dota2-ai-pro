@@ -7,7 +7,10 @@ It provides REST API endpoints for replay parsing, analysis, and data queries.
 
 import os
 import sys
+import asyncio
+import logging
 from contextlib import asynccontextmanager
+from contextlib import suppress
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -22,7 +25,30 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database.sqlite_db import init_database
-from routers import admin, health, matches, playback, replays, visualization
+from routers import admin, health, library, matches, playback, remote, replays, visualization
+from services.opendota_service import OpenDotaService, OpenDotaServiceError
+from services.opendota_sync_service import OpenDotaSyncService
+from storage.opendota_match_storage import OpenDotaMatchStorage
+from storage.opendota_reference_storage import OpenDotaReferenceStorage
+
+logger = logging.getLogger(__name__)
+
+
+async def _run_remote_incremental_sync(sync_service: OpenDotaSyncService) -> None:
+    """Run periodic remote mirror sync every 60 seconds."""
+    while True:
+        try:
+            await sync_service.sync_selected_sources(
+                include_pro=True,
+                include_public=True,
+                limit=100,
+                sync_reference=True,
+            )
+        except OpenDotaServiceError:
+            logger.exception("Remote incremental sync failed with OpenDota error")
+        except Exception:
+            logger.exception("Remote incremental sync failed")
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
@@ -54,9 +80,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     for dir_path in data_dirs:
         dir_path.mkdir(parents=True, exist_ok=True)
     
+    sync_service = OpenDotaSyncService(
+        opendota_service=OpenDotaService(),
+        opendota_match_storage=OpenDotaMatchStorage(),
+        opendota_reference_storage=OpenDotaReferenceStorage(),
+    )
+    remote_sync_task = asyncio.create_task(_run_remote_incremental_sync(sync_service))
+
     yield
     
     # Shutdown
+    remote_sync_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await remote_sync_task
     print("Shutting down True Sight Backend...")
 
 
@@ -86,6 +122,8 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(remote.router, prefix="/api/v1/remote", tags=["Remote"])
+app.include_router(library.router, prefix="/api/v1/library", tags=["Library"])
 app.include_router(replays.router, prefix="/api/v1/replays", tags=["Replays"])
 app.include_router(matches.router, prefix="/api/v1/matches", tags=["Matches"])
 app.include_router(playback.router, prefix="/api/v1/playback", tags=["Playback"])

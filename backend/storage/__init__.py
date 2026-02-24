@@ -13,6 +13,7 @@ from .opendota_match_storage import OpenDotaMatchStorage
 from .opendota_reference_storage import OpenDotaReferenceStorage
 from .replay_download_storage import ReplayDownloadStorage
 from .match_database_storage import MatchDatabaseStorage
+from .library_storage import LibraryStorage
 
 __all__ = [
     "ParquetStorage",
@@ -21,4 +22,5 @@ __all__ = [
     "OpenDotaReferenceStorage",
     "ReplayDownloadStorage",
     "MatchDatabaseStorage",
+    "LibraryStorage",
 ]

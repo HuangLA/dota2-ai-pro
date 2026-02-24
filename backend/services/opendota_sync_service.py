@@ -31,6 +31,7 @@ class OpenDotaSyncService:
         pro_only: bool,
     ) -> dict[str, Any]:
         """Fetch recent matches and optionally persist with idempotent upsert."""
+        source_label = "pro" if pro_only else "public"
         if pro_only:
             recent_matches = await self.opendota_service.fetch_pro_matches(limit=limit)
         else:
@@ -39,9 +40,14 @@ class OpenDotaSyncService:
         inserted = 0
         updated = 0
         if persist and not dry_run:
-            inserted, updated = self.opendota_match_storage.upsert_recent_matches(recent_matches)
+            try:
+                inserted, updated = self.opendota_match_storage.upsert_recent_matches(
+                    recent_matches,
+                    source=source_label,
+                )
+            except TypeError:
+                inserted, updated = self.opendota_match_storage.upsert_recent_matches(recent_matches)
 
-        source_label = "pro" if pro_only else "public"
         if dry_run:
             message = f"Dry-run fetch completed (source={source_label})."
         elif persist:
@@ -56,6 +62,71 @@ class OpenDotaSyncService:
             "message": message,
             "inserted": inserted,
             "updated": updated,
+        }
+
+    async def sync_selected_sources(
+        self,
+        *,
+        include_pro: bool,
+        include_public: bool,
+        limit: int,
+        sync_reference: bool,
+    ) -> dict[str, Any]:
+        """Sync selected OpenDota match sources and optional reference dimensions."""
+        total_inserted = 0
+        total_updated = 0
+        fetched = {"pro": 0, "public": 0}
+        inserted = {"pro": 0, "public": 0}
+        updated = {"pro": 0, "public": 0}
+
+        if include_pro:
+            pro_matches = await self.opendota_service.fetch_pro_matches(limit=limit)
+            fetched["pro"] = len(pro_matches)
+            inserted["pro"], updated["pro"] = self.opendota_match_storage.upsert_recent_matches(
+                pro_matches,
+                source="pro",
+            )
+            total_inserted += inserted["pro"]
+            total_updated += updated["pro"]
+
+        if include_public:
+            public_matches = await self.opendota_service.fetch_recent_matches(limit=limit)
+            fetched["public"] = len(public_matches)
+            inserted["public"], updated["public"] = self.opendota_match_storage.upsert_recent_matches(
+                public_matches,
+                source="public",
+            )
+            total_inserted += inserted["public"]
+            total_updated += updated["public"]
+
+        reference_result: dict[str, int] = {
+            "teams_inserted": 0,
+            "teams_updated": 0,
+            "leagues_inserted": 0,
+            "leagues_updated": 0,
+        }
+        if sync_reference:
+            result = await self.sync_reference_data(
+                team_limit=200,
+                league_limit=200,
+                dry_run=False,
+                persist=True,
+            )
+            reference_result = {
+                "teams_inserted": int(result["teams_inserted"]),
+                "teams_updated": int(result["teams_updated"]),
+                "leagues_inserted": int(result["leagues_inserted"]),
+                "leagues_updated": int(result["leagues_updated"]),
+            }
+
+        return {
+            "status": "ok",
+            "fetched": fetched,
+            "inserted": inserted,
+            "updated": updated,
+            "total_inserted": total_inserted,
+            "total_updated": total_updated,
+            "reference": reference_result,
         }
 
     async def sync_reference_data(

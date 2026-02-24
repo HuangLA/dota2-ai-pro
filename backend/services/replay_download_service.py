@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import bz2
 from pathlib import Path
+import shutil
 from typing import Any
 
 import httpx
 
 from services.opendota_service import OpenDotaService, OpenDotaServiceError
+from services.parse_service import ParseService
+from storage.opendota_match_storage import OpenDotaMatchStorage
 from storage.replay_download_storage import ReplayDownloadStorage
 
 
@@ -18,6 +22,8 @@ class ReplayDownloadService:
         self,
         opendota_service: OpenDotaService,
         replay_download_storage: ReplayDownloadStorage,
+        opendota_match_storage: OpenDotaMatchStorage | None = None,
+        parse_service: Any | None = None,
         download_timeout_seconds: float = 120.0,
         replays_dir: Path | None = None,
     ) -> None:
@@ -29,6 +35,15 @@ class ReplayDownloadService:
             if replays_dir is not None
             else Path(__file__).resolve().parent.parent / "data" / "replays"
         )
+        self.parse_service = parse_service or ParseService(replays_dir=str(self.replays_dir))
+        self.opendota_match_storage = opendota_match_storage or OpenDotaMatchStorage()
+
+    def _decompress_replay_archive(self, archive_path: Path, match_id: int) -> Path:
+        replay_path = self.replays_dir / f"{match_id}.dem"
+        with bz2.open(archive_path, "rb") as compressed:
+            with replay_path.open("wb") as replay_file:
+                shutil.copyfileobj(compressed, replay_file)
+        return replay_path
 
     async def prepare_replay_download(self, match_id: int) -> dict[str, Any]:
         """Prepare a replay download task by resolving replay URL from OpenDota."""
@@ -37,6 +52,7 @@ class ReplayDownloadService:
 
         try:
             details = await self.opendota_service.fetch_match_details(match_id=match_id)
+            self.opendota_match_storage.upsert_match_detail(details)
             replay_url = self.opendota_service.build_replay_url(
                 match_id=match_id,
                 cluster=details.get("cluster"),
@@ -138,6 +154,23 @@ class ReplayDownloadService:
                             if chunk:
                                 output_file.write(chunk)
 
+            try:
+                replay_path = self._decompress_replay_archive(download_target, match_id)
+                parse_result = await self.parse_service.parse_replay_async(str(replay_path))
+                if not parse_result.success:
+                    parse_error = parse_result.error or "Unknown parse error."
+                    return self.replay_download_storage.mark_failed(
+                        task_id=task_id,
+                        error_message=f"Replay parse failed: {parse_error}",
+                        error_code="PARSE_FAILED",
+                    )
+            except Exception as exc:
+                return self.replay_download_storage.mark_failed(
+                    task_id=task_id,
+                    error_message=f"Replay parse failed: {exc}",
+                    error_code="PARSE_FAILED",
+                )
+
             return self.replay_download_storage.mark_completed(
                 task_id=task_id,
                 download_path=str(download_target),
@@ -176,6 +209,48 @@ class ReplayDownloadService:
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         """Fetch one replay download task for observability."""
         return self.replay_download_storage.get_task(task_id)
+
+    def delete_downloaded_replay(self, match_id: int) -> dict[str, Any]:
+        """Delete downloaded replay artifacts for latest completed task by match_id."""
+        listed = self.replay_download_storage.list_tasks(
+            limit=1,
+            offset=0,
+            status="completed",
+            match_id=match_id,
+        )
+        tasks = listed.get("tasks", [])
+        if not tasks:
+            return {
+                "status": "error",
+                "message": f"No completed replay download found for match_id={match_id}.",
+                "task": None,
+            }
+
+        task = tasks[0]
+        task_id = str(task["task_id"])
+        bz2_path_raw = task.get("download_path")
+        bz2_path = Path(str(bz2_path_raw)) if isinstance(bz2_path_raw, str) and bz2_path_raw.strip() else (self.replays_dir / f"{match_id}.dem.bz2")
+        dem_path = self.replays_dir / f"{match_id}.dem"
+
+        removed_any = False
+        for candidate in (bz2_path, dem_path):
+            if candidate.exists() and candidate.is_file():
+                candidate.unlink()
+                removed_any = True
+
+        if not removed_any:
+            return {
+                "status": "error",
+                "message": f"Replay files not found for match_id={match_id}.",
+                "task": task,
+            }
+
+        updated = self.replay_download_storage.clear_download_path(task_id)
+        return {
+            "status": "ok",
+            "message": f"Replay files deleted for match_id={match_id}.",
+            "task": updated,
+        }
 
     async def prepare_and_execute(self, match_id: int) -> dict[str, Any]:
         """Prepare replay URL and execute download immediately when ready."""

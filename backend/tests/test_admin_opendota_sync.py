@@ -400,6 +400,7 @@ def test_admin_match_database_list_success(monkeypatch) -> None:
                     "download_status": "prepared",
                     "download_task_id": "task-prepare-1",
                     "download_attempt_count": 0,
+                    "download_path": None,
                 }
             ],
         )
@@ -440,6 +441,7 @@ def test_admin_match_database_list_success(monkeypatch) -> None:
                 "download_status": "prepared",
                 "download_task_id": "task-prepare-1",
                 "download_attempt_count": 0,
+                "download_path": None,
             }
         ],
     }
@@ -1191,3 +1193,203 @@ def test_admin_replay_download_tasks_status_invalid_returns_422() -> None:
     client = TestClient(app)
     response = client.get("/api/v1/admin/replays/download/tasks", params={"status": "running"})
     assert response.status_code == 422
+
+
+def test_admin_match_database_delete_replay_success(monkeypatch) -> None:
+    def _fake_delete_downloaded_replay(match_id: int) -> dict[str, object]:
+        assert match_id == 8674716612
+        return {
+            "status": "ok",
+            "message": "Replay files deleted for match_id=8674716612.",
+            "task": {
+                "task_id": "task-delete-1",
+                "match_id": 8674716612,
+                "status": "completed",
+                "attempt_count": 1,
+                "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+                "download_path": None,
+                "error_code": None,
+                "error_message": None,
+                "created_at": 1700103000,
+                "updated_at": 1700103010,
+            },
+        }
+
+    monkeypatch.setattr(admin.replay_download_service, "delete_downloaded_replay", _fake_delete_downloaded_replay)
+
+    client = TestClient(app)
+    response = client.post("/api/v1/admin/match-database/8674716612/delete-replay")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_admin_match_database_list_backfills_missing_names_before_return(monkeypatch) -> None:
+    calls = {"count": 0}
+    captured_details: list[dict[str, object]] = []
+
+    def _fake_list_match_database(
+        *,
+        limit: int,
+        offset: int,
+        professional_only: bool = True,
+        team_id: int | None = None,
+        leagueid: int | None = None,
+        has_download: bool | None = None,
+        start_time_from: int | None = None,
+        start_time_to: int | None = None,
+    ) -> tuple[int, list[dict[str, object]]]:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return (
+                1,
+                [
+                    {
+                        "match_id": 8123456789,
+                        "start_time": 1700054321,
+                        "duration": 2450,
+                        "radiant_team_id": 15,
+                        "dire_team_id": 2163,
+                        "leagueid": 15475,
+                        "radiant_team_name": None,
+                        "dire_team_name": None,
+                        "league_name": None,
+                        "download_status": None,
+                        "download_task_id": None,
+                        "download_attempt_count": None,
+                        "download_path": None,
+                    }
+                ],
+            )
+
+        return (
+            1,
+            [
+                {
+                    "match_id": 8123456789,
+                    "start_time": 1700054321,
+                    "duration": 2450,
+                    "radiant_team_id": 15,
+                    "dire_team_id": 2163,
+                    "leagueid": 15475,
+                    "radiant_team_name": "Team Liquid",
+                    "dire_team_name": "Team Falcons",
+                    "league_name": "DreamLeague Season 26",
+                    "download_status": None,
+                    "download_task_id": None,
+                    "download_attempt_count": None,
+                    "download_path": None,
+                }
+            ],
+        )
+
+    async def _fake_fetch_match_details(match_id: int) -> dict[str, object]:
+        assert match_id == 8123456789
+        return {
+            "match_id": 8123456789,
+            "start_time": 1700054321,
+            "duration": 2450,
+            "radiant_team_id": 15,
+            "dire_team_id": 2163,
+            "leagueid": 15475,
+            "radiant_team": {"name": "Team Liquid"},
+            "dire_team": {"name": "Team Falcons"},
+            "league": {"name": "DreamLeague Season 26"},
+        }
+
+    def _fake_upsert_match_detail(detail: dict[str, object]) -> tuple[int, int]:
+        captured_details.append(detail)
+        return 1, 0
+
+    monkeypatch.setattr(admin.match_database_storage, "list_match_database", _fake_list_match_database)
+    monkeypatch.setattr(admin.opendota_service, "fetch_match_details", _fake_fetch_match_details)
+    monkeypatch.setattr(admin.opendota_match_storage, "upsert_match_detail", _fake_upsert_match_detail)
+
+    client = TestClient(app)
+    response = client.get("/api/v1/admin/match-database", params={"limit": 20, "offset": 0})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["matches"][0]["radiant_team_name"] == "Team Liquid"
+    assert payload["matches"][0]["dire_team_name"] == "Team Falcons"
+    assert payload["matches"][0]["league_name"] == "DreamLeague Season 26"
+    assert calls["count"] == 2
+    assert len(captured_details) == 1
+    assert captured_details[0]["match_id"] == 8123456789
+
+
+def test_admin_match_database_list_open_dota_failure_does_not_block_response(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    def _fake_list_match_database(
+        *,
+        limit: int,
+        offset: int,
+        professional_only: bool = True,
+        team_id: int | None = None,
+        leagueid: int | None = None,
+        has_download: bool | None = None,
+        start_time_from: int | None = None,
+        start_time_to: int | None = None,
+    ) -> tuple[int, list[dict[str, object]]]:
+        calls["count"] += 1
+        return (
+            1,
+            [
+                {
+                    "match_id": 8123456790,
+                    "start_time": 1700054322,
+                    "duration": 2451,
+                    "radiant_team_id": 15,
+                    "dire_team_id": 2163,
+                    "leagueid": 15475,
+                    "radiant_team_name": None,
+                    "dire_team_name": "",
+                    "league_name": None,
+                    "download_status": None,
+                    "download_task_id": None,
+                    "download_attempt_count": None,
+                    "download_path": None,
+                }
+            ],
+        )
+
+    async def _fake_fetch_match_details(match_id: int) -> dict[str, object]:
+        assert match_id == 8123456790
+        raise OpenDotaServiceError("OpenDota request timed out.")
+
+    def _fake_upsert_match_detail(detail: dict[str, object]) -> tuple[int, int]:
+        raise AssertionError("upsert_match_detail should not be called when OpenDota fails")
+
+    monkeypatch.setattr(admin.match_database_storage, "list_match_database", _fake_list_match_database)
+    monkeypatch.setattr(admin.opendota_service, "fetch_match_details", _fake_fetch_match_details)
+    monkeypatch.setattr(admin.opendota_match_storage, "upsert_match_detail", _fake_upsert_match_detail)
+
+    client = TestClient(app)
+    response = client.get("/api/v1/admin/match-database")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["matches"][0]["match_id"] == 8123456790
+    assert calls["count"] == 2
+
+
+def test_admin_match_database_delete_replay_not_found(monkeypatch) -> None:
+    def _fake_delete_downloaded_replay(match_id: int) -> dict[str, object]:
+        assert match_id == 8674716612
+        return {
+            "status": "error",
+            "message": "No completed replay download found for match_id=8674716612.",
+            "task": None,
+        }
+
+    monkeypatch.setattr(admin.replay_download_service, "delete_downloaded_replay", _fake_delete_downloaded_replay)
+
+    client = TestClient(app)
+    response = client.post("/api/v1/admin/match-database/8674716612/delete-replay")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "error"
+    assert "No completed replay download" in response.json()["message"]

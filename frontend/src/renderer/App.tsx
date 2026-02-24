@@ -8,10 +8,21 @@ import MatchDatabasePage, {
   MatchDatabaseReplayContext,
   MatchDatabaseViewState,
 } from './pages/MatchDatabasePage';
+import OpenDotaLivePage from './pages/OpenDotaLivePage';
+import ReplayLibraryPage from './pages/ReplayLibraryPage';
 import { ReplayEntryContext, TeamProfileReplayContext } from './types/replayContext';
 import { TeamProfileViewState } from './pages/TeamProfilePage';
 
-type Page = 'home' | 'poc' | 'map' | 'match' | 'matchList' | 'matchDatabase' | 'teamProfile';
+type Page =
+  | 'home'
+  | 'poc'
+  | 'map'
+  | 'match'
+  | 'matchList'
+  | 'matchDatabase'
+  | 'teamProfile'
+  | 'openDotaLive'
+  | 'replayLibrary';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -39,6 +50,15 @@ function App() {
   const handleOpenReplayFromTeamProfile = (context: TeamProfileReplayContext) => {
     setCurrentMatchId(context.matchId);
     setReplayEntryContext(context);
+    setCurrentPage('match');
+  };
+
+  const handleOpenReplayFromReplayLibrary = (matchId: number) => {
+    setCurrentMatchId(matchId);
+    setReplayEntryContext({
+      source: 'replay_library',
+      matchId,
+    });
     setCurrentPage('match');
   };
 
@@ -73,8 +93,40 @@ function App() {
       setCurrentPage('teamProfile');
       return;
     }
+    if (replayEntryContext?.source === 'replay_library') {
+      setCurrentPage('replayLibrary');
+      return;
+    }
     setCurrentPage('home');
   };
+
+  if (currentPage === 'openDotaLive') {
+    return (
+      <div>
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50 shadow-lg border border-gray-700"
+        >
+           返回首页
+        </button>
+        <OpenDotaLivePage />
+      </div>
+    );
+  }
+
+  if (currentPage === 'replayLibrary') {
+    return (
+      <div>
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="fixed top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-50 shadow-lg border border-gray-700"
+        >
+           返回首页
+        </button>
+        <ReplayLibraryPage onOpenReplay={handleOpenReplayFromReplayLibrary} />
+      </div>
+    );
+  }
 
   if (currentPage === 'matchList') {
     return (
@@ -159,6 +211,8 @@ function App() {
               ? '返回比赛数据库'
               : replayEntryContext?.source === 'team_profile'
                 ? '返回战队档案'
+                : replayEntryContext?.source === 'replay_library'
+                  ? '返回回放库'
                 : '返回首页'}
         </button>
         <RealMatchViewer initialMatchId={currentMatchId} replayEntryContext={replayEntryContext} />
@@ -194,6 +248,18 @@ function App() {
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium"
           >
              录像查看器
+          </button>
+          <button
+            onClick={() => setCurrentPage('openDotaLive')}
+            className="px-4 py-2 bg-sky-700 text-white rounded hover:bg-sky-800 transition-colors font-medium"
+          >
+             OpenDota Live
+          </button>
+          <button
+            onClick={() => setCurrentPage('replayLibrary')}
+            className="px-4 py-2 bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-colors font-medium"
+          >
+             Replay Library
           </button>
           <button
             onClick={() => setCurrentPage('matchDatabase')}

@@ -225,7 +225,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   }, [initialMatchId]);
 
   useEffect(() => {
-    if (replayEntryContext?.source === 'match_database') {
+    if (
+      replayEntryContext?.source === 'match_database' ||
+      replayEntryContext?.source === 'replay_library'
+    ) {
       setSelectedMatch(replayEntryContext.matchId);
     }
   }, [replayEntryContext]);
@@ -830,6 +833,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 下载状态: <span className="font-mono">{replaySourceStatusText}</span>
               </p>
             )}
+          </div>
+        )}
+
+        {replayEntryContext?.source === 'replay_library' && (
+          <div className="mb-6 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-100">
+            来自回放库 · match_id：<span className="font-mono">{replayEntryContext.matchId}</span>
           </div>
         )}
 

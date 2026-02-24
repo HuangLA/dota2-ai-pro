@@ -28,6 +28,9 @@ def _seed_matches() -> None:
                 "radiant_team": 15,
                 "dire_team": 2163,
                 "leagueid": 15475,
+                "radiant_name": "Liquid Fallback",
+                "dire_name": "Falcons Fallback",
+                "league_name": "DreamLeague Fallback",
             },
             {
                 "match_id": 9002,
@@ -44,6 +47,9 @@ def _seed_matches() -> None:
                 "radiant_team": 111,
                 "dire_team": 222,
                 "leagueid": 16000,
+                "radiant_name": "Fallback Radiant 111",
+                "dire_name": "Fallback Dire 222",
+                "league_name": "Fallback League 16000",
             },
             {
                 "match_id": 9004,
@@ -62,6 +68,7 @@ def _insert_task(
     match_id: int,
     status: str,
     attempt_count: int,
+    download_path: str | None,
     created_at: int,
     updated_at: int,
 ) -> None:
@@ -73,9 +80,9 @@ def _insert_task(
             task_id, match_id, status, attempt_count, replay_url, download_path,
             error_code, error_message, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)
+        VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL, ?, ?)
         """,
-        (task_id, match_id, status, attempt_count, created_at, updated_at),
+        (task_id, match_id, status, attempt_count, download_path, created_at, updated_at),
     )
     conn.commit()
 
@@ -115,6 +122,7 @@ def test_list_match_database_returns_basic_aggregated_structure() -> None:
         match_id=9001,
         status="prepared",
         attempt_count=1,
+        download_path=None,
         created_at=100,
         updated_at=100,
     )
@@ -123,6 +131,7 @@ def test_list_match_database_returns_basic_aggregated_structure() -> None:
         match_id=9001,
         status="completed",
         attempt_count=2,
+        download_path="backend/data/replays/9001.dem.bz2",
         created_at=200,
         updated_at=200,
     )
@@ -136,6 +145,7 @@ def test_list_match_database_returns_basic_aggregated_structure() -> None:
     assert first["download_status"] == "completed"
     assert first["download_task_id"] == "task-new"
     assert first["download_attempt_count"] == 2
+    assert first["download_path"] == "backend/data/replays/9001.dem.bz2"
     assert first["radiant_team_name"] == "Team Liquid"
     assert first["dire_team_name"] == "Team Falcons"
     assert first["league_name"] == "DreamLeague Season 26"
@@ -143,9 +153,10 @@ def test_list_match_database_returns_basic_aggregated_structure() -> None:
     assert no_task["download_status"] is None
     assert no_task["download_task_id"] is None
     assert no_task["download_attempt_count"] is None
-    assert no_task["radiant_team_name"] is None
-    assert no_task["dire_team_name"] is None
-    assert no_task["league_name"] is None
+    assert no_task["download_path"] is None
+    assert no_task["radiant_team_name"] == "Fallback Radiant 111"
+    assert no_task["dire_team_name"] == "Fallback Dire 222"
+    assert no_task["league_name"] == "Fallback League 16000"
 
 
 def test_list_match_database_filters_team_and_league() -> None:
@@ -199,6 +210,7 @@ def test_list_match_database_filters_has_download_true_false() -> None:
         match_id=9001,
         status="prepared",
         attempt_count=0,
+        download_path=None,
         created_at=100,
         updated_at=100,
     )

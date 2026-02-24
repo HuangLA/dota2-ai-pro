@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
@@ -29,7 +29,33 @@ opendota_sync_service = OpenDotaSyncService(
 replay_download_service = ReplayDownloadService(
     opendota_service=opendota_service,
     replay_download_storage=replay_download_storage,
+    opendota_match_storage=opendota_match_storage,
 )
+
+
+def _is_missing_name(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
+def _find_match_ids_with_missing_names(records: list[dict[str, Any]]) -> list[int]:
+    match_ids: list[int] = []
+    for record in records:
+        if not (
+            _is_missing_name(record.get("radiant_team_name"))
+            or _is_missing_name(record.get("dire_team_name"))
+            or _is_missing_name(record.get("league_name"))
+        ):
+            continue
+
+        match_id = record.get("match_id")
+        if isinstance(match_id, int):
+            match_ids.append(match_id)
+
+    return match_ids
 
 
 class OpenDotaSyncRecentRequest(BaseModel):
@@ -105,6 +131,7 @@ class MatchDatabaseRecord(BaseModel):
     download_status: str | None = None
     download_task_id: str | None = None
     download_attempt_count: int | None = None
+    download_path: str | None = None
 
 
 class MatchDatabaseListResponse(BaseModel):
@@ -370,6 +397,27 @@ async def list_match_database(
         start_time_from=start_time_from,
         start_time_to=start_time_to,
     )
+
+    missing_name_match_ids = _find_match_ids_with_missing_names(records)
+    if missing_name_match_ids:
+        for match_id in missing_name_match_ids:
+            try:
+                detail = await opendota_service.fetch_match_details(match_id)
+                opendota_match_storage.upsert_match_detail(detail)
+            except OpenDotaServiceError:
+                continue
+
+        total, records = match_database_storage.list_match_database(
+            limit=limit,
+            offset=offset,
+            professional_only=professional_only,
+            team_id=team_id,
+            leagueid=leagueid,
+            has_download=has_download,
+            start_time_from=start_time_from,
+            start_time_to=start_time_to,
+        )
+
     return MatchDatabaseListResponse(
         status="ok",
         total=total,
@@ -463,6 +511,23 @@ async def trigger_match_database_download_action(
         match_id=match_id,
         mode=payload.mode,
     )
+    task = result.get("task")
+    return ReplayDownloadTaskActionResponse(
+        status=str(result.get("status", "error")),
+        message=str(result.get("message", "Unknown action result.")),
+        task=ReplayDownloadTaskRecord(**task) if isinstance(task, dict) else None,
+    )
+
+
+@router.post(
+    "/match-database/{match_id}/delete-replay",
+    response_model=ReplayDownloadTaskActionResponse,
+)
+async def delete_match_database_replay(
+    match_id: int = Path(..., ge=1),
+) -> ReplayDownloadTaskActionResponse:
+    """Delete downloaded replay artifacts for a match."""
+    result = replay_download_service.delete_downloaded_replay(match_id=match_id)
     task = result.get("task")
     return ReplayDownloadTaskActionResponse(
         status=str(result.get("status", "error")),

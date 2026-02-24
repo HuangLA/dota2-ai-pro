@@ -209,7 +209,7 @@ async def test_fetch_recent_matches_403_has_clear_risk_control_hint(
 
 def test_build_replay_url_success() -> None:
     url = OpenDotaService.build_replay_url(match_id=8123456789, cluster=236, replay_salt=123456789)
-    assert url == "https://replay236.valve.net/570/8123456789_123456789.dem.bz2"
+    assert url == "http://replay236.valve.net/570/8123456789_123456789.dem.bz2"
 
 
 def test_build_replay_url_missing_fields_is_controlled_error() -> None:

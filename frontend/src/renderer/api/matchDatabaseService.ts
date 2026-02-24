@@ -13,6 +13,7 @@ export interface MatchDatabaseRecord {
   download_status?: string | null;
   download_task_id?: string | null;
   download_attempt_count?: number | null;
+  download_path?: string | null;
 }
 
 export interface MatchDatabaseListResponse {
@@ -134,6 +135,24 @@ class MatchDatabaseService {
       `${API_BASE_URL}/api/v1/admin/replays/download/tasks/${encodeURIComponent(taskId)}`,
       {
         method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async deleteReplay(matchId: number): Promise<MatchDatabaseActionResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/admin/match-database/${matchId}/delete-replay`,
+      {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },

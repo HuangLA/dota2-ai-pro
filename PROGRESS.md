@@ -11,8 +11,8 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4 - 数据化回放与职业战队数据库 🚀 |
-| 最后更新 | 2026-02-19 |
-| 更新者 | OpenCode (Frontend Specialist) |
+| 最后更新 | 2026-02-24 |
+| 更新者 | OpenCode |
 
 ---
 
@@ -44,6 +44,58 @@
 | PH4-5 | 战队归档页（示例：XG 赛事战绩） | Frontend | `TODO` | TeamProfilePage |
 | PH4-6 | 回放实时 HUD（等级/装备/KDA/GPM/XPM/净资产） | Both | `TODO` | 新增 playback HUD API + UI 面板 |
 | PH4-7 | 经济差/经验差实时曲线图 | Both | `TODO` | Gold/XP Advantage 与 Timeline 联动 |
+
+### Phase 4.5 重构蓝图（OpenDota Live + Replay Library）
+**状态**: `IN_PROGRESS`  
+**目标**: 拆分“远端实时比赛流”和“本地已解析录像库”，形成可持续同步 + 本地资产管理闭环。
+
+#### 产品边界（确认版）
+- OpenDota Live: 作为“远端职业/路人比赛流”页面，支持定时增量同步 + 手动刷新。
+- Replay Library: 作为“本地录像资产”页面，仅展示本地已解析完成比赛，支持管理与检索。
+- 本地库入库范围: 允许任意 `match_id` 手动入库（不限职业）。
+
+#### 同步与数据策略（确认版）
+- 同步模式: `定时增量(每1分钟)` + `手动刷新`。
+- OpenDota Live 默认展示职业赛事，提供 `职业 / 路人` 复选过滤（可组合）。
+- 搜索能力: 支持 `match_id` 精确搜索、`leagueid` 精确搜索，并保留时间范围/分页。
+- 名称与图标: 列表优先显示联赛名/战队名，支持联赛 icon 与战队 icon（缺失时回退占位图）。
+
+#### 存储与状态模型（重构目标）
+- `remote_matches`（远端镜像层）: OpenDota 同步原始比赛索引，含 source=pro/public、sync 时间戳。
+- `local_replay_assets`（本地文件层）: `.dem.bz2/.dem` 文件路径、大小、hash、删除标记。
+- `local_parse_runs`（解析层）: 解析任务状态、版本、错误信息、耗时。
+- `local_match_index`（本地检索层）: 仅解析成功写入，作为 Team/Player/League 检索入口。
+- 软状态拆分: 下载状态与解析状态分离，页面展示聚合态，避免单字段混杂。
+
+#### 核心 API 蓝图（不与现有端点冲突，逐步迁移）
+- `GET /api/v1/remote/matches`：远端比赛列表（source 复选、match_id、leagueid、分页、时间筛选）。
+- `POST /api/v1/remote/sync`：手动触发同步（pro/public 可选、limit、dry_run）。
+- `POST /api/v1/remote/ingest`：按 `match_id` 触发下载+解析入库（支持批量）。
+- `GET /api/v1/library/matches`：本地解析完成库列表（team/player/league/search）。
+- `POST /api/v1/library/{match_id}/delete`：硬删本地文件并保留资产记录（`deleted_at` + reason）。
+- `POST /api/v1/library/{match_id}/reparse`：对本地已下载资产重新解析。
+- `GET /api/v1/jobs`：统一任务观察（sync/download/parse）。
+
+#### 前端页面蓝图（UI 改造目标）
+- 新页面 `OpenDotaLivePage`：
+  - 顶部状态条（上次同步时间、自动同步开关、手动刷新按钮）。
+  - 筛选区（职业/路人复选、match_id、leagueid、时间范围）。
+  - 列表区（战队/联赛名称 + icon、下载并入库按钮、批量 checkbox）。
+- 新页面 `ReplayLibraryPage`：
+  - 仅展示已解析完成项目。
+  - 支持按战队/选手/联赛检索。
+  - 行级动作：打开回放、查看任务历史、删除本地资产、重新解析。
+
+#### 迁移执行计划（建议）
+| ID | 任务 | 负责方 | 状态 | 验收标准 |
+|----|------|--------|------|----------|
+| RB-1 | 新建 remote/local 分层表与迁移脚本 | Backend | `DONE` | 已新增 remote/library 路由依赖的 schema 扩展与兼容迁移 |
+| RB-2 | 实现 1 分钟增量同步调度 + 手动刷新 API | Backend | `DONE` | 已接入 60s 后台增量同步与 `POST /api/v1/remote/sync` |
+| RB-3 | 构建 ingest pipeline（下载→解析→索引） | Backend | `DONE` | 已提供 `POST /api/v1/remote/ingest` 支持任意 match_id 批量入库 |
+| RB-4 | 实现 Replay Library API（仅 parsed） | Backend | `DONE` | 已提供 `GET /api/v1/library/matches` 与删除接口 |
+| RB-5 | 拆分前端为 Live + Library 双页面 | Frontend | `DONE` | 已新增 OpenDota Live / Replay Library 页面与入口 |
+| RB-6 | 图标资源接入（league/team）与占位策略 | Frontend | `IN_PROGRESS` | 已接入 icon URL + 占位样式，后续优化资源质量 |
+| RB-7 | 回归测试与性能基线 | Both | `TODO` | 同步/下载/解析/检索链路稳定 |
 
 ### Option2 执行看板：回放解析重构（进行中）
 **目标**: 以最小风险方式重构解析链路，统一时间契约并为 HUD/曲线扩展铺路。  
@@ -345,6 +397,7 @@
 | 2026-02-05 | 一次性加载整场比赛数据 | 初始加载稍慢但播放流畅，避免懒加载导致的请求堆积 | - |
 | 2026-02-05 | 双层插值动画系统 | 数据层(tick间)+渲染层(LERP)实现丝滑英雄移动 | - |
 | 2026-02-05 | 修正地图坐标边界 | 实测范围 7974~24992，边界扩大至 7500~25500 避免英雄消失 | - |
+| 2026-02-24 | 比赛数据库重构为 OpenDota Live + Replay Library 双域架构 | 拆分远端实时流与本地已解析资产，支持 1 分钟增量同步与可维护扩展 | PROGRESS.md (Phase 4.5 重构蓝图) |
 
 ---
 
@@ -397,6 +450,9 @@ print(f"Kill events: {len(result.kills)}")
 
 | 日期 | 更新内容 | 更新者 |
 |------|----------|--------|
+| 2026-02-24 | **修复 OpenDota Live 联赛名补全链路**: `GET /api/v1/remote/matches` 对当前页缺失 `league_name` 的比赛按 `match_id` best-effort 拉取 OpenDota match details 并回写 `opendota_matches`，补全失败不阻断响应且完成后重查当前页返回；补充 remote 路由测试覆盖“补全成功”和“失败不阻断”场景。 | OpenCode |
+| 2026-02-24 | **Phase 4.5 第一版实现完成（前后端并行）**: 后端新增 `/api/v1/remote/*` 与 `/api/v1/library/*`，支持 1 分钟增量同步、手动同步、批量 ingest、本地已解析库查询与硬删文件保留记录；前端新增 `OpenDotaLivePage` 与 `ReplayLibraryPage`，完成职业/路人筛选、match_id/leagueid 搜索、行级/批量入库、本地删除与回放入口。 | OpenCode |
+| 2026-02-24 | **新增 Phase 4.5 重构蓝图**: 明确 OpenDota Live + Replay Library 双页面与双域数据架构，确认同步策略（每1分钟增量+手动刷新）、删除策略（硬删文件保留记录）、本地库范围（支持任意 match_id 手动入库），并纳入 RB-1~RB-7 迁移计划 | OpenCode |
 | 2026-02-04 | 创建 PROGRESS.md 文件 | AI Assistant |
 | 2026-02-04 | 完成前后端项目初始化 | AI Assistant (Claude) |
 | 2026-02-04 | 创建 POC 测试脚本和组件 | AI Assistant (Claude) |
@@ -547,6 +603,7 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-18 | **DONE: PH4-5-TEAM-PROFILE-PAGE-SLICE-6 赛事预设视图与跨页回流**: Team Profile 新增 `Preset View`（`All Matches`/`With Download Status`/`Latest 20`）并自动应用筛选与 limit（`Latest 20` 强制最新优先）；App 层新增 Team Profile 会话态托管并打通 Team Profile -> Replay -> 返回后的上下文恢复（`team_id/limit/league quick filter/sort/only-with-download`）；补充前端测试覆盖预设切换与跨页回流 | OpenCode (Frontend Specialist) |
 | 2026-02-18 | **DONE: PH4-5-TEAM-PROFILE-PAGE-SLICE-7 分组批量跳转与可见项导出**: Team Profile 新增页面级 `Open Visible In Match Database`（可见项为空时轻提示不跳转，映射 `team_id` + 可选 `leagueid` + `has_download=true`）与 `Export Visible Matches (.txt)`（Blob 导出每行 `match_id\tstart_time\tleagueid`，空可见项禁用并反馈导出条数）；补充前端测试覆盖跳转上下文映射与导出/禁用分支 | OpenCode (Frontend Specialist) |
 | 2026-02-18 | **DONE: PH4-5-TEAM-PROFILE-PAGE-SLICE-8 最近赛事固定视图与分组批量复合动作**: Team Profile 新增 `Focus: Latest League`（基于当前筛选结果自动锁定最近比赛所属 league，关闭后恢复原 `League Quick Filter`），并新增页面级 `Prepare + Open First Replay (Visible)`（逐条 prepare 当前可见项后自动打开按当前排序第一场，展示 `Total/Success/Failed` 与已打开场次；全失败时仍打开首场并提示）；补充前端测试覆盖聚焦开关与复合批量动作链路 | OpenCode (Frontend Specialist) |
+| 2026-02-23 | **DONE: Match Database 交互改造（单行下载 + 勾选批量）**: MatchDatabasePage 行级动作收敛为单一“下载录像”（固定 `prepare_and_execute`），新增当前页 checkbox 选择与全选/取消全选，批量动作改为仅作用于勾选项并保留失败项复制/导出；同时优化战队/联赛缺失名称的友好回退文案并更新前端测试覆盖。 | OpenCode (Frontend Specialist) |
 | 2026-02-18 | **DONE: PH4-5-TEAM-PROFILE-PAGE-SLICE-9 赛事对比概览与可见项复制分享**: Team Profile 新增 `League Compare`（基于当前结果聚合每个 league 的比赛数/平均时长/最近比赛时间，默认按比赛数降序展示 Top 5，点击行可快捷应用 `League Quick Filter`）与页面级 `Copy Visible Match IDs`（按当前排序复制可见 `match_id` 为逗号分隔，空可见项禁用，clipboard 不可用时受控提示）；补充前端测试覆盖 league compare 渲染/点击筛选与复制可见项行为 | OpenCode (Frontend Specialist) |
 | 2026-02-18 | **DONE: PH4-5-TEAM-PROFILE-PAGE-SLICE-10 对比区联动与快速预设备忘**: Team Profile 在 `League Compare` 新增 `Pin Top League` 一键将 compare 第一名同步到 `League Quick Filter`（无可用 top 时禁用），并新增会话内 `Quick Preset`（`Save Snapshot`/`Load Snapshot`）保存与恢复 `team_id/limit/league quick filter/sort/only-with-download/focus-latest-league`，加载时在存在有效 team_id 时自动刷新；补充前端测试覆盖 pin 联动与 snapshot 恢复链路 | OpenCode (Frontend Specialist) |
 | 2026-02-18 | **DONE: PH4-5-TEAM-PROFILE-PAGE-SLICE-11 多快照管理与一键清理**: Team Profile `Quick Preset` 升级为最多 5 个会话内命名快照（`Snapshot Name` + `Save/Load/Delete` + 下拉选择），同名保存覆盖并提示 `updated`，超限新增返回受控提示；新增 `Clear All Snapshots` 清空并反馈条数，清理后下拉重置且 `Load/Delete` 禁用；补充前端测试覆盖多快照按名加载、同名覆盖与清空禁用行为 | OpenCode (Frontend Specialist) |
@@ -563,6 +620,8 @@ print(f"Kill events: {len(result.kills)}")
 | 2026-02-19 | **DONE: PH4-4-MATCH-DATABASE-PAGE-SLICE-4 职业赛事默认源与专业筛选修复**: `POST /api/v1/admin/opendota/sync/recent` 新增 `pro_only`（默认 `true`）并默认改走 OpenDota `/proMatches`（保留 `pro_only=false` 回退 public）；`GET /api/v1/admin/match-database` 新增 `professional_only`（默认 `true`）并默认过滤空 `leagueid` 比赛，修复路人局污染导致 team/league 筛选失效根因；补充路由/存储/服务层 pytest 覆盖默认路径与过滤组合可用性 | OpenCode (Backend Engineer) |
 | 2026-02-19 | **DONE: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-8 职业联赛默认筛选与可见开关**: Match Database 前端新增默认开启的 `仅职业联赛` 筛选开关，列表查询始终透传 `professional_only`（默认 `true`，关闭为 `false`），并在页面说明中明确“默认职业联赛，可关闭查看全部（含路人局）”；`清空` 操作保持职业联赛默认开启，补充前端测试覆盖默认/关闭两种请求参数与重置行为，确保分页/批量/任务详情逻辑不回退 | OpenCode (Frontend Specialist) |
 | 2026-02-19 | **DONE: PH4-1-OPENDOTA-SYNC-SLICE-5 recent 同步自动联动 reference 并增强诊断**: `POST /api/v1/admin/opendota/sync/recent` 新增 `sync_reference/reference_team_limit/reference_league_limit`（`1..1000`），在 `persist=true && dry_run=false && sync_reference=true` 时自动执行 teams/leagues reference sync，并在同一响应新增 `reference_teams_inserted/reference_teams_updated/reference_leagues_inserted/reference_leagues_updated`；`message` 统一追加 `reference_sync=executed|skipped` 诊断标记，补充后端 pytest 覆盖自动执行/禁用分支与参数边界。 | OpenCode (Backend Engineer) |
+| 2026-02-23 | **DONE: Replay 下载后自动解析 + 比赛库名称兜底**: `ReplayDownloadService` 下载成功后自动解压 `{match_id}.dem.bz2` 并异步触发解析，解析失败受控写入 `PARSE_FAILED`；`opendota_matches` 新增 `radiant_team_name/dire_team_name/league_name`（含 ALTER TABLE 迁移），`match_database` 查询改为 `COALESCE(reference_name, opendota_matches_name)` 兜底，相关后端 pytest 全部通过。 | OpenCode (Backend Engineer) |
+| 2026-02-23 | **DONE: Match Database 增强删除录像 + 名称补全链路修复**: 新增 `POST /api/v1/admin/match-database/{match_id}/delete-replay` 删除已下载 `.dem.bz2/.dem` 并清理任务 `download_path`；`prepare_replay_download` 同步回写 OpenDota match detail 到 `opendota_matches`（含 team/league 名称），修复已入库比赛名称长期缺失问题；前端新增“删除录像”行级动作并完成回归测试。 | OpenCode (Backend+Frontend) |
 
 ---
 

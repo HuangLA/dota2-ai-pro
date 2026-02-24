@@ -33,6 +33,7 @@ class MatchDatabaseStorage:
                     match_id,
                     status,
                     attempt_count,
+                    download_path,
                     created_at,
                     updated_at
                 FROM (
@@ -41,6 +42,7 @@ class MatchDatabaseStorage:
                         match_id,
                         status,
                         attempt_count,
+                        download_path,
                         created_at,
                         updated_at,
                         ROW_NUMBER() OVER (
@@ -107,12 +109,13 @@ class MatchDatabaseStorage:
                 m.radiant_team_id,
                 m.dire_team_id,
                 m.leagueid,
-                radiant_team.name AS radiant_team_name,
-                dire_team.name AS dire_team_name,
-                league.name AS league_name,
+                COALESCE(radiant_team.name, m.radiant_team_name) AS radiant_team_name,
+                COALESCE(dire_team.name, m.dire_team_name) AS dire_team_name,
+                COALESCE(league.name, m.league_name) AS league_name,
                 d.status AS download_status,
                 d.task_id AS download_task_id,
-                d.attempt_count AS download_attempt_count
+                d.attempt_count AS download_attempt_count,
+                d.download_path AS download_path
             """
             + from_sql
             + where_sql
@@ -135,6 +138,7 @@ class MatchDatabaseStorage:
                 "download_status": row["download_status"],
                 "download_task_id": row["download_task_id"],
                 "download_attempt_count": row["download_attempt_count"],
+                "download_path": row["download_path"],
             }
             for row in rows
         ]

@@ -72,8 +72,8 @@ describe('MatchDatabasePage', () => {
     expect(await screen.findByText('比赛 ID')).toBeTruthy();
     expect(await screen.findByText('下载状态')).toBeTruthy();
     expect(await screen.findByText('8123456789')).toBeTruthy();
-    expect(await screen.findByText('战队 15')).toBeTruthy();
-    expect(await screen.findByText('联赛 15475')).toBeTruthy();
+    expect(await screen.findByText('未知战队（ID: 15）')).toBeTruthy();
+    expect(await screen.findByText('未知联赛（ID: 15475）')).toBeTruthy();
     expect(await screen.findByText('已准备')).toBeTruthy();
   });
 
@@ -200,7 +200,7 @@ describe('MatchDatabasePage', () => {
     expect(formatUnixTimestampLocal(timestamp)).toBe(expected);
   });
 
-  it('calls action API with prepare mode when action button clicked', async () => {
+  it('calls action API with prepare_and_execute mode when download button clicked', async () => {
     const listSpy = vi
       .spyOn(matchDatabaseService, 'getMatchDatabase')
       .mockResolvedValue({
@@ -239,11 +239,11 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    const actionButton = await screen.findByRole('button', { name: '准备下载' });
+    const actionButton = await screen.findByRole('button', { name: '下载录像' });
     fireEvent.click(actionButton);
 
     await waitFor(() => {
-      expect(actionSpy).toHaveBeenCalledWith(8123456789, 'prepare');
+      expect(actionSpy).toHaveBeenCalledWith(8123456789, 'prepare_and_execute');
     });
 
     await waitFor(() => {
@@ -289,7 +289,7 @@ describe('MatchDatabasePage', () => {
     });
   });
 
-  it('runs batch action on current page and shows summary with failed examples', async () => {
+  it('runs batch action on checked matches and shows summary with failed examples', async () => {
     const listSpy = vi.spyOn(matchDatabaseService, 'getMatchDatabase').mockResolvedValue({
       status: 'ok',
       total: 2,
@@ -349,19 +349,20 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批量准备（当前页）' }));
+    fireEvent.click(await screen.findByLabelText('全选当前页'));
+    fireEvent.click(await screen.findByRole('button', { name: '批量下载（勾选项）' }));
 
     await waitFor(() => {
       expect(actionSpy).toHaveBeenCalledTimes(2);
     });
 
-    expect(actionSpy).toHaveBeenNthCalledWith(1, 8674716612, 'prepare');
-    expect(actionSpy).toHaveBeenNthCalledWith(2, 8676017978, 'prepare');
+    expect(actionSpy).toHaveBeenNthCalledWith(1, 8674716612, 'prepare_and_execute');
+    expect(actionSpy).toHaveBeenNthCalledWith(2, 8676017978, 'prepare_and_execute');
 
     await waitFor(() => {
       expect(
         screen.getByText(
-          '批量准备完成。 总数：2，成功：1，失败：1，含任务ID：1。失败示例：8676017978: Controlled test failure.'
+          '勾选批量下载完成。 总数：2，成功：1，失败：1，含任务ID：1。失败示例：8676017978: Controlled test failure.'
         )
       ).toBeTruthy();
     });
@@ -371,7 +372,7 @@ describe('MatchDatabasePage', () => {
     });
   });
 
-  it('disables batch buttons when current page has no rows', async () => {
+  it('disables batch button when no rows are selected', async () => {
     vi.spyOn(matchDatabaseService, 'getMatchDatabase').mockResolvedValue({
       status: 'ok',
       total: 0,
@@ -382,15 +383,114 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    const batchPrepareButton = await screen.findByRole('button', {
-      name: '批量准备（当前页）',
-    });
-    const batchPrepareExecuteButton = await screen.findByRole('button', {
-      name: '批量准备并执行（当前页）',
+    const batchDownloadButton = await screen.findByRole('button', {
+      name: '批量下载（勾选项）',
     });
 
-    expect((batchPrepareButton as HTMLButtonElement).disabled).toBe(true);
-    expect((batchPrepareExecuteButton as HTMLButtonElement).disabled).toBe(true);
+    expect((batchDownloadButton as HTMLButtonElement).disabled).toBe(true);
+    expect(await screen.findByText('当前页无可选比赛。')).toBeTruthy();
+  });
+
+  it('deletes replay for completed row when delete button clicked', async () => {
+    const listSpy = vi.spyOn(matchDatabaseService, 'getMatchDatabase').mockResolvedValue({
+      status: 'ok',
+      total: 1,
+      limit: 20,
+      offset: 0,
+      matches: [
+        {
+          match_id: 8123456789,
+          start_time: 1700054321,
+          duration: 2450,
+          radiant_team_id: 15,
+          dire_team_id: 2163,
+          leagueid: 15475,
+          radiant_team_name: 'Team Liquid',
+          dire_team_name: 'Team Falcons',
+          league_name: 'DreamLeague',
+          download_status: 'completed',
+          download_path: 'backend/data/replays/8123456789.dem.bz2',
+          download_attempt_count: 1,
+        },
+      ],
+    });
+
+    const deleteSpy = vi.spyOn(matchDatabaseService, 'deleteReplay').mockResolvedValue({
+      status: 'ok',
+      message: 'Replay files deleted for match_id=8123456789.',
+      task: {
+        task_id: 'task-delete-1',
+        match_id: 8123456789,
+        status: 'completed',
+      },
+    });
+
+    render(<MatchDatabasePage />);
+
+    const deleteButton = await screen.findByRole('button', { name: '删除录像' });
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(deleteSpy).toHaveBeenCalledWith(8123456789);
+      expect(listSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('batch download only triggers checked rows', async () => {
+    vi.spyOn(matchDatabaseService, 'getMatchDatabase').mockResolvedValue({
+      status: 'ok',
+      total: 2,
+      limit: 20,
+      offset: 0,
+      matches: [
+        {
+          match_id: 8674716612,
+          start_time: 1700054321,
+          duration: 2450,
+          radiant_team_id: 15,
+          dire_team_id: 2163,
+          leagueid: 15475,
+          radiant_team_name: 'Team Liquid',
+          dire_team_name: 'Team Falcons',
+          league_name: 'DreamLeague',
+          download_status: 'none',
+          download_attempt_count: 0,
+        },
+        {
+          match_id: 8676017978,
+          start_time: 1700055333,
+          duration: 2550,
+          radiant_team_id: 15,
+          dire_team_id: 2163,
+          leagueid: 15475,
+          radiant_team_name: 'Team Liquid',
+          dire_team_name: 'Team Falcons',
+          league_name: 'DreamLeague',
+          download_status: 'none',
+          download_attempt_count: 0,
+        },
+      ],
+    });
+
+    const actionSpy = vi.spyOn(matchDatabaseService, 'triggerDownloadAction').mockResolvedValue({
+      status: 'ok',
+      message: 'Replay download execute action finished.',
+      task: {
+        task_id: 'task-checked-only',
+        match_id: 8674716612,
+        status: 'downloading',
+      },
+    });
+
+    render(<MatchDatabasePage />);
+
+    fireEvent.click(await screen.findByLabelText('选择比赛 8674716612'));
+    fireEvent.click(await screen.findByRole('button', { name: '批量下载（勾选项）' }));
+
+    await waitFor(() => {
+      expect(actionSpy).toHaveBeenCalledTimes(1);
+      expect(actionSpy).toHaveBeenCalledWith(8674716612, 'prepare_and_execute');
+    });
   });
 
   it('auto opens task details from batch result and shows batch-opened hint', async () => {
@@ -455,7 +555,8 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批量准备（当前页）' }));
+    fireEvent.click(await screen.findByLabelText('全选当前页'));
+    fireEvent.click(await screen.findByRole('button', { name: '批量下载（勾选项）' }));
 
     await waitFor(() => {
       expect(taskDetailsSpy).toHaveBeenCalledWith('task-last');
@@ -501,7 +602,8 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    const batchButton = await screen.findByRole('button', { name: '批量准备（当前页）' });
+    fireEvent.click(await screen.findByLabelText('全选当前页'));
+    const batchButton = await screen.findByRole('button', { name: '批量下载（勾选项）' });
     fireEvent.click(batchButton);
     fireEvent.click(batchButton);
 
@@ -520,7 +622,7 @@ describe('MatchDatabasePage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('批量准备完成。 总数：1，成功：1，失败：0，含任务ID：1。')).toBeTruthy();
+      expect(screen.getByText('勾选批量下载完成。 总数：1，成功：1，失败：0，含任务ID：1。')).toBeTruthy();
     });
   });
 
@@ -580,10 +682,11 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批量准备（当前页）' }));
+    fireEvent.click(await screen.findByLabelText('全选当前页'));
+    fireEvent.click(await screen.findByRole('button', { name: '批量下载（勾选项）' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/批量准备完成。/)).toBeTruthy();
+      expect(screen.getByText(/勾选批量下载完成。/)).toBeTruthy();
     });
 
     fireEvent.click(screen.getByRole('button', { name: '复制失败项' }));
@@ -645,10 +748,11 @@ describe('MatchDatabasePage', () => {
 
     render(<MatchDatabasePage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批量准备（当前页）' }));
+    fireEvent.click(await screen.findByLabelText('全选当前页'));
+    fireEvent.click(await screen.findByRole('button', { name: '批量下载（勾选项）' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/批量准备完成。/)).toBeTruthy();
+      expect(screen.getByText(/勾选批量下载完成。/)).toBeTruthy();
     });
 
     fireEvent.click(screen.getByRole('button', { name: '导出失败项（.txt）' }));

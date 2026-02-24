@@ -1,20 +1,42 @@
-# True Sight (Dota 2 Replay Analysis)
+# True Sight - Dota 2 录像智能分析工作台
 
-True Sight 是一个面向 Dota 2 回放分析的本地工具链：
-- 前端：React + Vite + PixiJS 地图渲染
-- 后端：FastAPI + Parquet/SQLite 存储
-- 解析器：Clarity (Java 17)
+True Sight 是一个本地优先（local-first）的 Dota 2 录像分析平台，面向复盘、侦察与策略研究场景。
 
-## 项目状态 (as of 2026-02-15)
+- 前端：Electron + React + Vite + PixiJS
+- 后端：FastAPI + SQLite + Parquet + DuckDB
+- 解析器：Java 17 + Clarity
 
-- 当前阶段：Phase 4 (`IN_PROGRESS`)
-- 已落地核心链路：上传 -> 解析 -> 存储 -> 回放渲染
-- 本次已对齐实现更新：
-  - 比赛管理页支持多文件上传（前端批处理；后端 API 仍单文件）
-  - 小地图英雄图标映射修复（`anti_mage` / `antimage` 等下划线差异兼容）
-  - RealMatchViewer HUD 血条：实时血量、hover 数值浮层、移除双 tooltip 冲突
+当前产品包含两个核心页面：
 
-## 快速启动
+- OpenDota Live：同步并浏览远端比赛（职业/路人），按 `match_id` 入库
+- Replay Library：管理本地已解析比赛，支持检索与后续分析
+
+## 项目状态
+
+- 当前阶段：Phase 4 / Phase 4.5 重构（进行中）
+- 进度基线：`PROGRESS.md`
+- API 契约：`docs/api_specification.md`
+
+## 核心能力
+
+- 录像入库链路：prepare -> download -> decompress -> parse -> index
+- 本地录像管理：打开回放、删除本地文件、保留任务记录
+- 比赛检索：职业/路人过滤，`match_id` 与 `leagueid` 搜索
+- 下载/解析可观测：单场状态详情、任务级错误信息
+- 回放数据 API：支持时间轴/地图/事件可视化
+
+## 架构概览
+
+```text
+frontend/                 Electron + React 渲染层
+backend/                  FastAPI 路由/服务/存储/数据库
+parsers/                  Java 解析器项目（Clarity）
+backend/data/             运行时数据（db、replays、解析结果）
+docs/                     API/设计/规划文档
+PROGRESS.md               冲刺进度与更新日志
+```
+
+## 快速开始
 
 ### 环境要求
 
@@ -22,45 +44,104 @@ True Sight 是一个面向 Dota 2 回放分析的本地工具链：
 - Python 3.10+
 - Java 17+
 
-### 后端
+### 安装依赖
 
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
-```
-
-### 前端
+前端：
 
 ```bash
 cd frontend
 npm install
+```
+
+后端：
+
+```bash
+cd backend
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 启动方式
+
+方式 A（Windows 一键启动）：
+
+```cmd
+start-all.bat
+```
+
+方式 B（手动启动）：
+
+后端：
+
+```bash
+cd backend
+python main.py
+```
+
+前端：
+
+```bash
+cd frontend
 npm run dev
 ```
 
 ### 访问地址
 
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8000`
+- Swagger：`http://localhost:8000/docs`
 
-## 目录
+## 产品工作流
 
-```text
-frontend/            React renderer + Electron shell
-backend/             FastAPI, services, storage, routers
-parsers/             Clarity parser project (Java/Gradle)
-backend/data/        Runtime data root (matches/replays/db/logs)
-docs/                API/技术设计/规划文档
-PROGRESS.md          项目进度基线与更新日志
+### 1) OpenDota Live
+
+- 按来源（职业/路人）、`match_id`、`leagueid` 过滤
+- 手动触发同步
+- 单条/批量下载并入库
+- 查看单场下载与解析状态
+
+### 2) Replay Library
+
+- 浏览本地已解析比赛
+- 按战队/选手/联赛检索（API 侧）
+- 打开回放进行复盘
+- 删除本地录像文件并保留记录元数据
+
+## 重要文档
+
+- `PROGRESS.md`：当前冲刺与更新日志
+- `docs/api_specification.md`：接口契约
+- `docs/technical_design.md`：技术设计
+- `docs/REPLAY_MANAGEMENT_PLAN.md`：录像管理规划
+- `frontend/README.md`、`backend/README.md`：子模块说明
+
+## 开发说明
+
+- 运行时数据库：`backend/data/truesight.db`（元数据与任务状态）
+- 录像文件目录：`backend/data/replays/`
+- 解析输出目录：`backend/data/matches/`
+- 部分联赛/战队图片可能在上游缺失，前端会自动回退占位图
+
+## 测试
+
+后端：
+
+```bash
+cd backend
+pytest
 ```
 
-## 文档入口
+前端：
 
-- `PROGRESS.md`：当前冲刺与已完成项
-- `docs/api_specification.md`：最新 API 实现状态与契约
-- `docs/technical_design.md`：实现对齐后的技术设计
-- `docs/REPLAY_MANAGEMENT_PLAN.md`：Replay 管理现状和后续计划
-- `frontend/README.md` / `backend/README.md` / `data/README.md`：子模块说明
+```bash
+cd frontend
+npm run test
+```
+
+## 许可证
+
+MIT

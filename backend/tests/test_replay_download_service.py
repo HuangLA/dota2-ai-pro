@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bz2
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
@@ -45,7 +46,8 @@ class _FakeStreamResponse:
 
 class _FakeAsyncClient:
     def __init__(self, *_args: object, **_kwargs: object) -> None:
-        self._response = _FakeStreamResponse(chunks=[b"demo", b"-bytes"], status_code=200)
+        compressed = bz2.compress(b"demo-bytes")
+        self._response = _FakeStreamResponse(chunks=[compressed], status_code=200)
 
     async def __aenter__(self) -> "_FakeAsyncClient":
         return self
@@ -59,6 +61,22 @@ class _FakeAsyncClient:
         return self._response
 
 
+class _FakeParseResult:
+    def __init__(self, *, success: bool, error: str | None = None) -> None:
+        self.success = success
+        self.error = error
+
+
+class _FakeParseService:
+    def __init__(self, *, should_succeed: bool = True, error: str | None = None) -> None:
+        self.should_succeed = should_succeed
+        self.error = error
+
+    async def parse_replay_async(self, replay_path: str) -> _FakeParseResult:
+        assert replay_path.endswith(".dem")
+        return _FakeParseResult(success=self.should_succeed, error=self.error)
+
+
 @pytest.mark.asyncio
 async def test_execute_download_success_marks_completed_and_writes_file(
     monkeypatch: pytest.MonkeyPatch,
@@ -70,6 +88,7 @@ async def test_execute_download_success_marks_completed_and_writes_file(
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
         replays_dir=tmp_path / "replays",
     )
 
@@ -87,7 +106,10 @@ async def test_execute_download_success_marks_completed_and_writes_file(
 
     downloaded_file = Path(str(updated["download_path"]))
     assert downloaded_file.exists()
-    assert downloaded_file.read_bytes() == b"demo-bytes"
+    assert bz2.decompress(downloaded_file.read_bytes()) == b"demo-bytes"
+    dem_file = tmp_path / "replays" / "8674716612.dem"
+    assert dem_file.exists()
+    assert dem_file.read_bytes() == b"demo-bytes"
 
 
 class _FakeFailureAsyncClient(_FakeAsyncClient):
@@ -106,6 +128,7 @@ async def test_execute_download_failure_marks_failed_with_error(
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
         replays_dir=tmp_path / "replays",
     )
 
@@ -130,6 +153,7 @@ async def test_execute_download_missing_url_sets_url_missing_error_code(tmp_path
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
         replays_dir=tmp_path / "replays",
     )
 
@@ -148,6 +172,7 @@ def test_retry_task_resets_failed_to_prepared() -> None:
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
     )
 
     task = storage.create_prepare_task(match_id=8123456789)
@@ -173,6 +198,7 @@ async def test_execute_download_rejects_non_prepared_status(tmp_path: Path) -> N
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
         replays_dir=tmp_path / "replays",
     )
 
@@ -188,6 +214,7 @@ async def test_prepare_and_execute_runs_execute_when_prepared(monkeypatch: pytes
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
     )
 
     prepared_task = {
@@ -231,6 +258,7 @@ async def test_prepare_and_execute_returns_prepare_failure_directly(
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
     )
 
     failed_task = {
@@ -267,6 +295,7 @@ async def test_trigger_match_download_action_prepare_reuses_existing_prepared() 
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
     )
 
     task = storage.create_prepare_task(match_id=8123456789)
@@ -288,6 +317,7 @@ async def test_trigger_match_download_action_blocks_when_downloading_exists() ->
     service = ReplayDownloadService(
         opendota_service=OpenDotaService(),
         replay_download_storage=storage,
+        parse_service=_FakeParseService(),
     )
 
     task = storage.create_prepare_task(match_id=8123456790)
@@ -302,3 +332,79 @@ async def test_trigger_match_download_action_blocks_when_downloading_exists() ->
     assert result["status"] == "error"
     assert "already in progress" in str(result["message"])
     assert result["task"] == downloading
+
+
+@pytest.mark.asyncio
+async def test_execute_download_parse_failure_marks_failed_with_parse_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    storage = ReplayDownloadStorage()
+    service = ReplayDownloadService(
+        opendota_service=OpenDotaService(),
+        replay_download_storage=storage,
+        parse_service=_FakeParseService(should_succeed=False, error="parser exploded"),
+        replays_dir=tmp_path / "replays",
+    )
+
+    task = storage.create_prepare_task(match_id=8674716613)
+    storage.mark_prepared(
+        task_id=task["task_id"],
+        replay_url="https://replay236.valve.net/570/8674716613_55500123.dem.bz2",
+    )
+
+    updated = await service.execute_download(task_id=task["task_id"])
+
+    assert updated["status"] == "failed"
+    assert updated["error_code"] == "PARSE_FAILED"
+    assert "parser exploded" in str(updated["error_message"])
+
+
+def test_delete_downloaded_replay_removes_dem_and_bz2(tmp_path: Path) -> None:
+    storage = ReplayDownloadStorage()
+    service = ReplayDownloadService(
+        opendota_service=OpenDotaService(),
+        replay_download_storage=storage,
+        parse_service=_FakeParseService(),
+        replays_dir=tmp_path / "replays",
+    )
+
+    task = storage.create_prepare_task(match_id=8123456791)
+    storage.mark_prepared(
+        task_id=task["task_id"],
+        replay_url="http://replay236.valve.net/570/8123456791_1002.dem.bz2",
+    )
+    completed = storage.mark_completed(
+        task_id=task["task_id"],
+        download_path=str((tmp_path / "replays" / "8123456791.dem.bz2")),
+    )
+
+    bz2_path = Path(str(completed["download_path"]))
+    dem_path = tmp_path / "replays" / "8123456791.dem"
+    bz2_path.parent.mkdir(parents=True, exist_ok=True)
+    bz2_path.write_bytes(b"dummy")
+    dem_path.write_bytes(b"dummy-dem")
+
+    result = service.delete_downloaded_replay(match_id=8123456791)
+
+    assert result["status"] == "ok"
+    assert not bz2_path.exists()
+    assert not dem_path.exists()
+    assert result["task"] is not None
+    assert result["task"]["download_path"] is None
+
+
+def test_delete_downloaded_replay_returns_error_when_not_found() -> None:
+    storage = ReplayDownloadStorage()
+    service = ReplayDownloadService(
+        opendota_service=OpenDotaService(),
+        replay_download_storage=storage,
+        parse_service=_FakeParseService(),
+    )
+
+    result = service.delete_downloaded_replay(match_id=9999999999)
+
+    assert result["status"] == "error"
+    assert "No completed replay download" in str(result["message"])
