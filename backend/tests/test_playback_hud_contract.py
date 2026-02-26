@@ -22,6 +22,9 @@ class _FakeHudParquetStorage:
     def get_kills(self, match_id: int) -> pd.DataFrame:
         return self._kills.copy()
 
+    def get_metadata(self, match_id: int):
+        return {"game_start_time": 0.0}
+
 
 def _build_positions() -> pd.DataFrame:
     radiant = ["axe", "crystal_maiden", "juggernaut", "earthshaker", "lina"]
