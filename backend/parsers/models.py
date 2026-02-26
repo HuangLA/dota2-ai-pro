@@ -71,6 +71,7 @@ class KillEvent:
     victim: str  # Victim hero name
     x: Optional[float] = None
     y: Optional[float] = None
+    assist_players: Optional[list[int]] = None  # Player slot indices (0-9) who assisted
     
     @property
     def killer_hero(self) -> str:
@@ -86,6 +87,17 @@ class KillEvent:
             return self.victim.replace("npc_dota_hero_", "")
         return self.victim
 
+@dataclass
+class EconomySample:
+    """A single economy snapshot at a specific tick (team-level gold/xp)."""
+    tick: int
+    game_time: float  # In-game clock seconds (creep spawn is 0)
+    radiant_gold: int
+    dire_gold: int
+    radiant_xp: int
+    dire_xp: int
+    gold_advantage: int  # radiant_gold - dire_gold
+    xp_advantage: int  # radiant_xp - dire_xp
 
 @dataclass
 class WardEvent:
@@ -155,6 +167,7 @@ class ParseResult:
     kills: list[KillEvent] = field(default_factory=list)
     wards: list[WardEvent] = field(default_factory=list)
     heroes: dict[int, str] = field(default_factory=dict)  # handle -> hero_name
+    economy: list[EconomySample] = field(default_factory=list)  # team-level gold/xp snapshots
     
     # Error info (only set if success=False)
     error: Optional[str] = None

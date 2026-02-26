@@ -20,6 +20,7 @@ from .models import (
     PositionSample,
     KillEvent,
     WardEvent,
+    EconomySample,
 )
 
 
@@ -279,7 +280,8 @@ class ClarityParser:
                 killer=k.get("killer", ""),
                 victim=k.get("victim", ""),
                 x=k.get("x"),
-                y=k.get("y")
+                y=k.get("y"),
+                assist_players=k.get("assist_players"),
             ))
         
         # Parse wards
@@ -296,6 +298,21 @@ class ClarityParser:
                 game_time=w.get("game_time")
             ))
         
+
+        # Parse economy samples
+        economy = []
+        for e in data.get("economy", []):
+            economy.append(EconomySample(
+                tick=e.get("tick", 0),
+                game_time=e.get("game_time", 0.0),
+                radiant_gold=e.get("radiant_gold", 0),
+                dire_gold=e.get("dire_gold", 0),
+                radiant_xp=e.get("radiant_xp", 0),
+                dire_xp=e.get("dire_xp", 0),
+                gold_advantage=e.get("gold_advantage", 0),
+                xp_advantage=e.get("xp_advantage", 0),
+            ))
+
         # Parse heroes mapping
         heroes = {}
         raw_heroes = data.get("heroes", {})
@@ -315,7 +332,8 @@ class ClarityParser:
             positions=positions,
             kills=kills,
             wards=wards,
-            heroes=heroes
+            heroes=heroes,
+            economy=economy,
         )
 
 

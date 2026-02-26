@@ -9,6 +9,7 @@ Storage structure:
         ├── positions.parquet     # Hero position samples
         ├── kills.parquet         # Kill events
         ├── wards.parquet         # Ward placement/destruction
+        ├── economy.parquet       # Team-level gold/xp snapshots
         └── meta.json             # Match metadata
 """
 
@@ -20,7 +21,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from parsers.models import ParseResult, PositionSample, KillEvent, WardEvent
+from parsers.models import ParseResult, PositionSample, KillEvent, WardEvent, EconomySample
 
 
 def _coerce_float(value: object) -> Optional[float]:
@@ -99,6 +100,9 @@ class ParquetStorage:
         # Save wards
         self._save_wards(match_dir, result.wards)
         
+        # Save economy snapshots
+        self._save_economy(match_dir, result.economy)
+        
         # Save metadata as JSON
         self._save_metadata(match_dir, result)
         
@@ -142,16 +146,19 @@ class ParquetStorage:
     def _save_kills(self, match_dir: Path, kills: list[KillEvent]) -> None:
         """Save kill events to Parquet."""
         if not kills:
-            df = pd.DataFrame(columns=["time", "killer", "victim", "x", "y"])
+            df = pd.DataFrame(columns=["time", "killer", "victim", "x", "y", "assist_players"])
         else:
             data = []
             for kill in kills:
+                # Store assist_players as JSON string for parquet compatibility
+                ap = json.dumps(kill.assist_players) if kill.assist_players else None
                 data.append({
                     "time": kill.time,
                     "killer": kill.killer,
                     "victim": kill.victim,
                     "x": kill.x,
-                    "y": kill.y
+                    "y": kill.y,
+                    "assist_players": ap,
                 })
             df = pd.DataFrame(data)
         
@@ -187,6 +194,35 @@ class ParquetStorage:
         pq.write_table(
             table,
             match_dir / "wards.parquet",
+            compression="snappy"
+        )
+    
+    def _save_economy(self, match_dir: Path, economy: list[EconomySample]) -> None:
+        """Save economy snapshots to Parquet."""
+        if not economy:
+            df = pd.DataFrame(columns=[
+                "tick", "game_time", "radiant_gold", "dire_gold",
+                "radiant_xp", "dire_xp", "gold_advantage", "xp_advantage"
+            ])
+        else:
+            data = []
+            for e in economy:
+                data.append({
+                    "tick": e.tick,
+                    "game_time": e.game_time,
+                    "radiant_gold": e.radiant_gold,
+                    "dire_gold": e.dire_gold,
+                    "radiant_xp": e.radiant_xp,
+                    "dire_xp": e.dire_xp,
+                    "gold_advantage": e.gold_advantage,
+                    "xp_advantage": e.xp_advantage,
+                })
+            df = pd.DataFrame(data)
+        
+        table = pa.Table.from_pandas(df)
+        pq.write_table(
+            table,
+            match_dir / "economy.parquet",
             compression="snappy"
         )
     
@@ -400,6 +436,21 @@ class ParquetStorage:
             df["game_time"] = pd.NA
         
         return df
+    
+    def get_economy(self, match_id: int) -> pd.DataFrame:
+        """
+        Get economy snapshots for a match.
+        
+        Returns:
+            DataFrame with columns: tick, game_time, radiant_gold, dire_gold,
+            radiant_xp, dire_xp, gold_advantage, xp_advantage
+        """
+        parquet_path = self.get_match_dir(match_id) / "economy.parquet"
+        
+        if not parquet_path.exists():
+            return pd.DataFrame()
+        
+        return pq.read_table(parquet_path).to_pandas()
     
     def get_metadata(self, match_id: int) -> Optional[dict]:
         """Get match metadata."""
