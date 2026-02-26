@@ -17,7 +17,12 @@ parquet_storage = ParquetStorage("data/matches")
 
 
 def _resolve_duration_seconds(meta: Optional[dict], fallback_duration: int) -> int:
-    """Resolve match duration from metadata with SQLite fallback."""
+    """Resolve match duration: use the larger of meta.duration_seconds and SQLite.
+
+    meta.duration_seconds can be wrong for some replays (e.g., match 8703862527
+    reports 1551s but replay extends to ~3474s). SQLite stores max(tick_duration,
+    meta_duration) since the storage fix, so we take the max of both.
+    """
     if not meta:
         return fallback_duration
 
@@ -25,7 +30,7 @@ def _resolve_duration_seconds(meta: Optional[dict], fallback_duration: int) -> i
     if isinstance(duration_seconds, bool):
         return fallback_duration
     if isinstance(duration_seconds, (int, float)) and duration_seconds > 0:
-        return int(duration_seconds)
+        return max(int(duration_seconds), fallback_duration)
 
     return fallback_duration
 

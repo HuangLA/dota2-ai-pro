@@ -86,11 +86,14 @@ class MatchStorage:
         now = int(time.time())
         meta = result.metadata
         
-        # Estimate duration from ticks (30 ticks per second)
-        duration = int(result.total_ticks / 30) if result.total_ticks else 0
-        if meta.duration_seconds:
-            duration = int(meta.duration_seconds)
-        
+        # Compute duration: prefer tick-based (total_ticks / 30) as it reflects
+        # actual replay length including pre-game. meta.duration_seconds can be
+        # wrong for some replays (e.g., match 8703862527 reports 1551s but replay
+        # source_time extends to ~3474s). Use the larger of the two.
+        tick_duration = int(result.total_ticks / 30) if result.total_ticks else 0
+        meta_duration = int(meta.duration_seconds) if meta.duration_seconds else 0
+        duration = max(tick_duration, meta_duration)
+
         # Insert or update match
         cursor.execute("""
             INSERT INTO matches (

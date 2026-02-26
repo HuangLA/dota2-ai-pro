@@ -28,12 +28,13 @@ def _make_match(match_id: int, duration: int, parse_status: str = "completed") -
 @pytest.mark.parametrize(
     "meta,fallback,expected",
     [
-        ({"duration_seconds": 1800}, 3500, 1800),
-        ({"duration_seconds": 1800.8}, 3500, 1800),
+        ({"duration_seconds": 1800}, 3500, 3500),
+        ({"duration_seconds": 1800.8}, 3500, 3500),
         ({"duration_seconds": 0}, 3500, 3500),
         ({"duration_seconds": -5}, 3500, 3500),
         ({"duration_seconds": "1800"}, 3500, 3500),
         (None, 3500, 3500),
+        ({"duration_seconds": 4000}, 3500, 4000),  # meta larger than fallback
     ],
 )
 def test_resolve_duration_seconds(meta: dict | None, fallback: int, expected: int) -> None:
@@ -69,6 +70,6 @@ async def test_list_matches_prefers_parquet_duration_with_sqlite_fallback(monkey
     response = await matches_router.list_matches(limit=20, offset=0)
 
     durations = {item.match_id: item.duration for item in response.matches}
-    assert durations[101] == 1800
+    assert durations[101] == 3500
     assert durations[102] == 3600
     assert durations[103] == 120
