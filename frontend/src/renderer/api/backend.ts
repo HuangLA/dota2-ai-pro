@@ -134,6 +134,31 @@ export interface MatchDetail {
   parsed_at: string;
 }
 
+export interface AdvantageData {
+  tick: number;
+  game_time: number;
+  radiant_gold: number;
+  dire_gold: number;
+  radiant_xp: number;
+  dire_xp: number;
+  gold_advantage: number;
+  xp_advantage: number;
+}
+
+export interface AdvantageResponse {
+  match_id: number;
+  data: AdvantageData[];
+  time_basis: PlaybackTimeBasis;
+  summary?: {
+    total_samples: number;
+    max_gold_advantage: number;
+    min_gold_advantage: number;
+    max_xp_advantage: number;
+    min_xp_advantage: number;
+  };
+  message?: string;
+}
+
 export interface ApiTestResult {
   success: boolean;
   status?: number;
@@ -351,6 +376,40 @@ class BackendAPI {
         return null;
       }
       console.error('Failed to fetch HUD metrics:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get gold/XP advantage data for a match
+   */
+  async getAdvantage(
+    matchId: number,
+    signal?: AbortSignal
+  ): Promise<AdvantageResponse | null> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/playback/${matchId}/advantage`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: AdvantageResponse = await response.json();
+      return data;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return null;
+      }
+      console.error('Failed to fetch advantage data:', error);
       return null;
     }
   }

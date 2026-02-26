@@ -4,9 +4,11 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { usePlaybackStore } from '../store/playbackStore';
 import MapViewer from '../components/map/MapViewer';
-import { HeroPosition, Ward } from '../components/map/DotaMapRenderer';
+import { HeatmapBounds, HeroPosition, KillMarkerData, Ward } from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
+import AdvantageChart from '../components/charts/AdvantageChart';
 import backendAPI, {
   HudHeroMetric,
   Match,
@@ -145,6 +147,60 @@ function buildDeathIntervalsByHandle(
   return intervalsByHandle;
 }
 
+/**
+ * Extract kill events from tick data by detecting HP alive→dead transitions.
+ * Returns kill markers with game_time coordinates for minimap display.
+ */
+function extractKillMarkersFromTicks(
+  ticks: TickData[],
+  mapper: Pick<GameClockMapper, 'getSourceTime'>,
+): KillMarkerData[] {
+  const kills: KillMarkerData[] = [];
+  const lastAliveByHandle = new Map<number, boolean>();
+  const lastPosByHandle = new Map<number, { x: number; y: number; team: number; hero: string }>();
+  const sortedTicks = [...ticks].sort((a, b) => mapper.getSourceTime(a) - mapper.getSourceTime(b));
+
+  for (const tick of sortedTicks) {
+    const gameTime = getTickGameTime(tick);
+    if (gameTime === null) {
+      continue;
+    }
+
+    for (const hero of tick.heroes) {
+      const isAlive = (hero.hp ?? 0) > 0;
+      const wasAlive = lastAliveByHandle.get(hero.handle);
+
+      // Record position when alive (for accurate death location)
+      if (isAlive) {
+        lastPosByHandle.set(hero.handle, {
+          x: hero.x,
+          y: hero.y,
+          team: hero.team,
+          hero: hero.hero,
+        });
+      }
+
+      // Detect death: was alive, now dead
+      if (wasAlive === true && !isAlive) {
+        const lastPos = lastPosByHandle.get(hero.handle);
+        if (lastPos) {
+          kills.push({
+            time: gameTime,
+            victim: lastPos.hero,
+            x: hero.x || lastPos.x,
+            y: hero.y || lastPos.y,
+            victimTeam: lastPos.team,
+          });
+        }
+      }
+
+      lastAliveByHandle.set(hero.handle, isAlive);
+    }
+  }
+
+  return kills;
+}
+
 /** 线性插值函数 */
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -182,33 +238,39 @@ export interface RealMatchViewerProps {
 
 export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatchViewerProps) {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [selectedMatch, setSelectedMatch] = useState<number | null>(initialMatchId || null);
+  const { selectedMatch, setSelectedMatch, currentTime, setCurrentTime, currentDisplayGameTime, setCurrentDisplayGameTime, isPauseActive, setIsPauseActive, loading, setLoading, error, setError } = usePlaybackStore();
   
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [activeKillMarkers, setActiveKillMarkers] = useState<KillMarkerData[]>([]);
+  const [showPaths, setShowPaths] = useState(false);
   
-  const [currentTime, setCurrentTime] = useState(0);
+
   const [timelineMinTime, setTimelineMinTime] = useState(0);
   const [timelineMaxTime, setTimelineMaxTime] = useState(DEFAULT_DURATION);
   
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+
   const [showCalibration, setShowCalibration] = useState(false);
   const [timeBasisSource, setTimeBasisSource] = useState<'game_time' | 'fallback'>('fallback');
   const [timeBasisStrategy, setTimeBasisStrategy] = useState<GameClockMapper['strategy']>('fallback_pre_game_anchor');
   const [timeBasisOffsetSeconds, setTimeBasisOffsetSeconds] = useState(0);
   const [teamLineups, setTeamLineups] = useState<TeamLineups>({ radiant: [], dire: [] });
   const [hudHeroStatus, setHudHeroStatus] = useState<Record<number, HudHeroStatus>>({});
-  const [isPauseActive, setIsPauseActive] = useState(false);
-  const [currentDisplayGameTime, setCurrentDisplayGameTime] = useState(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
+
+
   const [hudMetrics, setHudMetrics] = useState<HudHeroMetric[]>([]);
   const [hudMetricsLoading, setHudMetricsLoading] = useState(false);
   const [hudMetricsError, setHudMetricsError] = useState<string | null>(null);
+  const [heatmapType, setHeatmapType] = useState<'none' | 'movement' | 'kill' | 'death'>('none');
+  const [heatmapGrid, setHeatmapGrid] = useState<number[][] | null>(null);
+  const [heatmapBounds, setHeatmapBounds] = useState<HeatmapBounds | null>(null);
   
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
   const gameClockMapperRef = useRef<GameClockMapper>(createGameClockMapper([]));
   const deathIntervalsRef = useRef<Map<number, DeathInterval[]>>(new Map());
+  const killMarkersRef = useRef<KillMarkerData[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hudRequestAbortControllerRef = useRef<AbortController | null>(null);
   const hudThrottleTimeoutRef = useRef<number | null>(null);
@@ -358,6 +420,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     allTicksRef.current = [];
     allWardsRef.current = null;
     deathIntervalsRef.current = new Map();
+    killMarkersRef.current = [];
+    setHeatmapType('none');
+    setHeatmapGrid(null);
+    setHeatmapBounds(null);
     
     try {
       const matchDetail = await backendAPI.getMatchDetail(matchId);
@@ -401,6 +467,8 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       const mapper = createGameClockMapper(mapperRecords, timeBasis);
       gameClockMapperRef.current = mapper;
       deathIntervalsRef.current = buildDeathIntervalsByHandle(allTicksRef.current, mapper);
+      killMarkersRef.current = extractKillMarkersFromTicks(allTicksRef.current, mapper);
+      console.log(`[RealMatchViewer] Extracted ${killMarkersRef.current.length} kill markers from tick data`);
       setTimeBasisSource(mapper.timeBasisSource);
       setTimeBasisStrategy(mapper.strategy);
       setTimeBasisOffsetSeconds(mapper.offsetSeconds);
@@ -627,6 +695,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     const pauseActive = pauseActiveFromSamples || mapper.isPausedAtSourceTime(time);
     setCurrentDisplayGameTime(currentGameClock);
     setIsPauseActive(pauseActive);
+    // Filter kill markers within ±5s window of current game time
+    const KILL_DISPLAY_WINDOW = 5;
+    const filteredKills = killMarkersRef.current.filter(
+      (k) => Math.abs(k.time - currentGameClock) <= KILL_DISPLAY_WINDOW
+    );
+    setActiveKillMarkers(filteredKills);
     const prevHeroesByHandle = new Map(prev.heroes.map((hero) => [hero.handle, hero]));
     const nextHeroesByHandle = new Map((next?.heroes ?? []).map((hero) => [hero.handle, hero]));
     const lineupHeroes = [...teamLineups.radiant, ...teamLineups.dire];
@@ -680,6 +754,37 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     }
     updateDisplayForTime(currentTime);
   }, [teamLineups, updateDisplayForTime]);
+
+  // Fetch heatmap data when type changes
+  useEffect(() => {
+    if (heatmapType === 'none' || !selectedMatch) {
+      setHeatmapGrid(null);
+      setHeatmapBounds(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(`http://localhost:8000/api/v1/visualization/${selectedMatch}/heatmap?type=${heatmapType}&resolution=64`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        if (!cancelled) {
+          setHeatmapGrid(data.grid);
+          setHeatmapBounds(data.bounds);
+        }
+      })
+      .catch(err => {
+        console.error('[RealMatchViewer] Failed to fetch heatmap:', err);
+        if (!cancelled) {
+          setHeatmapGrid(null);
+          setHeatmapBounds(null);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [heatmapType, selectedMatch]);
 
   const handleTimeChange = useCallback((newTime: number) => {
     setCurrentTime(newTime);
@@ -998,6 +1103,15 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     />
                     <span>显示校准标记</span>
                   </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showPaths}
+                      onChange={(e) => setShowPaths(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span>移动轨迹</span>
+                  </label>
                   {loading && (
                     <span className="text-sm text-gray-400 animate-pulse">加载中...</span>
                   )}
@@ -1025,6 +1139,30 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   </div>
                 </div>
 
+                {selectedMatch && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs text-gray-400 mr-1">热力图:</span>
+                    {([
+                      { key: 'none' as const, label: '关闭' },
+                      { key: 'movement' as const, label: '移动' },
+                      { key: 'kill' as const, label: '击杀' },
+                      { key: 'death' as const, label: '死亡' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setHeatmapType(opt.key)}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                          heatmapType === opt.key
+                            ? 'bg-dota-gold/20 text-dota-gold border border-dota-gold/50'
+                            : 'bg-gray-800/80 text-gray-400 border border-gray-700/60 hover:bg-gray-700/80 hover:text-gray-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {selectedMatch ? (
                   <div className="flex justify-center">
                     <MapViewer
@@ -1033,7 +1171,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       height={900}
                       heroPositions={heroPositions}
                       wards={wards}
+                      killMarkers={activeKillMarkers}
+                      currentGameTime={currentDisplayGameTime}
                       showCalibrationMarkers={showCalibration}
+                      heatmapGrid={heatmapGrid}
+                      heatmapBounds={heatmapBounds}
+                      showPaths={showPaths}
                     />
                   </div>
                 ) : (
@@ -1043,6 +1186,28 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 )}
               </div>
             </div>
+
+            {selectedMatch && (
+              <Timeline
+                currentTime={currentTime}
+                minTime={timelineMinTime}
+                maxTime={timelineMaxTime}
+                onTimeChange={handleTimeChange}
+                isLoading={loading}
+                disabled={!selectedMatch || matches.length === 0}
+                formatTime={formatTimeDisplay}
+                showTimeDisplay={false}
+                pauseSegments={gameClockMapperRef.current.pauseIntervals}
+                isPausedAtTime={(time) => gameClockMapperRef.current.isPausedAtSourceTime(time)}
+              />
+            )}
+
+            {selectedMatch && (
+              <AdvantageChart
+                matchId={selectedMatch}
+                currentGameTime={currentDisplayGameTime}
+              />
+            )}
 
             <div className="bg-dota-surface p-4 rounded-lg">
               <div className="mb-3 flex items-center justify-between gap-2">
@@ -1110,21 +1275,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 </div>
               )}
             </div>
-
-            {selectedMatch && (
-              <Timeline
-                currentTime={currentTime}
-                minTime={timelineMinTime}
-                maxTime={timelineMaxTime}
-                onTimeChange={handleTimeChange}
-                isLoading={loading}
-                disabled={!selectedMatch || matches.length === 0}
-                formatTime={formatTimeDisplay}
-                showTimeDisplay={false}
-                pauseSegments={gameClockMapperRef.current.pauseIntervals}
-                isPausedAtTime={(time) => gameClockMapperRef.current.isPausedAtSourceTime(time)}
-              />
-            )}
           </div>
         </div>
 
