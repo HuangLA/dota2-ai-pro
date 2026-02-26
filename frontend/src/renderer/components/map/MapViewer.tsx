@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import DotaMapRenderer, { HeroPosition, Ward } from './DotaMapRenderer';
+import DotaMapRenderer, { HeatmapBounds, HeroPosition, KillMarkerData, Ward } from './DotaMapRenderer';
 
 export interface MapViewerProps {
   width?: number;
@@ -12,12 +12,22 @@ export interface MapViewerProps {
   mapImageUrl?: string;
   heroPositions?: HeroPosition[];
   wards?: Ward[];
+  /** Kill markers to display on the minimap */
+  killMarkers?: KillMarkerData[];
+  /** Current game time for kill marker fade calculation */
+  currentGameTime?: number;
+  /** Whether to show hero movement path traces */
+  showPaths?: boolean;
   /** 是否使用英雄图标（默认 true） */
   useHeroIcons?: boolean;
   /** 英雄图标大小（默认 32） */
   heroIconSize?: number;
   /** 是否显示校准标记（用于调试坐标对齐） */
   showCalibrationMarkers?: boolean;
+  /** 热力图网格数据 (64×64 normalized grid) */
+  heatmapGrid?: number[][] | null;
+  /** 热力图坐标边界 */
+  heatmapBounds?: HeatmapBounds | null;
 }
 
 export function MapViewer({
@@ -26,9 +36,14 @@ export function MapViewer({
   mapImageUrl,
   heroPositions = [],
   wards = [],
+  killMarkers = [],
+  currentGameTime = 0,
+  showPaths = false,
   useHeroIcons = true,
   heroIconSize = 32,
   showCalibrationMarkers = false,
+  heatmapGrid = null,
+  heatmapBounds = null,
 }: MapViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DotaMapRenderer | null>(null);
@@ -104,7 +119,16 @@ export function MapViewer({
     
     console.log('[MapViewer] Updating heroes:', heroPositions.length);
     rendererRef.current.renderHeroes(heroPositions);
-  }, [isInitialized, heroPositions]);
+    if (showPaths) {
+      rendererRef.current.updatePathTraces(heroPositions);
+    }
+  }, [isInitialized, heroPositions, showPaths]);
+
+  // Toggle path traces visibility
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) return;
+    rendererRef.current.togglePathTraces(showPaths);
+  }, [isInitialized, showPaths]);
 
   // Update wards
   useEffect(() => {
@@ -116,6 +140,26 @@ export function MapViewer({
     console.log('[MapViewer] Updating wards:', wards.length);
     rendererRef.current.renderWards(wards);
   }, [isInitialized, wards]);
+
+  // Update kill markers
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+    rendererRef.current.updateKillMarkers(killMarkers, currentGameTime);
+  }, [isInitialized, killMarkers, currentGameTime]);
+
+  // Update heatmap overlay
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+    if (heatmapGrid && heatmapBounds) {
+      rendererRef.current.renderHeatmap(heatmapGrid, heatmapBounds);
+    } else {
+      rendererRef.current.clearHeatmap();
+    }
+  }, [isInitialized, heatmapGrid, heatmapBounds]);
 
   if (error) {
     return (

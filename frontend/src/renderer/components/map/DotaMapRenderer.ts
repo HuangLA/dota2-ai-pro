@@ -55,6 +55,27 @@ export interface Ward {
 }
 
 /**
+ * Kill event marker data for minimap display
+ */
+export interface KillMarkerData {
+  time: number;         // game_time of kill (seconds)
+  victim: string;       // hero name
+  x: number;            // world x coordinate
+  y: number;            // world y coordinate
+  victimTeam: number;   // 2=Radiant, 3=Dire
+}
+
+/**
+ * Heatmap bounds from backend visualization API
+ */
+export interface HeatmapBounds {
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+}
+
+/**
  * Renderer configuration
  */
 export interface RendererConfig {
@@ -100,10 +121,15 @@ export class DotaMapRenderer {
   private mapContainer!: PIXI.Container;
   private buildingsContainer!: PIXI.Container;  // 建筑层
   private wardsContainer!: PIXI.Container;
+  private killsContainer!: PIXI.Container;   // 击杀标记层
+  private pathsContainer!: PIXI.Container;   // 英雄移动轨迹层
+  private heatmapContainer!: PIXI.Container;
   private heroesContainer!: PIXI.Container;
   
   private mapSprite?: PIXI.Sprite;
   private heroStates: Map<number, HeroState> = new Map();
+  private showPaths: boolean = false;
+  private pathHistory: Map<string, Array<{x: number, y: number}>> = new Map();
   /** 按英雄 ID 索引的纹理缓存 */
   private heroTexturesById: Map<number, PIXI.Texture> = new Map();
   /** 按英雄名称索引的纹理缓存 (用于后端返回英雄名而非 ID 的情况) */
@@ -163,14 +189,20 @@ export class DotaMapRenderer {
     container.appendChild(this.app.canvas);
 
     this.mapContainer = new PIXI.Container();
+    this.heatmapContainer = new PIXI.Container();
     this.buildingsContainer = new PIXI.Container();
     this.wardsContainer = new PIXI.Container();
+    this.killsContainer = new PIXI.Container();
+    this.pathsContainer = new PIXI.Container();
     this.heroesContainer = new PIXI.Container();
     
-    // 图层顺序: 地图背景 -> 建筑 -> 眼位 -> 英雄
+    // 图层顺序: 地图背景 -> 热力图 -> 建筑 -> 眼位 -> 路径轨迹 -> 击杀标记 -> 英雄
     this.app.stage.addChild(this.mapContainer);
+    this.app.stage.addChild(this.heatmapContainer);
     this.app.stage.addChild(this.buildingsContainer);
     this.app.stage.addChild(this.wardsContainer);
+    this.app.stage.addChild(this.pathsContainer);
+    this.app.stage.addChild(this.killsContainer);
     this.app.stage.addChild(this.heroesContainer);
 
     if (this.config.mapImageUrl) {
@@ -1314,6 +1346,248 @@ export class DotaMapRenderer {
   }
 
   /**
+   * Update kill markers on the minimap
+   * Shows kill events within ±KILL_TIME_WINDOW seconds of currentGameTime
+   * Opacity fades based on time distance (1.0 at current, 0.3 at edge)
+   */
+  private static readonly KILL_TIME_WINDOW = 5;
+  private static readonly KILL_MARKER_SIZE = 8;
+  private static readonly KILL_MARKER_MIN_ALPHA = 0.3;
+
+  updateKillMarkers(kills: KillMarkerData[], currentGameTime: number): void {
+    if (!this.initialized || !this.app?.stage) {
+      return;
+    }
+
+    this.killsContainer.removeChildren();
+
+    const window = DotaMapRenderer.KILL_TIME_WINDOW;
+    const minAlpha = DotaMapRenderer.KILL_MARKER_MIN_ALPHA;
+    const size = DotaMapRenderer.KILL_MARKER_SIZE;
+
+    for (const kill of kills) {
+      const timeDiff = Math.abs(kill.time - currentGameTime);
+      if (timeDiff > window) {
+        continue;
+      }
+
+      // Opacity: 1.0 at current time, KILL_MARKER_MIN_ALPHA at ±window edge
+      const alpha = 1.0 - (1.0 - minAlpha) * (timeDiff / window);
+
+      const screenPos = this.gameToScreen(kill.x, kill.y);
+
+      // Color based on victim team:
+      // Radiant victim (team 2) = red marker (bad for Radiant)
+      // Dire victim (team 3) = green marker (good for Radiant)
+      const markerColor = kill.victimTeam === 2 ? 0xef4444 : 0x22c55e;
+      const outlineColor = 0x000000;
+
+      const marker = new PIXI.Graphics();
+
+      // Dark outline for readability
+      marker.moveTo(screenPos.x - size, screenPos.y - size);
+      marker.lineTo(screenPos.x + size, screenPos.y + size);
+      marker.moveTo(screenPos.x + size, screenPos.y - size);
+      marker.lineTo(screenPos.x - size, screenPos.y + size);
+      marker.stroke({ width: 4, color: outlineColor, alpha: alpha * 0.6 });
+
+      // Colored X marker
+      marker.moveTo(screenPos.x - size, screenPos.y - size);
+      marker.lineTo(screenPos.x + size, screenPos.y + size);
+      marker.moveTo(screenPos.x + size, screenPos.y - size);
+      marker.lineTo(screenPos.x - size, screenPos.y + size);
+      marker.stroke({ width: 2.5, color: markerColor, alpha });
+
+      // Small center dot for emphasis
+      marker.circle(screenPos.x, screenPos.y, 2.5);
+      marker.fill({ color: markerColor, alpha });
+
+      this.killsContainer.addChild(marker);
+    }
+  }
+
+  /**
+   * Clear all kill markers
+   */
+  clearKillMarkers(): void {
+    if (this.killsContainer) {
+      this.killsContainer.removeChildren();
+    }
+  }
+
+  // ────────── Path Traces ──────────
+
+  /**
+   * Update hero movement path traces on the minimap.
+   * Maintains a rolling buffer of recent positions per hero and draws
+   * polylines with fading opacity (oldest 0.05 → newest 0.5).
+   */
+  updatePathTraces(heroPositions: HeroPosition[], trailLength: number = 30): void {
+    if (!this.initialized || !this.app?.stage || !this.showPaths) {
+      return;
+    }
+
+    this.pathsContainer.removeChildren();
+
+    for (const pos of heroPositions) {
+      const screenPos = this.gameToScreen(pos.x, pos.y);
+      const key = pos.hero_name;
+
+      // Get or create history buffer
+      let history = this.pathHistory.get(key);
+      if (!history) {
+        history = [];
+        this.pathHistory.set(key, history);
+      }
+
+      // Skip duplicate points (e.g. when playback is paused)
+      const last = history[history.length - 1];
+      if (!last || Math.abs(last.x - screenPos.x) > 0.5 || Math.abs(last.y - screenPos.y) > 0.5) {
+        history.push({ x: screenPos.x, y: screenPos.y });
+      }
+
+      // Trim to trail length
+      if (history.length > trailLength) {
+        history.splice(0, history.length - trailLength);
+      }
+
+      // Need at least 2 points to draw a segment
+      if (history.length < 2) continue;
+
+      const teamColor = pos.team === 'radiant' ? 0x22c55e : 0xef4444;
+      const gfx = new PIXI.Graphics();
+
+      for (let i = 1; i < history.length; i++) {
+        const p0 = history[i - 1];
+        const p1 = history[i];
+
+        // Opacity gradient: oldest segment ≈ 0.05, newest ≈ 0.5
+        const progress = i / (history.length - 1);
+        const alpha = 0.05 + 0.45 * progress;
+
+        gfx.moveTo(p0.x, p0.y);
+        gfx.lineTo(p1.x, p1.y);
+        gfx.stroke({ width: 2, color: teamColor, alpha });
+      }
+
+      this.pathsContainer.addChild(gfx);
+    }
+  }
+
+  /**
+   * Toggle hero movement path traces on/off.
+   * Clears accumulated path history when disabling.
+   */
+  togglePathTraces(enabled: boolean): void {
+    this.showPaths = enabled;
+    if (this.pathsContainer) {
+      this.pathsContainer.visible = enabled;
+    }
+    if (!enabled) {
+      this.pathHistory.clear();
+      if (this.pathsContainer) {
+        this.pathsContainer.removeChildren();
+      }
+    }
+  }
+  // ────────── Heatmap Overlay ──────────
+
+  /**
+   * Compute heatmap color for a normalized value [0, 1]
+   * Blue → Cyan → Yellow → Red gradient
+   */
+  private static heatmapColor(value: number): number {
+    const v = Math.max(0, Math.min(1, value));
+    let r: number, g: number, b: number;
+
+    if (v < 0.33) {
+      const t = v / 0.33;
+      r = 0;
+      g = Math.floor(t * 255);
+      b = 255;
+    } else if (v < 0.66) {
+      const t = (v - 0.33) / 0.33;
+      r = Math.floor(t * 255);
+      g = 255;
+      b = Math.floor((1 - t) * 255);
+    } else {
+      const t = (v - 0.66) / 0.34;
+      r = 255;
+      g = Math.floor((1 - t) * 255);
+      b = 0;
+    }
+
+    return (r << 16) | (g << 8) | b;
+  }
+
+  /**
+   * Render a heatmap overlay on the minimap
+   * @param grid 2D array of normalized [0,1] density values (grid[row][col], row 0 = min_y)
+   * @param bounds Game-world bounds for the grid
+   */
+  renderHeatmap(grid: number[][], bounds: HeatmapBounds): void {
+    if (!this.initialized || !this.app?.stage) {
+      return;
+    }
+
+    this.clearHeatmap();
+
+    const resolution = grid.length;
+    if (resolution === 0) return;
+
+    const THRESHOLD = 0.05;
+
+    // Screen-space bounding box for the heatmap area
+    const topLeft = this.gameToScreen(bounds.min_x, bounds.max_y);
+    const bottomRight = this.gameToScreen(bounds.max_x, bounds.min_y);
+    const totalW = bottomRight.x - topLeft.x;
+    const totalH = bottomRight.y - topLeft.y;
+    const cellW = totalW / resolution;
+    const cellH = totalH / resolution;
+
+    const gfx = new PIXI.Graphics();
+
+    for (let row = 0; row < resolution; row++) {
+      const rowData = grid[row];
+      if (!rowData) continue;
+
+      for (let col = 0; col < resolution; col++) {
+        const value = rowData[col] ?? 0;
+        if (value < THRESHOLD) continue;
+
+        // row 0 = min_y (map bottom) → screen bottom, so invert row index
+        const sx = topLeft.x + col * cellW;
+        const sy = topLeft.y + (resolution - 1 - row) * cellH;
+        const color = DotaMapRenderer.heatmapColor(value);
+        const alpha = 0.15 + value * 0.45;
+
+        gfx.rect(sx, sy, cellW, cellH);
+        gfx.fill({ color, alpha });
+      }
+    }
+
+    this.heatmapContainer.addChild(gfx);
+    this.heatmapContainer.visible = true;
+  }
+
+  /**
+   * Clear the heatmap overlay
+   */
+  clearHeatmap(): void {
+    if (this.heatmapContainer) {
+      this.heatmapContainer.removeChildren();
+    }
+  }
+
+  /**
+   * Toggle heatmap layer visibility
+   */
+  setHeatmapVisible(visible: boolean): void {
+    if (this.heatmapContainer) {
+      this.heatmapContainer.visible = visible;
+    }
+  }
+  /**
    * Clear all rendered objects
    */
   clear(): void {
@@ -1322,6 +1596,16 @@ export class DotaMapRenderer {
     }
     if (this.wardsContainer) {
       this.wardsContainer.removeChildren();
+    }
+    if (this.killsContainer) {
+      this.killsContainer.removeChildren();
+    }
+    if (this.pathsContainer) {
+      this.pathsContainer.removeChildren();
+    }
+    this.pathHistory.clear();
+    if (this.heatmapContainer) {
+      this.heatmapContainer.removeChildren();
     }
     this.heroStates.clear();
   }
