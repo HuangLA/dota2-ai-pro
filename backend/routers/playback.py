@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, cast
 
 import pandas as pd
+import json
 from fastapi import APIRouter, HTTPException, Query
 
 from storage.parquet_storage import ParquetStorage
@@ -103,8 +104,15 @@ def build_hud_heroes(
     kills_df: pd.DataFrame,
     target_tick: int,
     target_game_time: float,
+    game_start_time: float = 0.0,
+    metadata: Optional[dict] = None,
 ) -> list[dict]:
-    """Build hero HUD rows for a single snapshot."""
+    """Build hero HUD rows for a single snapshot.
+
+    Computes kills, deaths, and assists for each hero.
+    Assists are read from the parser's assist_players data (player slot indices),
+    resolved to hero names via metadata.players.
+    """
     if positions_df.empty:
         return []
 
@@ -114,11 +122,27 @@ def build_hud_heroes(
 
     snapshot_df = snapshot_df.sort_values("tick").drop_duplicates(subset=["hero", "team"], keep="last")
 
+    # Build player index -> hero_key mapping from metadata
+    _player_index_to_hero_key: dict[int, str] = {}
+    if metadata and "players" in metadata:
+        for idx, player in enumerate(metadata["players"]):
+            hero_name = player.get("hero_name", "")
+            if hero_name:
+                _player_index_to_hero_key[idx] = normalize_hero_key(hero_name)
+
     kill_counts: dict[str, int] = {}
     death_counts: dict[str, int] = {}
+    assist_counts: dict[str, int] = {}
 
     if not kills_df.empty and "time" in kills_df.columns:
-        kill_events_df = kills_df[kills_df["time"] <= target_game_time]
+        # kills "time" is raw combat log timestamp (cle.getTimestamp()),
+        # which includes pre-game warmup. Convert to game_time by subtracting
+        # game_start_time so it aligns with positions-derived target_game_time.
+        adjusted_time = kills_df["time"] - game_start_time
+        kill_events_df = kills_df[adjusted_time <= target_game_time]
+
+        has_assist_col = "assist_players" in kills_df.columns
+
         for _, event in kill_events_df.iterrows():
             killer_key = normalize_hero_key(event.get("killer"))
             victim_key = normalize_hero_key(event.get("victim"))
@@ -127,6 +151,25 @@ def build_hud_heroes(
                 kill_counts[killer_key] = kill_counts.get(killer_key, 0) + 1
             if victim_key:
                 death_counts[victim_key] = death_counts.get(victim_key, 0) + 1
+
+            # Extract assists from parser data
+            if has_assist_col and pd.notna(event.get("assist_players")):
+                raw_assists = event["assist_players"]
+                # assist_players is stored as JSON string in parquet
+                if isinstance(raw_assists, str):
+                    try:
+                        player_indices = json.loads(raw_assists)
+                    except (json.JSONDecodeError, TypeError):
+                        player_indices = []
+                elif isinstance(raw_assists, list):
+                    player_indices = raw_assists
+                else:
+                    player_indices = []
+
+                for player_idx in player_indices:
+                    hero_key = _player_index_to_hero_key.get(player_idx)
+                    if hero_key:
+                        assist_counts[hero_key] = assist_counts.get(hero_key, 0) + 1
 
     heroes: list[dict] = []
     for _, row in snapshot_df.sort_values(["team", "hero"]).iterrows():
@@ -143,7 +186,7 @@ def build_hud_heroes(
                 "level": level_value,
                 "kills": kill_counts.get(hero_key, 0),
                 "deaths": death_counts.get(hero_key, 0),
-                "assists": 0,
+                "assists": assist_counts.get(hero_key, 0),
                 "net_worth": 0,
                 "gpm": 0,
                 "xpm": 0,
@@ -793,7 +836,9 @@ async def get_hud(
 
     target_tick, target_game_time = resolve_hud_snapshot_tick(positions_df, tick, game_time)
     kills_df = parquet_storage.get_kills(match_id)
-    heroes = build_hud_heroes(positions_df, kills_df, target_tick, target_game_time)
+    metadata = parquet_storage.get_metadata(match_id)
+    game_start_time = float(metadata.get("game_start_time", 0.0)) if metadata else 0.0
+    heroes = build_hud_heroes(positions_df, kills_df, target_tick, target_game_time, game_start_time, metadata)
 
     return {
         "status": "ok",
@@ -802,6 +847,93 @@ async def get_hud(
         "tick": target_tick,
         "heroes": heroes,
         "message": "items/net_worth/gpm/xpm currently use fallback values ([], 0).",
+    }
+
+
+@router.get("/{match_id}/advantage")
+async def get_advantage(
+    match_id: int,
+    start_time: Optional[float] = Query(None, description="Start game_time in seconds"),
+    end_time: Optional[float] = Query(None, description="End game_time in seconds"),
+) -> dict:
+    """
+    Get gold and XP advantage curves over time.
+    
+    Returns team-level gold/xp totals and advantage (radiant - dire) at each sampled tick.
+    Used for rendering the advantage chart (Recharts).
+    
+    Args:
+        match_id: Match ID
+        start_time: Filter by minimum game_time (seconds)
+        end_time: Filter by maximum game_time (seconds)
+    """
+    # Check if match exists
+    if not parquet_storage.match_exists(match_id):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Match {match_id} not found or not parsed"
+        )
+    
+    # Get economy data
+    economy_df = parquet_storage.get_economy(match_id)
+    meta = parquet_storage.get_metadata(match_id)
+    
+    if economy_df.empty:
+        # Fallback: no economy data parsed yet
+        positions_df = parquet_storage.get_positions(match_id)
+        has_game_time = has_non_null_game_time(positions_df)
+        offset_seconds, clock_zero_source = resolve_offset_seconds(meta, positions_df, None)
+        pause_intervals = resolve_pause_intervals(meta, positions_df, None)
+        time_basis = build_time_basis(
+            meta, has_game_time, offset_seconds, clock_zero_source, pause_intervals,
+        )
+        return {
+            "match_id": match_id,
+            "data": [],
+            "time_basis": time_basis,
+            "message": "No economy data available. Re-parse replay with updated parser.",
+        }
+    
+    # Apply time filters
+    if start_time is not None:
+        economy_df = economy_df[economy_df["game_time"] >= start_time]
+    if end_time is not None:
+        economy_df = economy_df[economy_df["game_time"] <= end_time]
+    
+    # Build time_basis from economy data
+    has_game_time = True  # economy always has game_time
+    positions_df = parquet_storage.get_positions(match_id)
+    offset_seconds, clock_zero_source = resolve_offset_seconds(meta, positions_df, None)
+    pause_intervals = resolve_pause_intervals(meta, positions_df, None)
+    time_basis = build_time_basis(
+        meta, has_game_time, offset_seconds, clock_zero_source, pause_intervals,
+    )
+    
+    # Build response data
+    data = []
+    for _, row in economy_df.iterrows():
+        data.append({
+            "tick": int(row["tick"]),
+            "game_time": float(row["game_time"]),
+            "radiant_gold": int(row["radiant_gold"]),
+            "dire_gold": int(row["dire_gold"]),
+            "radiant_xp": int(row["radiant_xp"]),
+            "dire_xp": int(row["dire_xp"]),
+            "gold_advantage": int(row["gold_advantage"]),
+            "xp_advantage": int(row["xp_advantage"]),
+        })
+    
+    return {
+        "match_id": match_id,
+        "data": data,
+        "time_basis": time_basis,
+        "summary": {
+            "total_samples": len(data),
+            "max_gold_advantage": max((d["gold_advantage"] for d in data), default=0),
+            "min_gold_advantage": min((d["gold_advantage"] for d in data), default=0),
+            "max_xp_advantage": max((d["xp_advantage"] for d in data), default=0),
+            "min_xp_advantage": min((d["xp_advantage"] for d in data), default=0),
+        },
     }
 
 
