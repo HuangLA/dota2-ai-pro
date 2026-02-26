@@ -206,6 +206,9 @@ public class SimpleDemoParser {
         
         // Add ward events
         result.put("wards", processor.getWardEvents());
+
+        // Add economy timeline samples
+        result.put("economy", processor.getEconomySamples());
         
         // Add hero mapping (hero_id -> hero_name)
         result.put("heroes", processor.getHeroMapping());
@@ -267,7 +270,12 @@ public class SimpleDemoParser {
         private List<Map<String, Object>> positionSamples = new ArrayList<>();
         private List<Map<String, Object>> killEvents = new ArrayList<>();
         private List<Map<String, Object>> wardEvents = new ArrayList<>();
+        private List<Map<String, Object>> economySamples = new ArrayList<>();
         private Map<Integer, String> heroMapping = new HashMap<>();
+
+        // Team-level entities for economy extraction
+        private Entity dataRadiantEntity = null;
+        private Entity dataDireEntity = null;
         
         // Track known heroes by entity handle
         private Map<Integer, HeroState> trackedHeroes = new HashMap<>();
@@ -314,6 +322,30 @@ public class SimpleDemoParser {
         @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
         public void onGameRulesUpdated(Context ctx, Entity e, FieldPath[] changedPaths, int numChanges) {
             updateGameRules(ctx, e);
+        }
+
+        @OnEntityCreated(classPattern = "CDOTA_DataRadiant")
+        public void onDataRadiantCreated(Context ctx, Entity e) {
+            dataRadiantEntity = e;
+        }
+
+        @OnEntityCreated(classPattern = "CDOTA_DataDire")
+        public void onDataDireCreated(Context ctx, Entity e) {
+            dataDireEntity = e;
+        }
+
+        @OnEntityDeleted(classPattern = "CDOTA_DataRadiant")
+        public void onDataRadiantDeleted(Context ctx, Entity e) {
+            if (dataRadiantEntity != null && e != null && dataRadiantEntity.getHandle() == e.getHandle()) {
+                dataRadiantEntity = null;
+            }
+        }
+
+        @OnEntityDeleted(classPattern = "CDOTA_DataDire")
+        public void onDataDireDeleted(Context ctx, Entity e) {
+            if (dataDireEntity != null && e != null && dataDireEntity.getHandle() == e.getHandle()) {
+                dataDireEntity = null;
+            }
         }
         
         private void updateGameRules(Context ctx, Entity e) {
@@ -560,6 +592,11 @@ public class SimpleDemoParser {
                             killEvent.put("y", cle.getLocationY());
                         }
                         
+                        // Add assist player indices (0-9 = player slot)
+                        if (cle.hasAssistPlayers()) {
+                            killEvent.put("assist_players", cle.getAssistPlayers());
+                        }
+                        
                         killEvents.add(killEvent);
                     }
                 }
@@ -635,8 +672,110 @@ public class SimpleDemoParser {
                     // Entity access can fail, skip this sample
                 }
             }
+
+            sampleEconomyData(tick, gameClock);
         }
-        
+
+        private void sampleEconomyData(int tick, float gameClock) {
+            if (dataRadiantEntity == null || dataDireEntity == null) {
+                return;
+            }
+
+            int radiantGold = 0;
+            int direGold = 0;
+            int radiantXp = 0;
+            int direXp = 0;
+            int radiantNetWorthTotal = 0;
+            int direNetWorthTotal = 0;
+            List<Integer> radiantNetWorth = new ArrayList<>(5);
+            List<Integer> direNetWorth = new ArrayList<>(5);
+
+            for (int i = 0; i < 5; i++) {
+                String slot = String.format("%04d", i);
+
+                Object rGold = getTeamDataProperty(dataRadiantEntity, slot, "m_iTotalEarnedGold");
+                Object rXp = getTeamDataProperty(dataRadiantEntity, slot, "m_iTotalEarnedXP");
+                Object dGold = getTeamDataProperty(dataDireEntity, slot, "m_iTotalEarnedGold");
+                Object dXp = getTeamDataProperty(dataDireEntity, slot, "m_iTotalEarnedXP");
+                Object rNetWorth = getTeamDataProperty(dataRadiantEntity, slot, "m_iNetWorth");
+                Object dNetWorth = getTeamDataProperty(dataDireEntity, slot, "m_iNetWorth");
+
+                int rGoldValue = toIntOrZero(rGold);
+                int rXpValue = toIntOrZero(rXp);
+                int dGoldValue = toIntOrZero(dGold);
+                int dXpValue = toIntOrZero(dXp);
+                int rNetWorthValue = toIntOrZero(rNetWorth);
+                int dNetWorthValue = toIntOrZero(dNetWorth);
+
+                radiantGold += rGoldValue;
+                radiantXp += rXpValue;
+                direGold += dGoldValue;
+                direXp += dXpValue;
+                radiantNetWorthTotal += rNetWorthValue;
+                direNetWorthTotal += dNetWorthValue;
+                radiantNetWorth.add(rNetWorthValue);
+                direNetWorth.add(dNetWorthValue);
+            }
+
+            if (radiantGold == 0 && direGold == 0 && radiantXp == 0 && direXp == 0
+                    && radiantNetWorthTotal == 0 && direNetWorthTotal == 0) {
+                return;
+            }
+
+            Map<String, Object> sample = new HashMap<>();
+            sample.put("tick", tick);
+            sample.put("game_time", gameClock);
+            sample.put("radiant_gold", radiantGold);
+            sample.put("dire_gold", direGold);
+            sample.put("radiant_xp", radiantXp);
+            sample.put("dire_xp", direXp);
+            sample.put("gold_advantage", radiantGold - direGold);
+            sample.put("xp_advantage", radiantXp - direXp);
+            sample.put("radiant_net_worth", radiantNetWorth);
+            sample.put("dire_net_worth", direNetWorth);
+            sample.put("radiant_net_worth_total", radiantNetWorthTotal);
+            sample.put("dire_net_worth_total", direNetWorthTotal);
+            sample.put("net_worth_advantage", radiantNetWorthTotal - direNetWorthTotal);
+            economySamples.add(sample);
+        }
+
+        private Object getTeamDataProperty(Entity teamEntity, String slot, String statName) {
+            if (teamEntity == null) {
+                return null;
+            }
+
+            String[] patterns = new String[] {
+                    "m_vecDataTeam.%s.%s",
+                    "m_pPlayerData.m_vecDataTeam.%s.%s",
+                    "m_vecDataTeam.%d.%s",
+                    "m_pPlayerData.m_vecDataTeam.%d.%s"
+            };
+
+            for (String pattern : patterns) {
+                String property;
+                if (pattern.contains("%d")) {
+                    int slotIndex = Integer.parseInt(slot);
+                    property = String.format(pattern, slotIndex, statName);
+                } else {
+                    property = String.format(pattern, slot, statName);
+                }
+
+                Object value = getPropertySafe(teamEntity, property);
+                if (value != null) {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        private int toIntOrZero(Object value) {
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            return 0;
+        }
+
         private float[] getEntityPosition(Entity e) {
             try {
                 // Try CBodyComponent first (Source 2)
@@ -859,6 +998,7 @@ public class SimpleDemoParser {
         public List<Map<String, Object>> getPositionSamples() { return positionSamples; }
         public List<Map<String, Object>> getKillEvents() { return killEvents; }
         public List<Map<String, Object>> getWardEvents() { return wardEvents; }
+        public List<Map<String, Object>> getEconomySamples() { return economySamples; }
         public Map<Integer, String> getHeroMapping() { return heroMapping; }
     }
     
