@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "N:/dota2-ai-pro"
+      ]
+    },
+    "git": {
+      "command": "N:/dota2-ai-pro/harness/.venv/Scripts/python.exe",
+      "args": [
+        "-m",
+        "mcp_server_git",
+        "--repository",
+        "N:/dota2-ai-pro"
+      ]
+    }
+  }
+}

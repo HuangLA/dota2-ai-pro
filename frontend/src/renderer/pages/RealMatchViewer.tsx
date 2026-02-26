@@ -7,8 +7,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import MapViewer from '../components/map/MapViewer';
 import { HeroPosition, Ward } from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
-import backendAPI, { Match, PlaybackTimeBasis, TickData, WardsResponse } from '../api/backend';
+import backendAPI, {
+  HudHeroMetric,
+  Match,
+  PlaybackTimeBasis,
+  TickData,
+  WardsResponse,
+} from '../api/backend';
 import { getHeroByName, getHeroPortraitUrl } from '../data/heroes';
+import { ReplayEntryContext } from '../types/replayContext';
 import {
   createGameClockMapper,
   formatGameClockTime,
@@ -22,6 +29,8 @@ const DEFAULT_DURATION = 3600;
 const DEFAULT_INITIAL_GAME_CLOCK_SECONDS = -90;
 const DEFAULT_HERO_PORTRAIT_URL = '/assets/dota/heroes/default.png';
 const TEAM_HERO_COUNT = 5;
+const HUD_REQUEST_THROTTLE_MS = 500;
+const HUD_VISIBLE_ROW_COUNT = 10;
 
 interface TeamHeroPortrait {
   key: number;
@@ -168,9 +177,10 @@ function getGameClockDisplayShift(mapper: GameClockMapper, ticks: TickData[]): n
 
 export interface RealMatchViewerProps {
   initialMatchId?: number | null;
+  replayEntryContext?: ReplayEntryContext | null;
 }
 
-export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
+export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatchViewerProps) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<number | null>(initialMatchId || null);
   
@@ -191,12 +201,20 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const [hudHeroStatus, setHudHeroStatus] = useState<Record<number, HudHeroStatus>>({});
   const [isPauseActive, setIsPauseActive] = useState(false);
   const [currentDisplayGameTime, setCurrentDisplayGameTime] = useState(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
+  const [hudMetrics, setHudMetrics] = useState<HudHeroMetric[]>([]);
+  const [hudMetricsLoading, setHudMetricsLoading] = useState(false);
+  const [hudMetricsError, setHudMetricsError] = useState<string | null>(null);
   
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
   const gameClockMapperRef = useRef<GameClockMapper>(createGameClockMapper([]));
   const deathIntervalsRef = useRef<Map<number, DeathInterval[]>>(new Map());
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hudRequestAbortControllerRef = useRef<AbortController | null>(null);
+  const hudThrottleTimeoutRef = useRef<number | null>(null);
+  const pendingHudSourceTimeRef = useRef<number | null>(null);
+  const lastHudRequestAtRef = useRef(0);
+  const hudRequestSequenceRef = useRef(0);
 
   useEffect(() => {
     loadMatches();
@@ -205,6 +223,102 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   useEffect(() => {
     setSelectedMatch(initialMatchId ?? null);
   }, [initialMatchId]);
+
+  useEffect(() => {
+    if (
+      replayEntryContext?.source === 'match_database' ||
+      replayEntryContext?.source === 'replay_library'
+    ) {
+      setSelectedMatch(replayEntryContext.matchId);
+    }
+  }, [replayEntryContext]);
+
+  const replaySourceStatusText = replayEntryContext?.downloadStatus
+    ? replayEntryContext.downloadStatus
+    : null;
+
+  const clearPendingHudRequest = useCallback(() => {
+    if (hudThrottleTimeoutRef.current !== null) {
+      window.clearTimeout(hudThrottleTimeoutRef.current);
+      hudThrottleTimeoutRef.current = null;
+    }
+    pendingHudSourceTimeRef.current = null;
+    hudRequestAbortControllerRef.current?.abort();
+    hudRequestAbortControllerRef.current = null;
+  }, []);
+
+  const fetchHudMetricsForSourceTime = useCallback(async (sourceTime: number) => {
+    if (!selectedMatch) {
+      return;
+    }
+
+    const mapper = gameClockMapperRef.current;
+    const gameTime = mapper.sourceToGameClock(sourceTime);
+    if (!Number.isFinite(gameTime)) {
+      return;
+    }
+
+    hudRequestAbortControllerRef.current?.abort();
+    const requestController = new AbortController();
+    hudRequestAbortControllerRef.current = requestController;
+    const requestSequence = ++hudRequestSequenceRef.current;
+
+    setHudMetricsLoading(true);
+    setHudMetricsError(null);
+
+    const response = await backendAPI.getHudMetrics(selectedMatch, {
+      gameTime,
+      signal: requestController.signal,
+    });
+
+    if (requestController.signal.aborted || requestSequence !== hudRequestSequenceRef.current) {
+      return;
+    }
+
+    if (!response || !Array.isArray(response.heroes)) {
+      setHudMetricsError('HUD 指标请求失败，不影响主回放。');
+      setHudMetricsLoading(false);
+      return;
+    }
+
+    setHudMetrics(response.heroes.slice(0, HUD_VISIBLE_ROW_COUNT));
+    setHudMetricsError(null);
+    setHudMetricsLoading(false);
+  }, [selectedMatch]);
+
+  const scheduleHudMetricsFetch = useCallback((sourceTime: number) => {
+    if (!selectedMatch || !Number.isFinite(sourceTime)) {
+      return;
+    }
+
+    pendingHudSourceTimeRef.current = sourceTime;
+    const now = Date.now();
+    const elapsed = now - lastHudRequestAtRef.current;
+
+    if (elapsed >= HUD_REQUEST_THROTTLE_MS) {
+      lastHudRequestAtRef.current = now;
+      const immediateSourceTime = pendingHudSourceTimeRef.current;
+      pendingHudSourceTimeRef.current = null;
+      if (immediateSourceTime !== null) {
+        void fetchHudMetricsForSourceTime(immediateSourceTime);
+      }
+      return;
+    }
+
+    if (hudThrottleTimeoutRef.current !== null) {
+      return;
+    }
+
+    hudThrottleTimeoutRef.current = window.setTimeout(() => {
+      hudThrottleTimeoutRef.current = null;
+      lastHudRequestAtRef.current = Date.now();
+      const nextSourceTime = pendingHudSourceTimeRef.current;
+      pendingHudSourceTimeRef.current = null;
+      if (nextSourceTime !== null) {
+        void fetchHudMetricsForSourceTime(nextSourceTime);
+      }
+    }, HUD_REQUEST_THROTTLE_MS - elapsed);
+  }, [fetchHudMetricsForSourceTime, selectedMatch]);
 
   const loadMatches = async () => {
     setLoading(true);
@@ -237,6 +351,10 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
     setHudHeroStatus({});
     setIsPauseActive(false);
     setCurrentDisplayGameTime(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
+    setHudMetrics([]);
+    setHudMetricsError(null);
+    setHudMetricsLoading(false);
+    clearPendingHudRequest();
     allTicksRef.current = [];
     allWardsRef.current = null;
     deathIntervalsRef.current = new Map();
@@ -304,6 +422,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
         );
         setCurrentTime(gameStartSourceTime);
         updateDisplayForTime(gameStartSourceTime);
+        scheduleHudMetricsFetch(gameStartSourceTime);
       }
       
     } catch (err) {
@@ -329,8 +448,13 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      clearPendingHudRequest();
     };
-  }, [selectedMatch]);
+  }, [clearPendingHudRequest, selectedMatch]);
+
+  useEffect(() => () => {
+    clearPendingHudRequest();
+  }, [clearPendingHudRequest]);
 
   /**
    * 找到指定时间前后的两个 tick，用于插值
@@ -560,7 +684,8 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const handleTimeChange = useCallback((newTime: number) => {
     setCurrentTime(newTime);
     updateDisplayForTime(newTime);
-  }, [updateDisplayForTime]);
+    scheduleHudMetricsFetch(newTime);
+  }, [scheduleHudMetricsFetch, updateDisplayForTime]);
 
   const formatTimeDisplay = (seconds: number): string => {
     const { prev, next, t } = findTicksForInterpolation(seconds);
@@ -595,6 +720,29 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
   const getHeroLabel = (heroName: string, fallbackKey: number): string => {
     const heroData = getHeroByName(heroName || '');
     return heroData?.chineseName || heroName?.replace('npc_dota_hero_', '') || `英雄 ${fallbackKey}`;
+  };
+
+  const getHudHeroLabel = (heroName: string): string => {
+    const heroData = getHeroByName(heroName || '');
+    return heroData?.chineseName || heroName?.replace('npc_dota_hero_', '') || heroName || '未知英雄';
+  };
+
+  const getHudTeamLabel = (team: string): string => {
+    const normalized = String(team || '').toLowerCase();
+    if (normalized === 'radiant' || normalized === '2') {
+      return '天辉';
+    }
+    if (normalized === 'dire' || normalized === '3') {
+      return '夜魇';
+    }
+    return team || '未知';
+  };
+
+  const formatHudValue = (value: number): string => {
+    if (!Number.isFinite(value)) {
+      return '-';
+    }
+    return Math.round(value).toLocaleString();
   };
 
   const renderTeamPortraitStrip = (heroes: TeamHeroPortrait[], team: 'radiant' | 'dire') => {
@@ -675,6 +823,25 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
           查看解析后的 .dem 录像数据
         </p>
 
+        {replayEntryContext?.source === 'match_database' && (
+          <div className="mb-6 rounded-lg border border-cyan-500/50 bg-cyan-900/20 px-4 py-3 text-sm text-cyan-100">
+            <p>
+              来自比赛数据库 · match_id：<span className="font-mono">{replayEntryContext.matchId}</span>
+            </p>
+            {replaySourceStatusText && (
+              <p className="mt-1 text-cyan-200">
+                下载状态: <span className="font-mono">{replaySourceStatusText}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {replayEntryContext?.source === 'replay_library' && (
+          <div className="mb-6 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-100">
+            来自回放库 · match_id：<span className="font-mono">{replayEntryContext.matchId}</span>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-900/20 border border-red-700 p-4 rounded mb-6">
             <p className="text-red-400">{error}</p>
@@ -684,7 +851,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-dota-surface p-4 rounded-lg">
-              <h3 className="text-lg font-medium mb-3">选择比赛</h3>
+                 <h3 className="text-lg font-medium mb-3">选择比赛</h3>
               
               {matches.length === 0 ? (
                 <div className="text-gray-400 text-sm">
@@ -846,7 +1013,7 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                       <div className="relative overflow-hidden rounded-xl border border-slate-400/25 bg-gradient-to-b from-slate-700/55 to-slate-900/80 px-4 py-2 shadow-[0_0_0_1px_rgba(148,163,184,0.14),0_8px_24px_rgba(2,6,23,0.5)]">
                         <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-white/10" />
                         <p className="text-center text-[10px] uppercase tracking-[0.22em] text-slate-300/75">
-                          GAME TIME
+                          游戏时间
                         </p>
                         <p className="text-center font-mono text-lg font-semibold tracking-[0.1em] text-slate-100 tabular-nums">
                           {currentGameClockLabel}
@@ -875,6 +1042,73 @@ export function RealMatchViewer({ initialMatchId }: RealMatchViewerProps) {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="bg-dota-surface p-4 rounded-lg">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-lg font-medium">HUD 指标</h3>
+                {hudMetricsLoading && (
+                  <span className="text-xs text-gray-400">加载中...</span>
+                )}
+              </div>
+
+              {hudMetricsError && (
+                <p className="mb-3 rounded border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-sm text-amber-200">
+                  {hudMetricsError}
+                </p>
+              )}
+
+              {!hudMetricsError && !hudMetricsLoading && selectedMatch && hudMetrics.length === 0 && (
+                <p className="text-sm text-gray-400">当前时间没有 HUD 指标数据。</p>
+              )}
+
+              {!selectedMatch && (
+                <p className="text-sm text-gray-400">请先选择比赛以查看 HUD 指标。</p>
+              )}
+
+              {selectedMatch && hudMetrics.length > 0 && (
+                <div className="overflow-x-auto" data-testid="hud-metrics-panel">
+                  <table className="min-w-full border-collapse text-xs text-gray-200">
+                    <thead>
+                      <tr className="border-b border-slate-700 text-left text-[11px] uppercase tracking-[0.08em] text-slate-400">
+                        <th className="py-2 pr-3">英雄</th>
+                        <th className="py-2 pr-3">阵营</th>
+                        <th className="py-2 pr-3">等级</th>
+                        <th className="py-2 pr-3">K/D/A</th>
+                        <th className="py-2 pr-3">NW</th>
+                        <th className="py-2 pr-3">GPM</th>
+                        <th className="py-2 pr-3">XPM</th>
+                        <th className="py-2 pr-0">装备数</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hudMetrics.map((hero, index) => {
+                        const teamLabel = getHudTeamLabel(hero.team);
+                        const itemCount = Array.isArray(hero.items) ? hero.items.length : 0;
+                        return (
+                          <tr
+                            key={`${hero.hero}-${hero.team}-${index}`}
+                            className="border-b border-slate-800/80 last:border-b-0"
+                          >
+                            <td className="py-2 pr-3 text-slate-100">{getHudHeroLabel(hero.hero)}</td>
+                            <td className="py-2 pr-3">
+                              <span className={teamLabel === '天辉' ? 'text-emerald-300' : teamLabel === '夜魇' ? 'text-rose-300' : 'text-slate-300'}>
+                                {teamLabel}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.level)}</td>
+                            <td className="py-2 pr-3 font-mono">{`${formatHudValue(hero.kills)}/${formatHudValue(hero.deaths)}/${formatHudValue(hero.assists)}`}</td>
+                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.net_worth)}</td>
+                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.gpm)}</td>
+                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.xpm)}</td>
+                            <td className="py-2 pr-0 font-mono text-slate-300">{itemCount}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {selectedMatch && (

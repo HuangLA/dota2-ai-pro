@@ -103,6 +103,27 @@ export interface WardsResponse {
   };
 }
 
+export interface HudHeroMetric {
+  hero: string;
+  team: string;
+  level: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  net_worth: number;
+  gpm: number;
+  xpm: number;
+  items: string[];
+}
+
+export interface PlaybackHudResponse {
+  status: string;
+  match_id: number;
+  game_time: number;
+  tick: number;
+  heroes: HudHeroMetric[];
+}
+
 export interface MatchDetail {
   match_id: number;
   radiant_team: string;
@@ -286,6 +307,50 @@ class BackendAPI {
       return data;
     } catch (error) {
       console.error('Failed to fetch wards:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get playback HUD metrics for one timepoint
+   */
+  async getHudMetrics(
+    matchId: number,
+    params?: { gameTime?: number; tick?: number; signal?: AbortSignal }
+  ): Promise<PlaybackHudResponse | null> {
+    try {
+      const query = new URLSearchParams();
+
+      if (typeof params?.gameTime === 'number' && Number.isFinite(params.gameTime)) {
+        query.set('game_time', String(params.gameTime));
+      }
+      if (typeof params?.tick === 'number' && Number.isFinite(params.tick)) {
+        query.set('tick', String(Math.floor(params.tick)));
+      }
+
+      const queryString = query.toString();
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/playback/${matchId}/hud${queryString ? `?${queryString}` : ''}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: params?.signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: PlaybackHudResponse = await response.json();
+      return data;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return null;
+      }
+      console.error('Failed to fetch HUD metrics:', error);
       return null;
     }
   }

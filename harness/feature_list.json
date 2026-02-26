@@ -1,0 +1,673 @@
+[
+  {
+    "id": "BASE-REPLAY-PIPELINE",
+    "category": "baseline",
+    "description": "Upload -> parse -> storage -> playback core pipeline is stable and available for regression baseline in Phase 4.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run backend API and call GET /api/v1/matches.",
+      "Open one parsed match in RealMatchViewer and confirm heroes/wards render.",
+      "Confirm playback ticks endpoint returns non-empty data for a known match."
+    ],
+    "passes": true
+  },
+  {
+    "id": "BASE-PAUSE-AWARE-TIME",
+    "category": "baseline",
+    "description": "Pause-aware dual time basis (replay_time/game_time) is integrated in parser/backend/frontend and used as current timing foundation.",
+    "priority": "P0",
+    "verification_steps": [
+      "Open a match with known pause intervals.",
+      "Confirm game clock freezes and shows paused state while replay timeline keeps moving.",
+      "Confirm leaving pause resumes game clock progression correctly."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-1-OPENDOTA-SYNC",
+    "category": "backend",
+    "description": "Integrate OpenDota sync flow for recent matches, teams, and tournaments with incremental updates.",
+    "priority": "P0",
+    "verification_steps": [
+      "Implement sync endpoint/service and run a dry sync against OpenDota.",
+      "Verify records are inserted or updated without duplication.",
+      "Re-run sync and confirm idempotent behavior on unchanged data."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH4-1-OPENDOTA-SYNC-SLICE-1",
+    "category": "backend",
+    "description": "Minimal OpenDota connectivity slice: async recent matches fetch service + admin dry-run sync endpoint with controlled error handling.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run targeted OpenDota service tests with mocked HTTP success and timeout.",
+      "Call POST /api/v1/admin/opendota/sync/recent with dry_run=true and confirm response shape.",
+      "Run one smoke check that imports backend app or calls /health to confirm core routes still load."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-1-OPENDOTA-SYNC-SLICE-2",
+    "category": "backend",
+    "description": "Incremental persistence slice: add SQLite upsert storage and admin persist mode with inserted/updated stats.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run idempotent upsert storage tests and confirm repeated batch does not increase row count.",
+      "Call POST /api/v1/admin/opendota/sync/recent with persist=true and verify inserted/updated response fields.",
+      "Run a smoke call to /health to ensure app startup and routing still work."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-1-OPENDOTA-SYNC-SLICE-3",
+    "category": "backend",
+    "description": "Read-query slice: add paginated admin query endpoint for synced OpenDota matches with total count for match database integration.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run storage tests to verify total count plus start_time DESC pagination order.",
+      "Call GET /api/v1/admin/opendota/matches and confirm response shape status/total/limit/offset/matches.",
+      "Validate parameter bounds (for example limit=0 returns 422) and run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-1-OPENDOTA-SYNC-SLICE-4",
+    "category": "backend",
+    "description": "Harden OpenDota request compatibility by adding stable browser-like default headers and clearer controlled 403 risk-control diagnostics.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run OpenDota service tests to verify default headers are attached and 403 error message includes risk-control hint.",
+      "Run admin OpenDota sync tests to confirm endpoint behavior remains compatible.",
+      "Run one scripted call to POST /api/v1/admin/opendota/sync/recent with dry_run=true and verify stable response shape."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-2-MATCH-DATA-MODEL",
+    "category": "backend",
+    "description": "Extend Team/Tournament/Match data model and query paths for filtering by team, tournament, and time range.",
+    "priority": "P0",
+    "verification_steps": [
+      "Add schema changes and migration/update logic.",
+      "Call list/search APIs with team/tournament/time filters.",
+      "Verify returned records and pagination metadata are correct."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH4-2-MATCH-DATA-MODEL-SLICE-1",
+    "category": "backend",
+    "description": "Add filter query capability to admin OpenDota matches list endpoint by team, league, and start_time range with filtered total count.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run storage tests to verify team_id filter across radiant/dire and league+time-range filtering behavior.",
+      "Call GET /api/v1/admin/opendota/matches with new optional query params and confirm stable response shape status/total/limit/offset/matches.",
+      "Validate boundary handling for reversed time range and run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-2-MATCH-DATA-MODEL-SLICE-2",
+    "category": "backend",
+    "description": "Add OpenDota reference dimension model (teams/leagues) with idempotent persistence, reference sync endpoint, and paginated admin list APIs.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run reference storage tests to verify teams/leagues upsert idempotency and pagination behavior.",
+      "Call POST /api/v1/admin/opendota/sync/reference and confirm response shape includes fetched/inserted/updated stats for both entities.",
+      "Call GET /api/v1/admin/opendota/teams and GET /api/v1/admin/opendota/leagues to verify total/limit/offset/list structure and validate boundary 422 for team_limit=0."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-3-REPLAY-DOWNLOAD-SYSTEM",
+    "category": "backend",
+    "description": "Build replay download task system by match_id with progress tracking and retry handling.",
+    "priority": "P0",
+    "verification_steps": [
+      "Submit download tasks for valid and invalid match IDs.",
+      "Verify status transitions (pending/running/success/failed).",
+      "Trigger retry flow and confirm final state is updated correctly."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-1",
+    "category": "backend",
+    "description": "Preparation-only replay download slice: create task state, resolve OpenDota match details, build Valve replay URL, and expose admin prepare/list endpoints.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run tests for replay URL builder success and missing-fields controlled failure.",
+      "Call POST /api/v1/admin/replays/download/prepare with mocked OpenDota match details and verify prepared and failed task transitions.",
+      "Call GET /api/v1/admin/replays/download/tasks and confirm stable response shape status/total/limit/offset/tasks, then run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-2",
+    "category": "backend",
+    "description": "Minimal execute+retry download loop: task-level replay download execution with attempt tracking, controlled failure states, and admin execute/retry endpoints.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run replay download service tests covering success (stream write), HTTP failure, retry reset, and non-prepared boundary behavior.",
+      "Call POST /api/v1/admin/replays/download/execute and POST /api/v1/admin/replays/download/retry to verify controlled response shape and task status transitions.",
+      "Call GET /api/v1/admin/replays/download/tasks to verify attempt_count/download_path observability and run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-3",
+    "category": "backend",
+    "description": "Task observability and one-click trigger slice: add single-task query endpoint and by-match prepare+execute endpoint for minimal operations flow.",
+    "priority": "P0",
+    "verification_steps": [
+      "Call GET /api/v1/admin/replays/download/tasks/{task_id} for existing and missing task IDs and verify controlled payloads.",
+      "Call POST /api/v1/admin/replays/download/by-match with mocked prepare+execute success path and confirm completed task response shape.",
+      "Call POST /api/v1/admin/replays/download/by-match with prepare failure path and confirm failed task is returned directly, then run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-4",
+    "category": "backend",
+    "description": "Task filtering and error taxonomy slice: add list filter params (status/match_id) and machine-readable error_code classification for replay download failures.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run replay download storage tests to verify list_tasks status and match_id filtering with filtered total count.",
+      "Run replay download service tests to verify failed task writes machine-readable error_code values across multiple failure classes.",
+      "Call GET /api/v1/admin/replays/download/tasks with invalid status and verify 422, then run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-1",
+    "category": "backend",
+    "description": "Match database aggregation contract slice: add admin API that joins OpenDota matches with latest replay download task status for direct frontend consumption.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run match database storage tests to verify base records, team/league filters, and has_download true/false filtering with filtered total count.",
+      "Call GET /api/v1/admin/match-database and confirm response shape status/total/limit/offset/matches plus download_status/task metadata fields.",
+      "Validate boundary handling (for example limit=0 returns 422) and run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-2",
+    "category": "backend",
+    "description": "Match database display-enrichment slice: add team/league name fields and start_time range filtering for direct frontend table rendering.",
+    "priority": "P0",
+    "verification_steps": [
+      "Run match database storage tests to verify radiant/dire/league name joins and start_time range filtering with filtered total count.",
+      "Call GET /api/v1/admin/match-database with reversed start_time range and verify 422 boundary handling.",
+      "Call GET /health as smoke check to confirm app startup and route stability after contract expansion."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-3",
+    "category": "backend",
+    "description": "Match database action slice: add single-match download trigger endpoint with mode switch, controlled duplicate-downloading guard, and lightweight prepare idempotency.",
+    "priority": "P0",
+    "verification_steps": [
+      "Call POST /api/v1/admin/match-database/{match_id}/download with mode=prepare and confirm action response returns status/message/task.",
+      "Call POST /api/v1/admin/match-database/{match_id}/download with mode=prepare_and_execute and confirm final task is returned through the same action contract.",
+      "Verify controlled error when existing downloading task is present, validate invalid mode returns 422, and run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-4",
+    "category": "backend",
+    "description": "Professional-data default slice: switch recent OpenDota sync default source to pro matches and add professional-only default filter for match-database queries while preserving existing team/league/time filters and totals.",
+    "priority": "P0",
+    "verification_steps": [
+      "Call POST /api/v1/admin/opendota/sync/recent without pro_only and verify default pro-source path is used; call again with pro_only=false and verify public-source compatibility.",
+      "Call GET /api/v1/admin/match-database without professional_only and verify rows with empty leagueid are excluded by default while response contract remains stable.",
+      "Run backend tests to verify team_id/leagueid/start_time filters still work under professional_only=true and filtered total remains correct."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-1-OPENDOTA-SYNC-SLICE-5",
+    "category": "backend",
+    "description": "Enhance recent sync operability by adding optional auto reference sync (teams/leagues) with explicit diagnostics and aggregated inserted/updated stats in the same response.",
+    "priority": "P0",
+    "verification_steps": [
+      "Call POST /api/v1/admin/opendota/sync/recent with persist=true,dry_run=false,sync_reference=true and verify sync/reference chain executes and response includes reference_* inserted/updated fields.",
+      "Call POST /api/v1/admin/opendota/sync/recent with sync_reference=false and verify reference sync is skipped while recent sync remains successful.",
+      "Validate boundary handling for reference_team_limit/reference_league_limit (1..1000) and verify out-of-range returns 422."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE",
+    "category": "frontend",
+    "description": "Deliver frontend match database page with filters, pagination, and navigation to replay view.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open match database page and apply multiple filter combinations.",
+      "Verify pagination and sort behavior with backend responses.",
+      "Navigate to replay viewer from a selected record."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-1",
+    "category": "frontend",
+    "description": "Deliver minimal Match Database frontend page wired to admin match-database list/action APIs with filters, pagination, and row actions.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Match Database page from app home and confirm filter form + table + pagination are visible.",
+      "Verify GET /api/v1/admin/match-database is called with optional params team_id/leagueid/start_time_from/start_time_to/has_download/limit/offset.",
+      "Click row actions Prepare Download and Prepare + Execute, verify POST /api/v1/admin/match-database/{match_id}/download is called with mode and page refreshes with feedback.",
+      "Run frontend targeted tests for MatchDatabasePage rendering and action API triggering."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-2",
+    "category": "frontend",
+    "description": "Wire Match Database -> Replay Viewer navigation with row-level replay context and keep Match Database filters/pagination restorable in-session.",
+    "priority": "P1",
+    "verification_steps": [
+      "Click Open Replay on Match Database row and verify replay navigation callback carries match_id/download_status/download_task_id context.",
+      "On Replay Viewer, confirm lightweight source hint displays 'From Match Database' and source match_id (plus download_status when present).",
+      "Return to Match Database and verify previous filter input plus offset are restored in-session; run targeted frontend tests for navigation context and restore behavior."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-3",
+    "category": "frontend",
+    "description": "Add Match Database task-details panel with manual refresh and lightweight status polling lifecycle for replay download tasks.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Match Database and click Task Details on a row with download_task_id; verify GET /api/v1/admin/replays/download/tasks/{task_id} is called and key fields are rendered.",
+      "Use mocked timer flow to verify polling runs every 4 seconds while task status is pending/prepared/downloading and stops after completed/failed.",
+      "Run frontend targeted tests for Match Database page interactions and App navigation regression to ensure existing flow remains stable."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-4",
+    "category": "frontend",
+    "description": "Improve Match Database list readability and action feedback with download-status badges, readable local time/duration formatting, manual page refresh, and terminal task-state hinting.",
+    "priority": "P1",
+    "verification_steps": [
+      "Verify Match Database list renders status badges for at least prepared/failed and falls back to Unknown for unsupported values.",
+      "Verify start_time and task updated_at display local readable datetime while retaining raw Unix timestamp in title, and duration renders as mm:ss or hh:mm:ss.",
+      "Click Refresh Current Page and verify list request is re-triggered; run targeted frontend tests for badge rendering, formatter output, and refresh behavior."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-5",
+    "category": "frontend",
+    "description": "Add current-page batch download actions on Match Database with serial execution, run-state guard, and completion summary (total/success/failed + top failed snippets).",
+    "priority": "P1",
+    "verification_steps": [
+      "Click `Batch Prepare (Current Page)` and verify it calls POST /api/v1/admin/match-database/{match_id}/download for each actionable row on current page and refreshes list after completion.",
+      "Click `Batch Prepare + Execute (Current Page)` and verify the same per-row behavior with mode `prepare_and_execute`, while batch buttons are disabled during execution.",
+      "Verify completion feedback includes total/success/failed counts and up to 3 failed match_id+message snippets; verify both batch buttons stay disabled when current page list is empty."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-6",
+    "category": "frontend",
+    "description": "Improve batch-action observability/stability: include withTaskId summary, auto-open last batch task details with hint, and add page-level concurrency guard against duplicate batch triggers and conflicting row actions.",
+    "priority": "P1",
+    "verification_steps": [
+      "Run MatchDatabasePage frontend tests and verify batch completion summary includes withTaskId count.",
+      "Verify batch run auto-opens task details for the last processed result with task_id and renders hint 'Opened from batch result.'.",
+      "Verify duplicate batch clicks while in-flight do not trigger a second request round and row-level actions are disabled during batch execution."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-7",
+    "category": "frontend",
+    "description": "Improve batch failure operability and filter reuse with failed-items copy/export actions plus in-session match database filter presets.",
+    "priority": "P1",
+    "verification_steps": [
+      "Run MatchDatabasePage frontend tests and verify `Copy Failed Items` writes failed rows to clipboard in stable `match_id\\tmessage` format when failures exist.",
+      "Verify `Export Failed Items (.txt)` triggers Blob download flow (`URL.createObjectURL`) and is disabled when no failures are present.",
+      "Save a filter preset (`team_id/leagueid/start_time_from/start_time_to/has_download`) and apply it, then verify filter values restore and list request is re-triggered."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-8",
+    "category": "frontend",
+    "description": "Add a default-on professional-only filter in Match Database to prevent pub-match noise while keeping opt-out visibility and existing pagination/task flows unchanged.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Match Database page and verify first list request includes professional_only=true by default.",
+      "Turn off `仅职业联赛`, click 查询, and verify list request includes professional_only=false.",
+      "Click 清空 and verify `仅职业联赛` returns to default-on state; run MatchDatabasePage and App navigation frontend tests to confirm no regression."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE",
+    "category": "frontend",
+    "description": "Build team archive/profile page to show tournament participation and match history (e.g. XG).",
+    "priority": "P1",
+    "verification_steps": [
+      "Open team profile by team ID and verify identity/header data.",
+      "Verify tournament grouping and per-match rows are complete.",
+      "Confirm jump from team profile to match detail/replay works."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-1",
+    "category": "frontend",
+    "description": "Deliver minimum usable Team Profile page: filter OpenDota matches by team_id, open replay navigation, and reuse prepare-download action from match database API.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Team Profile page from home, input team_id and limit, and verify GET /api/v1/admin/opendota/matches is called with team_id filter and rows render core fields match_id/start_time/duration/radiant_team_id/dire_team_id/leagueid.",
+      "Click Open Replay on one row and verify navigation callback receives the row match_id.",
+      "Click Prepare Download on one row and verify POST /api/v1/admin/match-database/{match_id}/download is triggered with mode=prepare; run frontend targeted tests for TeamProfilePage plus existing Match Database/App navigation tests."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-2",
+    "category": "frontend",
+    "description": "Enhance Team Profile readability with league-based grouped sections, start_time sort toggle, and download-status-only view fallback-safe filtering.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Team Profile page, search by team_id, and verify matches render under league groups with headers preferring league_name then League {leagueid} then Unknown League plus per-group match counts.",
+      "Toggle sort button and verify in-group match order switches between start_time DESC (default) and ASC.",
+      "Enable `Only show with download status` and verify rows with download metadata (`download_status` or `download_task_id`) are kept while others are filtered, with graceful fallback when metadata is absent.",
+      "Run frontend targeted tests for TeamProfilePage grouping/sort/filter behavior and ensure related existing frontend tests remain passing."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-3",
+    "category": "frontend",
+    "description": "Improve Team Profile browsing/action efficiency with collapsible league groups, recent-match timestamps, and a composite Prepare + Open Replay row action.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Team Profile page and verify each league group is expanded by default, supports collapse/expand toggle, and group header shows current state plus match count.",
+      "Verify each group header shows `Recent` local datetime based on the first match of current in-group sorted result.",
+      "Click `Prepare + Open Replay` and verify POST /api/v1/admin/match-database/{match_id}/download is called with mode=prepare, then replay navigation still triggers on both prepare success and failure paths.",
+      "Run frontend targeted tests for TeamProfilePage plus existing Match Database/App navigation regression tests."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-4",
+    "category": "frontend",
+    "description": "Add Team Profile tournament summary metrics and per-league quick jump into Match Database with team+league filter context.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Team Profile page and verify top `Tournament Summary` renders total matches, deduplicated tournament count, and most recent match time from current view.",
+      "Verify each league group header shows additional stats (`matches` + average duration) and keeps existing collapse/expand behavior and row actions unchanged.",
+      "Click `Open In Match Database` on a league group and verify navigation context carries `team_id + leagueid`; verify groups missing `leagueid` present disabled jump button.",
+      "Run frontend targeted tests for TeamProfilePage summary and quick-jump context plus existing related regression tests."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-5",
+    "category": "frontend",
+    "description": "Add Team Profile league quick filter and page-level prepare action for currently visible matches with guarded execution and result summary.",
+    "priority": "P1",
+    "verification_steps": [
+      "Switch `League Quick Filter` between a specific league and `All`, and verify only the selected league group(s) are rendered while preserving existing sort/download-filter/collapse behavior.",
+      "Click `Prepare Visible Matches` and verify only currently visible matches trigger POST /api/v1/admin/match-database/{match_id}/download with mode=prepare; verify button disabled during run and when no visible items.",
+      "Verify completion feedback renders `Total/Success/Failed` summary and Team Profile data refreshes; run targeted frontend regression tests for TeamProfile + MatchDatabase + App navigation flows."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-6",
+    "category": "frontend",
+    "description": "Add Team Profile preset views for common tournament browsing and restore Team Profile view context when returning from Replay Viewer.",
+    "priority": "P1",
+    "verification_steps": [
+      "Switch Team Profile `Preset View` to `With Download Status` and `Latest 20`, and verify corresponding filter/limit behavior (`Latest 20` keeps newest-first ordering).",
+      "From Team Profile open Replay Viewer, navigate back, and verify `team_id/limit/league quick filter/sort/only-with-download` state is restored in-session.",
+      "Run targeted frontend tests for TeamProfilePage preset behavior and App Team Profile replay-return navigation restore."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-7",
+    "category": "frontend",
+    "description": "Add Team Profile visible-items operation bridge: page-level jump to Match Database with mapped filters and visible-list text export.",
+    "priority": "P1",
+    "verification_steps": [
+      "Click `Open Visible In Match Database` and verify navigation context always carries `team_id`, optionally carries `leagueid` when quick filter locks to a single league, and carries `has_download=true` when `Only show with download status` is enabled.",
+      "When no visible matches remain (for example all groups collapsed), verify open action does not navigate and shows lightweight feedback.",
+      "Click `Export Visible Matches (.txt)` and verify Blob download flow is triggered with stable per-line format `match_id\\tstart_time\\tleagueid`; verify export button stays disabled when visible list is empty.",
+      "Run frontend targeted regression tests for Team Profile page plus Match Database/App navigation suites."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-8",
+    "category": "frontend",
+    "description": "Add Team Profile latest-league focus view and visible-items composite batch action to prepare all then open first replay.",
+    "priority": "P1",
+    "verification_steps": [
+      "Enable `Focus: Latest League` and verify page locks to latest match league from current filters; disable and verify previous `League Quick Filter` behavior restores.",
+      "Click `Prepare + Open First Replay (Visible)` and verify all visible matches call `POST /api/v1/admin/match-database/{match_id}/download` with `mode=prepare`, then replay navigation fires once for the first visible match by current sorting.",
+      "Verify composite action button is disabled when visible list is empty and during in-flight execution; run targeted frontend tests for TeamProfilePage plus related App navigation suites."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-9",
+    "category": "frontend",
+    "description": "Add Team Profile league compare overview and visible-id clipboard sharing to improve league filtering and handoff efficiency.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Team Profile with multiple leagues and verify `League Compare` shows top 5 leagues by match count with metrics (`matches`, `avg duration`, `most recent match`).",
+      "Click a `League Compare` row and verify `League Quick Filter` switches to that league and visible groups update accordingly.",
+      "Click `Copy Visible Match IDs` and verify clipboard receives comma-separated visible `match_id` values in current sort order; verify button disabled when no visible matches remain.",
+      "Run frontend targeted tests for TeamProfilePage plus related App navigation suites to confirm no regressions in focus/preset/batch/export flows."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-10",
+    "category": "frontend",
+    "description": "Improve Team Profile compare/filter workflow with top-league pinning and add in-session quick snapshot save/load for key filter combinations.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open Team Profile and verify `Pin Top League` applies the current League Compare first-place league to `League Quick Filter`; confirm button is disabled when compare data is unavailable.",
+      "Save a `Quick Preset` snapshot, modify filters (`team_id/league quick filter/only-with-download`), then load snapshot and verify key fields restore and data refresh triggers when team_id is valid.",
+      "Run targeted frontend tests covering TeamProfilePage and related App navigation suites to ensure compare/focus/preset/export flows remain stable."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-11",
+    "category": "frontend",
+    "description": "Upgrade Team Profile quick preset from single-slot to in-session multi-snapshot management (max 5) with named save/load/delete and one-click clear-all.",
+    "priority": "P1",
+    "verification_steps": [
+      "Save multiple named snapshots and verify Snapshot List allows selecting a specific snapshot to load restored filters (`team_id/limit/league quick filter/sort/only-with-download/focus-latest-league`).",
+      "Save again with an existing snapshot name and verify overwrite behavior plus `updated` feedback while snapshot count remains unchanged; verify adding a 6th unique snapshot is rejected with controlled message.",
+      "Click `Clear All Snapshots` and verify snapshot list is reset/empty, `Load Snapshot` + `Delete Snapshot` are disabled, and cleared-count feedback is shown.",
+      "Run frontend targeted regression tests for TeamProfilePage plus related App navigation suites."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-12",
+    "category": "frontend",
+    "description": "Add Team Profile snapshot import/export JSON flow and League Compare multi-select apply/clear filtering for faster collaborative session analysis.",
+    "priority": "P1",
+    "verification_steps": [
+      "Click `Export Snapshots (.json)` after saving snapshots and verify Blob download flow is triggered with JSON payload containing only snapshot name + filter fields.",
+      "Import a snapshot JSON containing valid + invalid items and at least one same-name item; verify valid merge, same-name overwrite, invalid-item skip summary, and max-5 truncation feedback behavior.",
+      "In `League Compare`, select multiple league rows and click `Apply Selected Leagues`; verify visible league groups are filtered to selected keys and `Focus: Latest League` is auto-disabled; click `Clear Selection` and verify view returns to `League Quick Filter` behavior.",
+      "Run targeted frontend tests for TeamProfilePage and related App navigation suites to confirm no regressions in existing snapshot/export/batch/navigation workflows."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-13",
+    "category": "frontend",
+    "description": "Turn Team Profile compare multi-select into a batch action entrypoint with visible-scope prepare execution and add Apply Snapshot quick action alias.",
+    "priority": "P1",
+    "verification_steps": [
+      "Select multiple leagues in `League Compare`, click `Prepare Selected Leagues`, and verify only selected+currently-visible matches call `POST /api/v1/admin/match-database/{match_id}/download` with `mode=prepare` while run-state guard prevents duplicate triggers.",
+      "Verify completion feedback shows `Total/Success/Failed` summary and that `Prepare Selected Leagues` stays disabled when no selected-visible targets are present.",
+      "Select a saved snapshot and click `Apply Snapshot`; verify key fields (at least `team_id` and one filter field such as `League Quick Filter`) restore and data refresh behavior matches `Load Snapshot`.",
+      "Run frontend targeted tests for TeamProfile page and related TeamProfile/MatchDatabase app navigation suites."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-14",
+    "category": "frontend",
+    "description": "Convert Team Profile compare selections into a shareable export and a one-click replay prep list that opens only the first replay.",
+    "priority": "P1",
+    "verification_steps": [
+      "Select one or more leagues in `League Compare`, click `Export Compare Selection (.txt)`, and verify Blob download flow is triggered with line format `match_id\\tleagueid\\tstart_time`; verify button is disabled when selected-visible compare targets are empty.",
+      "Select leagues with at least 3 selected-visible matches, click `Open Compare First 3 Replays`, and verify exactly three `POST /api/v1/admin/match-database/{match_id}/download` calls with `mode=prepare` for current visible order while replay navigation occurs exactly once for the first match.",
+      "Verify completion feedback includes `prepared_count/failed_count/opened_match_id` and that action button is disabled during execution to prevent duplicate triggers.",
+      "Run targeted frontend tests for TeamProfilePage and related App navigation suites to ensure no regressions."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-15",
+    "category": "frontend",
+    "description": "Add Team Profile in-session action history panel with one-click replay support for high-frequency page actions.",
+    "priority": "P1",
+    "verification_steps": [
+      "Run TeamProfilePage frontend tests and verify page-level actions append Action History entries with action name/time/summary (including `Prepare Visible Matches`).",
+      "Click `Replay Action` on a recorded history item and verify the corresponding operation is re-triggered using recorded parameters (API calls/navigation mocked).",
+      "Verify replay safely no-ops with controlled feedback when recorded targets are no longer valid in current session data, and ensure existing TeamProfile/MatchDatabase/App navigation tests remain passing."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-16",
+    "category": "frontend",
+    "description": "Improve Team Profile Action History usability with action-type filtering and batch cleanup (visible/all) while preserving replay stability and history cap.",
+    "priority": "P1",
+    "verification_steps": [
+      "Switch `History Filter` between `All` and action types (`Prepare Visible Matches`, `Prepare Selected Leagues`, `Open Compare First 3 Replays`, `Open Visible In Match Database`) and verify only matching entries are rendered.",
+      "Click `Clear Visible History` under a non-All filter and verify only filtered entries are removed while other history records remain.",
+      "Click `Clear All History` and verify all history entries are removed with clear-count feedback; verify clear buttons are disabled when history is empty or filter has no visible items.",
+      "Run frontend targeted tests for TeamProfilePage plus related App/MatchDatabase navigation suites to confirm no regressions."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-17",
+    "category": "frontend",
+    "description": "Upgrade Team Profile Action History replay flow with visible-history batch replay, per-record last-run status tracking, and failed-record retry action.",
+    "priority": "P1",
+    "verification_steps": [
+      "Click `Replay Visible History` and verify current-filter visible history records replay in chronological order with final summary `replayed/succeeded/failed`.",
+      "Create a failed replay history record and verify `Retry` button is shown only for failed records, then click `Retry` to re-trigger the recorded action.",
+      "Verify history entries keep cap at 10 and update `lastRunStatus/lastRunAt/lastRunMessage` after replay/retry, while existing TeamProfile/App navigation tests remain passing."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-6-REALTIME-HUD-METRICS",
+    "category": "both",
+    "description": "Add real-time HUD metrics for heroes: level, items, KDA, GPM/XPM, and net worth.",
+    "priority": "P1",
+    "verification_steps": [
+      "Expose required fields through playback/HUD API contract.",
+      "Render HUD metrics in RealMatchViewer and validate updates while playing.",
+      "Spot-check several timestamps against raw tick-derived values."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH4-6-REALTIME-HUD-METRICS-SLICE-1",
+    "category": "backend",
+    "description": "Add minimal stable playback HUD contract endpoint returning per-hero snapshot metrics at a selected tick/game_time with fallback fields for unavailable stats.",
+    "priority": "P1",
+    "verification_steps": [
+      "Call GET /api/v1/playback/{match_id}/hud and verify stable payload fields status/match_id/game_time/tick/heroes with per-hero keys hero/team/level/kills/deaths/assists/net_worth/gpm/xpm/items.",
+      "Call GET /api/v1/playback/{match_id}/hud with tick (or game_time) and verify snapshot selection path plus K/D aggregation behavior for that timepoint.",
+      "Call GET /api/v1/playback/{match_id}/hud with both game_time and tick and verify controlled 422 validation, then run /health smoke check."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-6-REALTIME-HUD-METRICS-SLICE-2",
+    "category": "frontend",
+    "description": "Add minimal RealMatchViewer HUD metrics integration: time-linked frontend HUD API polling with throttling, visible panel states, and non-blocking failure handling.",
+    "priority": "P1",
+    "verification_steps": [
+      "Open RealMatchViewer and confirm HUD Metrics panel renders core columns `Hero/Team/Lvl/K-D-A/NW/GPM/XPM` plus at least one hero row when HUD API returns data.",
+      "Verify playback/drag updates trigger HUD API requests linked to current playback time with lightweight 500ms throttling and without timeline/map regressions.",
+      "Simulate HUD API failure and verify HUD error state is visible while map/timeline/main playback content remains interactive; run targeted frontend tests for success and failure states."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-FE-LOCALIZATION-SLICE-1",
+    "category": "frontend",
+    "description": "Localize this phase's newly delivered frontend surfaces to Simplified Chinese, including App entries, Match Database, Team Profile, and RealMatchViewer HUD panel plus aligned visible-text tests/docs.",
+    "priority": "P1",
+    "verification_steps": [
+      "Run frontend tests covering MatchDatabasePage, TeamProfilePage, App navigation, and RealMatchViewer HUD assertions after localization updates.",
+      "Verify all key user-visible labels/buttons/status text in the localized pages are Simplified Chinese and terminology remains consistent.",
+      "Confirm docs/user_guide_team_profile_match_database_hud.md uses the same Chinese button/panel names as the UI."
+    ],
+    "passes": true
+  },
+  {
+    "id": "PH4-7-GOLD-XP-ADVANTAGE",
+    "category": "both",
+    "description": "Implement team total net worth plus gold/XP advantage timeline chart linked with playback timeline.",
+    "priority": "P1",
+    "verification_steps": [
+      "Expose advantage series API aligned to replay timing basis.",
+      "Render synchronized chart and validate cursor/link with timeline scrub.",
+      "Verify data continuity around pauses and resume points."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH3-LEGACY-HEATMAP-UI",
+    "category": "frontend",
+    "description": "Complete frontend heatmap visualization using existing backend heatmap API.",
+    "priority": "P1",
+    "verification_steps": [
+      "Load heatmap layer for a parsed match.",
+      "Switch heatmap modes (movement/kill/death) and verify visual updates.",
+      "Validate request parameters and result rendering against API output."
+    ],
+    "passes": false
+  },
+  {
+    "id": "PH3-LEGACY-PATHS-UI",
+    "category": "frontend",
+    "description": "Complete frontend path trajectory visualization using existing backend path API.",
+    "priority": "P1",
+    "verification_steps": [
+      "Load one hero path and verify map alignment.",
+      "Toggle simplify/time-range options and verify path update behavior.",
+      "Confirm performance remains smooth during playback interaction."
+    ],
+    "passes": false
+  },
+  {
+    "id": "HARNESS-FLOW-BOOTSTRAP",
+    "category": "process",
+    "description": "Long-running harness artifacts (feature list/session checklist/init scripts/MCP examples/next task) are in place for incremental agent work.",
+    "priority": "P0",
+    "verification_steps": [
+      "Confirm harness directory includes required files.",
+      "Run init scripts to verify environment checks and startup guidance output.",
+      "Confirm session checklist and next-task docs describe update protocol for feature_list and agent-progress."
+    ],
+    "passes": true
+  }
+]

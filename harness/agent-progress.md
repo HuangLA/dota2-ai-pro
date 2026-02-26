@@ -1,0 +1,972 @@
+# Agent Progress Log
+
+This file is the handoff log for long-running agent sessions.
+
+## Entry Template
+
+- Date:
+- Session ID:
+- Owner:
+- Feature ID:
+- Status: `IN_PROGRESS` | `DONE` | `BLOCKED`
+- Scope (this session only):
+- Changes:
+  -
+- Verification:
+  -
+- Risks / Follow-ups:
+  -
+- Next suggested task:
+
+---
+
+## Entries
+
+- Date: 2026-02-17
+- Session ID: harness-bootstrap-v1
+- Owner: OpenCode (Implementation Sub-agent)
+- Feature ID: HARNESS-FLOW-BOOTSTRAP
+- Status: `DONE`
+- Scope (this session only):
+  - Create first version of long-running harness artifacts and MCP integration examples.
+- Changes:
+  - Added `harness/feature_list.json` with Phase 4 + baseline + process features.
+  - Added session handoff/checklist/init scripts/MCP docs/next task plan.
+  - Appended one log line in `PROGRESS.md` for harness introduction.
+- Verification:
+  - JSON files validated.
+  - `harness/init.sh` syntax checked and executed in non-destructive mode.
+  - `harness/init.bat` executed and printed environment guidance.
+- Risks / Follow-ups:
+  - MCP package names and config paths can vary by client version.
+  - First incremental task should start with a small OpenDota sync slice.
+- Next suggested task:
+  - PH4-1-OPENDOTA-SYNC-SLICE-1
+
+- Date: 2026-02-17
+- Session ID: ph4-1-opendota-sync-slice-1-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-1-OPENDOTA-SYNC-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Add minimal OpenDota async service + admin dry-run sync endpoint without persistence.
+- Changes:
+  - Added `backend/services/opendota_service.py` with typed async `fetch_recent_matches(limit)` and controlled timeout/network failures.
+  - Added `backend/routers/admin.py` endpoint `POST /api/v1/admin/opendota/sync/recent` returning fixed shape `status/fetched/dry_run/message`.
+  - Registered admin router in `backend/main.py` and router exports in `backend/routers/__init__.py`.
+  - Added `backend/tests/test_opendota_service.py` with mocked HTTP success + timeout cases.
+  - Updated `harness/feature_list.json` with slice entry marked `passes: true` while keeping parent feature `PH4-1-OPENDOTA-SYNC` as `passes: false`.
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_admin_opendota_sync.py` (run in `backend/`)
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; with TestClient(app) as client: r1 = client.get('/health'); r2 = client.get('/api/v1/matches'); print('health', r1.status_code); print('matches', r2.status_code)"` (run in `backend/`)
+- Risks / Follow-ups:
+  - Current slice validates connectivity only and does not persist OpenDota data yet.
+  - Endpoint currently maps upstream failures to payload `status=error` (no DB/task state yet).
+- Next suggested task:
+  - Implement PH4-1 slice-2: incremental persistence for recent matches with idempotent upsert.
+
+- Date: 2026-02-17
+- Session ID: harness-mcp-runtime-install-v1
+- Owner: OpenCode (Orchestrator)
+- Feature ID: HARNESS-FLOW-BOOTSTRAP
+- Status: `DONE`
+- Scope (this session only):
+  - Install MCP runtime dependencies in isolated project-local locations.
+- Changes:
+  - Installed Node MCP packages in `harness/package.json` (`@playwright/mcp`, `@modelcontextprotocol/server-filesystem`).
+  - Created `harness/.venv` and installed `mcp-server-git` for git MCP server.
+  - Updated `harness/mcp.servers.example.json` to use `harness/.venv/Scripts/python.exe -m mcp_server_git`.
+  - Updated `harness/README.md` install instructions to project-local commands.
+- Verification:
+  - `npm ls --prefix N:/dota2-ai-pro/harness --depth=0`
+  - `bash harness/init.sh`
+  - `powershell -Command "& 'N:\dota2-ai-pro\harness\init.bat'"`
+- Risks / Follow-ups:
+  - MCP client still needs manual config merge/restart by developer.
+- Next suggested task:
+  - PH4-1-OPENDOTA-SYNC slice-2 (persistence + idempotent upsert)
+
+- Date: 2026-02-17
+- Session ID: ph4-1-opendota-sync-slice-2-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-1-OPENDOTA-SYNC-SLICE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Add minimal SQLite persistence for OpenDota recent sync with idempotent upsert and persist-mode admin response stats.
+- Changes:
+  - Added `backend/storage/opendota_match_storage.py` with normalized SQLite upsert and `(inserted, updated)` stats.
+  - Added `opendota_matches` table/index creation in `backend/database/sqlite_db.py`.
+  - Added `backend/services/opendota_sync_service.py` to coordinate fetch + optional persistence.
+  - Extended `backend/routers/admin.py` request payload with `persist` and response payload with `inserted/updated` while preserving `status/fetched/dry_run/message`.
+  - Added `backend/tests/test_opendota_match_storage.py` and expanded `backend/tests/test_admin_opendota_sync.py` for persist success + limit validation.
+  - Updated `harness/feature_list.json` with new slice-2 item and marked `passes: true` after verification.
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_opendota_match_storage.py tests/test_admin_opendota_sync.py` (run in `backend/`) -> 8 passed.
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); response = client.get('/health'); print(response.status_code); print(response.json())"` (run in `backend/`) -> `200`, healthy payload.
+- Risks / Follow-ups:
+  - This slice persists recent matches only; teams/tournaments and broader incremental sync logic remain for later slices.
+  - `last_synced_at` refreshes on each persisted sync while `updated` counts only substantive field changes.
+- Next suggested task:
+  - Expand PH4-1 with teams/tournaments persistence and foreign-key linking to `opendota_matches`.
+
+- Date: 2026-02-17
+- Session ID: ph4-1-opendota-sync-slice-3-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-1-OPENDOTA-SYNC-SLICE-3
+- Status: `DONE`
+- Scope (this session only):
+  - Add read-only query path for persisted OpenDota matches for upcoming frontend match database integration.
+- Changes:
+  - Extended `backend/storage/opendota_match_storage.py` with `list_recent_matches(limit, offset)` returning `total` + paged records ordered by `start_time DESC`.
+  - Added `GET /api/v1/admin/opendota/matches` in `backend/routers/admin.py` with validated `limit`/`offset` and stable response shape.
+  - Expanded `backend/tests/test_opendota_match_storage.py` for total + pagination assertions.
+  - Expanded `backend/tests/test_admin_opendota_sync.py` with endpoint success shape test and `limit=0` boundary 422 test.
+  - Updated `harness/feature_list.json` with slice-3 entry and marked `passes: true` after verification.
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_match_storage.py tests/test_admin_opendota_sync.py` (run in `backend/`)
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json().get('status'))"` (run in `backend/`)
+- Risks / Follow-ups:
+  - Current list endpoint is intentionally minimal (no filters by team/league/time yet).
+  - Parent PH4-1 still requires teams/tournaments sync coverage.
+- Next suggested task:
+  - Add optional filter params to `/api/v1/admin/opendota/matches` (team/league/time window) and index support as needed.
+
+- Date: 2026-02-17
+- Session ID: ph4-2-match-data-model-slice-1-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-2-MATCH-DATA-MODEL-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Extend existing admin OpenDota matches list query with optional team/league/time filters while preserving response contract.
+- Changes:
+  - Extended `backend/routers/admin.py` `GET /api/v1/admin/opendota/matches` with optional query params `team_id`, `leagueid`, `start_time_from`, `start_time_to` and added 422 validation for reversed time range.
+  - Extended `backend/storage/opendota_match_storage.py` list query with parameterized dynamic WHERE conditions and filtered `COUNT(*)` total calculation.
+  - Added storage tests in `backend/tests/test_opendota_match_storage.py` for `team_id` filtering and `leagueid + time range` filtering.
+  - Added endpoint boundary test in `backend/tests/test_admin_opendota_sync.py` for reversed time range -> 422.
+  - Updated `docs/api_specification.md`, `PROGRESS.md`, and `harness/feature_list.json` to reflect this completed slice.
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_opendota_match_storage.py tests/test_admin_opendota_sync.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json().get('status'))"` (run in `backend/`).
+- Risks / Follow-ups:
+  - Parent `PH4-2-MATCH-DATA-MODEL` remains incomplete: team/tournament expanded schema and richer query paths still pending.
+- Next suggested task:
+  - PH4-2 slice-2: add team/tournament normalized tables and join-based query endpoints for database page consumption.
+
+- Date: 2026-02-17
+- Session ID: ph4-2-match-data-model-slice-2-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-2-MATCH-DATA-MODEL-SLICE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Add OpenDota teams/leagues reference storage model and minimal admin sync/list API path.
+- Changes:
+  - Added SQLite tables `opendota_teams` and `opendota_leagues` in `backend/database/sqlite_db.py`.
+  - Added `backend/storage/opendota_reference_storage.py` with idempotent `upsert_teams/upsert_leagues` and paginated `list_teams/list_leagues`.
+  - Extended `backend/services/opendota_service.py` with `fetch_teams` and `fetch_leagues` while keeping shared timeout/error handling.
+  - Extended `backend/services/opendota_sync_service.py` with `sync_reference_data` returning fetched/inserted/updated stats.
+  - Extended `backend/routers/admin.py` with `POST /api/v1/admin/opendota/sync/reference`, `GET /api/v1/admin/opendota/teams`, and `GET /api/v1/admin/opendota/leagues`.
+  - Added/updated tests in `backend/tests/test_opendota_reference_storage.py`, `backend/tests/test_admin_opendota_sync.py`, and `backend/tests/test_opendota_service.py`.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for this slice.
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_opendota_match_storage.py tests/test_opendota_reference_storage.py tests/test_admin_opendota_sync.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - Reference lists are currently plain pagination only; search/filter/sort fields can be added in next slice if needed.
+  - Parent PH4-2 still needs deeper Team/Tournament/Match relational model expansion beyond minimal reference dimensions.
+- Next suggested task:
+  - PH4-2 slice-3: wire reference dimensions into match query composition for richer admin/frontend database views.
+
+- Date: 2026-02-17
+- Session ID: ph4-3-replay-download-system-slice-1-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Implement replay download preparation chain (task creation + OpenDota match detail lookup + replay URL assembly) without real large file download.
+- Changes:
+  - Added SQLite table/indexes for `replay_download_tasks` in `backend/database/sqlite_db.py`.
+  - Added `backend/storage/replay_download_storage.py` with `create_prepare_task`, `mark_prepared`, `mark_failed`, and `list_tasks`.
+  - Extended `backend/services/opendota_service.py` with `fetch_match_details(match_id)` and controlled `build_replay_url(match_id, cluster, replay_salt)`.
+  - Added `backend/services/replay_download_service.py` and integrated it into `backend/routers/admin.py`.
+  - Added admin endpoints `POST /api/v1/admin/replays/download/prepare` and `GET /api/v1/admin/replays/download/tasks`.
+  - Added/updated tests in `backend/tests/test_opendota_service.py`, `backend/tests/test_admin_opendota_sync.py`, and `backend/tests/test_replay_download_storage.py`.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for this slice.
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_replay_download_storage.py tests/test_admin_opendota_sync.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - This slice only prepares URLs/tasks and does not execute the actual replay binary download yet.
+  - Retry/download worker and status `running/success` transitions remain for later PH4-3 slices.
+- Next suggested task:
+  - PH4-3 slice-2: implement actual `.dem.bz2` download executor with retry policy and task progress fields.
+
+- Date: 2026-02-17
+- Session ID: ph4-3-replay-download-system-slice-2-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Implement minimal replay download execution/retry closed loop on top of prepared tasks, without introducing background queue infrastructure.
+- Changes:
+  - Extended `replay_download_tasks` schema with `attempt_count` and `download_path`, and expanded status set to `pending/prepared/downloading/completed/failed` with in-place column upgrade guard.
+  - Extended `backend/storage/replay_download_storage.py` with `get_task`, `mark_downloading`, `mark_completed`, `increment_attempt`, and `retry_task` plus updated list/read models.
+  - Extended `backend/services/replay_download_service.py` with `execute_download(task_id)` using streamed `httpx` GET to write `backend/data/replays/{match_id}.dem.bz2` and controlled failure transitions.
+  - Extended `backend/routers/admin.py` with `POST /api/v1/admin/replays/download/execute` and `POST /api/v1/admin/replays/download/retry` while keeping existing prepare/list endpoints compatible.
+  - Added/updated tests in `backend/tests/test_replay_download_service.py`, `backend/tests/test_replay_download_storage.py`, and `backend/tests/test_admin_opendota_sync.py`.
+  - Updated `docs/api_specification.md` and `harness/feature_list.json` to reflect execute/retry API and slice completion.
+- Verification:
+  - `py -3 -m pytest tests/test_replay_download_storage.py tests/test_replay_download_service.py tests/test_admin_opendota_sync.py` (run in `backend/`) -> 24 passed.
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`) -> `200`, healthy payload.
+- Risks / Follow-ups:
+  - Current download execution is synchronous per API call and intended as minimal closed-loop; queue-based concurrency control remains future work.
+  - Retry currently supports reset from `failed/prepared`; broader scheduling policies (backoff/max-attempts) are not included in this slice.
+- Next suggested task:
+  - PH4-3 slice-3: add bounded auto-retry policy (max attempts + backoff metadata) and optional background execution mode.
+
+- Date: 2026-02-17
+- Session ID: ph4-3-replay-download-system-slice-3-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-3
+- Status: `DONE`
+- Scope (this session only):
+  - Add minimal operations observability and one-click trigger path for replay download tasks.
+- Changes:
+  - Kept `ReplayDownloadStorage.get_task(task_id)` as canonical single-task read path and added coverage to assert full observability fields.
+  - Extended `backend/services/replay_download_service.py` with `get_task(task_id)` and `prepare_and_execute(match_id)`.
+  - Extended `backend/routers/admin.py` with `GET /api/v1/admin/replays/download/tasks/{task_id}` (controlled not-found payload) and `POST /api/v1/admin/replays/download/by-match` (prepare+execute).
+  - Added/updated tests in `backend/tests/test_admin_opendota_sync.py`, `backend/tests/test_replay_download_service.py`, and `backend/tests/test_replay_download_storage.py`.
+  - Updated `docs/api_specification.md` and `harness/feature_list.json` for slice-3 API/documentation status.
+- Verification:
+  - `py -3 -m pytest tests/test_replay_download_storage.py tests/test_replay_download_service.py tests/test_admin_opendota_sync.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - `by-match` currently runs synchronously within request lifecycle; queue/background mode is still future work.
+  - Parent PH4-3 still lacks scheduling/backoff/max-attempt controls.
+- Next suggested task:
+  - PH4-3 slice-4: add bounded retry policy metadata (`max_attempts`, `next_retry_at`) and optional async worker mode.
+
+- Date: 2026-02-17
+- Session ID: ph4-3-replay-download-system-slice-4-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-4
+- Status: `DONE`
+- Scope (this session only):
+  - Improve replay download task observability with list filtering and machine-readable error classification.
+- Changes:
+  - Extended replay task schema/storage (`backend/database/sqlite_db.py`, `backend/storage/replay_download_storage.py`) with `error_code` and in-place schema upgrade guard.
+  - Extended replay task list query to support optional `status` and `match_id` filters with parameterized SQL and filtered `total`.
+  - Extended `ReplayDownloadService.execute_download` failure taxonomy with `INVALID_STATE/URL_MISSING/DOWNLOAD_TIMEOUT/HTTP_ERROR/NETWORK_ERROR/FILE_WRITE_ERROR/UNKNOWN_ERROR` and failed-task persistence of `error_code`.
+  - Extended admin route `GET /api/v1/admin/replays/download/tasks` with optional query params `status` and `match_id`; invalid `status` now returns FastAPI 422 validation.
+  - Added/updated tests in `backend/tests/test_replay_download_storage.py`, `backend/tests/test_replay_download_service.py`, and `backend/tests/test_admin_opendota_sync.py` for filtering, error_code assertions, and invalid status boundary.
+  - Updated `docs/api_specification.md` and `harness/feature_list.json` for slice-4 contract/documentation status.
+- Verification:
+  - `py -3 -m pytest tests/test_replay_download_storage.py tests/test_replay_download_service.py tests/test_admin_opendota_sync.py` (run in `backend/`) -> 35 passed.
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); response = client.get('/health'); print(response.status_code); print(response.json())"` (run in `backend/`) -> `200`, healthy payload.
+- Risks / Follow-ups:
+  - `INVALID_STATE` currently surfaces in error message for request-level failures (no task mutation); if frontend needs explicit field-level code in action response, action payload schema can be extended in next slice.
+- Next suggested task:
+  - PH4-3 slice-5: add retry policy metadata (`max_attempts`, `next_retry_at`) and scheduling/backoff controls.
+
+- Date: 2026-02-17
+- Session ID: ph4-4-match-database-page-slice-1-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Add backend aggregation query/API contract for match database page by joining OpenDota matches with latest replay download task status.
+- Changes:
+  - Added `backend/storage/match_database_storage.py` with parameterized `list_match_database(limit, offset, team_id, leagueid, has_download)` and filtered `total` count.
+  - Extended `backend/routers/admin.py` with `GET /api/v1/admin/match-database` and typed response models `status/total/limit/offset/matches`.
+  - Added tests in `backend/tests/test_match_database_storage.py` for base structure, team/league filtering, and `has_download=true/false` filtering.
+  - Extended `backend/tests/test_admin_opendota_sync.py` with new endpoint shape test and boundary validation (`limit=0 -> 422`).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for this slice.
+- Verification:
+  - `py -3 -m pytest tests/test_match_database_storage.py tests/test_admin_opendota_sync.py tests/test_replay_download_storage.py tests/test_replay_download_service.py tests/test_opendota_match_storage.py tests/test_opendota_service.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - `has_download` currently reflects whether latest task exists; if frontend needs status-level filtering (e.g. only `completed`) it can be extended in next slice.
+  - Aggregation currently returns IDs/status only; league/team names can be joined from reference tables in later slices if UI needs direct labels.
+- Next suggested task:
+  - PH4-4-MATCH-DATABASE-PAGE-SLICE-2: add optional sort/status filters and enrich list payload with team/league display names.
+
+- Date: 2026-02-17
+- Session ID: ph4-4-match-database-page-slice-2-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Extend match database aggregation contract with team/league display names and start_time range filtering for frontend-ready rendering.
+- Changes:
+  - Extended `backend/storage/match_database_storage.py` with `start_time_from/start_time_to` filters and joins to `opendota_teams/opendota_leagues` for `radiant_team_name/dire_team_name/league_name` fields.
+  - Extended `backend/routers/admin.py` `GET /api/v1/admin/match-database` with `start_time_from/start_time_to` query params and 422 validation for reversed range.
+  - Updated `MatchDatabaseRecord` response model to include optional name fields while keeping previous ID/status fields unchanged.
+  - Expanded tests in `backend/tests/test_match_database_storage.py` and `backend/tests/test_admin_opendota_sync.py` for name joins, time-range filtering, and reversed-range 422 endpoint boundary.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for this slice.
+- Verification:
+  - `py -3 -m pytest tests/test_match_database_storage.py tests/test_admin_opendota_sync.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - Name fields are nullable and depend on reference sync freshness; stale or missing reference rows will surface as null labels.
+  - Current range filter is inclusive (`>= start_time_from` and `<= start_time_to`); if frontend needs open intervals, contract can be extended later.
+- Next suggested task:
+  - PH4-4-MATCH-DATABASE-PAGE-SLICE-3: add sorting/status filters and optional full-text search by team/league names.
+
+- Date: 2026-02-17
+- Session ID: ph4-4-match-database-page-slice-3-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-3
+- Status: `DONE`
+- Scope (this session only):
+  - Add match database single-match download action endpoint for frontend trigger flow and guard duplicate active downloads.
+- Changes:
+  - Extended `backend/routers/admin.py` with `POST /api/v1/admin/match-database/{match_id}/download` and request model `mode=prepare|prepare_and_execute`.
+  - Extended `backend/services/replay_download_service.py` with `trigger_match_download_action` including `downloading` guard and `prepare` idempotent reuse of latest prepared task.
+  - Added endpoint tests in `backend/tests/test_admin_opendota_sync.py` for `mode=prepare`, `mode=prepare_and_execute`, controlled downloading block, and invalid mode `422`.
+  - Added service tests in `backend/tests/test_replay_download_service.py` for prepare-idempotent reuse and active-downloading guard behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for this slice.
+- Verification:
+  - `py -3 -m pytest tests/test_admin_opendota_sync.py tests/test_replay_download_service.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - `prepare_and_execute` mode still creates a new prepare task when no active downloading task exists; future optimization can optionally reuse latest prepared task for stricter dedup.
+  - Download execution remains synchronous in request lifecycle; background worker mode is future scope.
+- Next suggested task:
+  - PH4-4 frontend integration slice: wire match table row action button to this new endpoint and surface controlled in-progress error state.
+
+- Date: 2026-02-17
+- Session ID: ph4-4-match-database-page-slice-fe-1-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Deliver minimal Match Database frontend page wired to admin list/action APIs with filters, pagination, and row operations.
+- Changes:
+  - Added `frontend/src/renderer/pages/MatchDatabasePage.tsx` with filter form (`team_id`, `leagueid`, `start_time_from`, `start_time_to`, `has_download`), table rendering, loading/error/empty states, and pagination controls.
+  - Added `frontend/src/renderer/api/matchDatabaseService.ts` to call `GET /api/v1/admin/match-database` and `POST /api/v1/admin/match-database/{match_id}/download` (`prepare` and `prepare_and_execute`).
+  - Integrated page entry in `frontend/src/renderer/App.tsx` (home button + route switch path).
+  - Added `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` for successful render coverage and action button API trigger coverage.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` to record FE slice completion.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx --run` (run in `frontend/`) -> 2 passed.
+- Risks / Follow-ups:
+  - Match list fetch currently uses existing fetch-service style; migration to shared TanStack Query layer can be done in later FE slices when app-level provider is introduced.
+  - Parent feature `PH4-4-MATCH-DATABASE-PAGE` still has remaining scope (e.g. replay-view navigation integration) beyond this minimal slice.
+- Next suggested task:
+  - Extend Match Database page with direct jump to replay viewer once route contract is finalized.
+
+- Date: 2026-02-18
+- Session ID: ph4-4-match-database-page-slice-fe-2-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Add Match Database -> Replay Viewer navigation context handoff and in-session Match Database filter/pagination restore.
+- Changes:
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` with row-level `Open Replay` action carrying `match_id/download_status/download_task_id` context and added view-state persistence hooks for filters/appliedFilters/offset.
+  - Extended `frontend/src/renderer/App.tsx` to keep Match Database page state in-session, route replay entry from Match Database, and return from Replay Viewer back to Match Database when source context exists.
+  - Extended `frontend/src/renderer/pages/RealMatchViewer.tsx` with minimal source hint panel showing `From Match Database`, source `match_id`, and optional `download_status`.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with tests for replay context callback and restored filter+offset behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice tracking.
+- Verification:
+  - `npm run test -- src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx --run` (run in `frontend/`) -> 5 passed.
+- Risks / Follow-ups:
+  - Replay source context is currently session-memory only (App state). If cross-refresh restore is needed later, URL query or persisted store can be introduced.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE minimal frontend slice.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-1-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Deliver minimum usable Team Profile page using existing admin APIs and minimal navigation/actions.
+- Changes:
+  - Added `frontend/src/renderer/api/teamProfileService.ts` with `GET /api/v1/admin/opendota/matches` client (`team_id/limit/offset`) and typed response model for OpenDota match rows.
+  - Added `frontend/src/renderer/pages/TeamProfilePage.tsx` with `team_id + limit` filters, loading/error/empty states, table rendering of required fields (`match_id/start_time/duration/radiant_team_id/dire_team_id/leagueid`), row `Open Replay`, and row `Prepare Download` wired to existing match-database action API (`mode=prepare`).
+  - Updated `frontend/src/renderer/App.tsx` with Team Profile route branch and home entry button while preserving existing page entries.
+  - Added `frontend/src/renderer/pages/TeamProfilePage.test.tsx` covering filter-driven list fetch/render and `Open Replay` callback trigger.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 21 passed.
+- Risks / Follow-ups:
+  - Team Profile current data source is raw OpenDota match rows; team identity/header enrichment and tournament grouping remain for later slices.
+  - `Prepare Download` currently uses action API response feedback only; no task panel is shown in this slice by design.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE-SLICE-2 (team identity header + optional tournament grouping + in-session filter persistence).
+
+- Date: 2026-02-18
+- Session ID: ph4-4-match-database-page-slice-fe-7-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-7
+- Status: `DONE`
+- Scope (this session only):
+  - Add batch failed-items copy/export actions and in-session filter preset save/apply flow for Match Database page.
+- Changes:
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` with batch failed-items state and lightweight actions `Copy Failed Items` + `Export Failed Items (.txt)` using stable line format `match_id\tmessage`, clipboard API, and Blob download flow (`URL.createObjectURL` + revoke).
+  - Added minimal in-session filter presets UI/logic in `frontend/src/renderer/pages/MatchDatabasePage.tsx`: `Preset Name`, `Save Preset`, `Preset` select, and `Apply` action restoring `team_id/leagueid/start_time_from/start_time_to/has_download` and refreshing list via existing query flow.
+  - Added accessibility labels for filter/preset controls in `frontend/src/renderer/pages/MatchDatabasePage.tsx` to keep test targeting deterministic.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with coverage for clipboard write (mock), export download flow (`URL.createObjectURL` mock), and preset save/apply request restore behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 19 passed.
+- Risks / Follow-ups:
+  - Filter presets are session-memory only on the page instance; they do not persist across full app reloads by design in this slice.
+  - Failed-items export filename currently uses timestamp only; future UX slice can add custom naming if needed.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE minimal frontend slice.
+
+- Date: 2026-02-18
+- Session ID: ph4-4-match-database-page-slice-fe-5-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-5
+- Status: `DONE`
+- Scope (this session only):
+  - Add current-page batch download actions and result summary on Match Database page while keeping existing filter/pagination/task-details behavior intact.
+- Changes:
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` with batch action buttons (`Batch Prepare (Current Page)` and `Batch Prepare + Execute (Current Page)`), actionable-row filtering, serial per-row action execution, in-progress disable state, and post-run summary feedback (`Total/Success/Failed` + up to 3 failed snippets).
+  - Kept action implementation on existing single-match endpoint `POST /api/v1/admin/match-database/{match_id}/download` by reusing `matchDatabaseService.triggerDownloadAction` and refreshing current list after completion.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with coverage for batch multi-call behavior + summary rendering and empty-list batch-button disable behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` to track FE slice-5 alignment and completion.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 14 passed.
+- Risks / Follow-ups:
+  - Batch execution currently uses serial processing for predictability; if throughput becomes a concern, a bounded-concurrency mode can be introduced later without changing API contract.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE minimal frontend slice.
+
+- Date: 2026-02-18
+- Session ID: ph4-4-match-database-page-slice-fe-4-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-4
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Match Database list readability and action/task feedback without changing existing API contracts or route behaviors.
+- Changes:
+  - Added `frontend/src/renderer/pages/matchDatabaseFormatting.ts` to centralize download status badge metadata and reusable formatters (`status`, local datetime, `mm:ss`/`hh:mm:ss`).
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` with status badge rendering, raw timestamp tooltips, duration formatter usage, row-level action success highlight (2.5s), and `Refresh Current Page` button.
+  - Extended task details panel behavior to show explicit terminal hint `Final state: auto refresh stopped.` when task reaches `completed/failed`.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with status badge variant coverage, formatter output assertions, refresh-button request trigger assertion, and terminal-state hint coverage.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` to record FE slice-4 alignment and completion.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 12 passed.
+- Risks / Follow-ups:
+  - Datetime display currently uses local machine timezone (by design); cross-timezone visual consistency should rely on raw Unix tooltip when comparing environments.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE minimal frontend slice.
+
+- Date: 2026-02-18
+- Session ID: ph4-4-match-database-page-slice-fe-3-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-3
+- Status: `DONE`
+- Scope (this session only):
+  - Add replay download task-details observability panel on Match Database page with manual refresh and lightweight auto-refresh lifecycle.
+- Changes:
+  - Extended `frontend/src/renderer/api/matchDatabaseService.ts` with `getDownloadTaskDetails(taskId)` for `GET /api/v1/admin/replays/download/tasks/{task_id}`.
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` with row-level `Task Details` action (enabled only when `download_task_id` exists), right-side details panel, loading/error handling, manual refresh, and 4-second polling for `pending/prepared/downloading` that auto-stops on `completed/failed`.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with task-details render coverage and mocked-timer polling lifecycle assertions (including terminal `completed` and `failed` stop behavior).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` to track FE slice-3 alignment and completion.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Task details panel currently uses fixed 4-second interval; if operations load increases, add adaptive backoff and visibility-aware polling in later slices.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE minimal frontend slice.
+
+- Date: 2026-02-18
+- Session ID: ph4-4-match-database-page-slice-fe-6-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-6
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Match Database batch-action observability and concurrency safety with minimal page-level changes.
+- Changes:
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` batch flow to include `withTaskId` summary count, auto-open task details for the last processed batch result with `task_id`, and show lightweight hint `Opened from batch result.` when auto-opened.
+  - Added page-level concurrency protections during batch execution: row-level `Prepare/Prepare+Execute/Open Replay/Task Details` actions are disabled, duplicate batch triggers are guarded with in-flight ref, and refresh click during batch shows consistent deferred-refresh message.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with coverage for auto-open hint behavior and duplicate batch-click guard, while updating batch summary assertions for `withTaskId`.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for FE slice-6 alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Auto-open picks the last processed result carrying `task_id`; if future batch mode introduces concurrency, selection rule should remain explicit (processed order vs completed order).
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE minimal frontend slice.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-2-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Team Profile page readability with league grouping, sort/filter controls, and minimal regression tests.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` to group matches by `leagueid` (fallback `Unknown League`), show per-group match counts, and keep existing row actions.
+  - Added Team Profile controls for `Only show with download status` and `Sort: Newest First/Oldest First` (default `start_time` DESC) with graceful fallback when no download metadata is available.
+  - Extended `frontend/src/renderer/api/teamProfileService.ts` match record typing with optional frontend-consumable fields (`league_name/download_status/download_task_id/replay_url`) for resilient filtering/group titles.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for league grouping (two groups), sort toggle behavior, and download-status-only filter behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` to track slice completion and frontend-aligned behavior.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 24 passed.
+- Risks / Follow-ups:
+  - Team Profile download-status filtering currently relies on optional fields present in list payload; if backend omits those fields entirely, toggle falls back to show-all by design in this slice.
+- Next suggested task:
+  - PH4-5-TEAM-PROFILE-PAGE-SLICE-3: add team identity header enrichment (name/tag/logo from reference endpoints) and optional in-session Team Profile filter persistence.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-3-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-3
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Team Profile browsing/action efficiency for larger match lists without changing backend API contracts.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with per-league collapse/expand (default expanded), group-header state/count indicators, and group-header `Recent` timestamp based on the first match of current sorted results.
+  - Added row-level composite action `Prepare + Open Replay` in `frontend/src/renderer/pages/TeamProfilePage.tsx`: calls `POST /api/v1/admin/match-database/{match_id}/download` with `mode=prepare`, then always navigates to replay and emits lightweight feedback (`prepared`/`prepare failed`).
+  - Preserved existing Team Profile interactions (`Open Replay`, `Prepare Download`, grouping/sort/filter behavior) while layering new slice-3 behavior.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for group collapse/expand behavior and `Prepare + Open Replay` success/failure paths (prepare API call + replay navigation trigger).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-3 tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 27 passed.
+- Risks / Follow-ups:
+  - `Prepare + Open Replay` uses a short delayed navigation to surface feedback before page switch; if future routing moves feedback to a global toast layer, delay can be removed.
+- Next suggested task:
+  - PH4-5 next slice: team identity header enrichment (team/tag/logo) while keeping current grouped interaction model.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-4-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-4
+- Status: `DONE`
+- Scope (this session only):
+  - Add tournament-level summary and league quick-jump flow from Team Profile to Match Database without changing backend contracts.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with top `Tournament Summary` cards (total matches, deduplicated leagues, most recent match time) computed from current filtered view.
+  - Extended Team Profile league group headers with per-group stats (`matches` + average duration using shared formatter) and added `Open In Match Database` action.
+  - Wired Team Profile quick jump to App-level Match Database view state in `frontend/src/renderer/App.tsx`, passing `team_id + leagueid` as initial/applied filters and preserving existing restore mechanism.
+  - Kept existing Team Profile behaviors intact (`Only show with download status`, sort toggle, group collapse, `Open Replay`, `Prepare Download`, `Prepare + Open Replay`).
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for summary/stat rendering and `Open In Match Database` navigation context + disabled state on missing league id.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-4 tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Team Profile -> Match Database quick jump currently uses in-session state handoff only; full reload/deeplink persistence would require URL-level query sync in a later slice.
+- Next suggested task:
+  - PH4-5 next slice: team identity header enrichment (team/tag/logo) while keeping tournament summary and quick-jump workflow stable.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-5-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-5
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Team Profile multi-tournament browsing/action efficiency with league quick filter and visible-items prepare flow.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with `League Quick Filter` options sourced from current fetched results (deduplicated by league group key), including `All` reset and compatibility with existing sort/download-status filtering/group collapse behavior.
+  - Added page-level action `Prepare Visible Matches` in `frontend/src/renderer/pages/TeamProfilePage.tsx` that serially calls existing match-database action API (`mode=prepare`) for currently visible (expanded) grouped matches, with in-flight disable guard and empty-visible disable behavior.
+  - Added completion summary feedback (`Total/Success/Failed`) and post-run Team Profile data refresh after visible prepare batch.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for league quick filter switching (`league -> all`) and visible prepare behavior (only visible rows trigger API + summary + refresh call).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-5 tracking and frontend-aligned behavior notes.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 31 passed.
+- Risks / Follow-ups:
+  - `Prepare Visible Matches` currently executes serially for predictable feedback and stable action ordering; if throughput pressure appears later, bounded concurrency can be introduced with the same API contract.
+- Next suggested task:
+  - PH4-5 next slice: team identity/header enrichment (team name/tag/logo) while preserving current grouped quick-filter + visible-action workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-6-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-6
+- Status: `DONE`
+- Scope (this session only):
+  - Add Team Profile preset views and replay-return context restoration without backend contract changes.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with `Preset View` controls (`All Matches` / `With Download Status` / `Latest 20`) and auto-apply behavior; `Latest 20` forces `limit=20` + newest-first order, and preset switching is guarded from invalid requests when no active team context exists.
+  - Added Team Profile in-session view-state contract (`initialViewState` + `onViewStateChange`) in `frontend/src/renderer/pages/TeamProfilePage.tsx` and wired App-level state hosting in `frontend/src/renderer/App.tsx`.
+  - Extended replay navigation context to include Team Profile source via `frontend/src/renderer/types/replayContext.ts`, and updated `frontend/src/renderer/pages/RealMatchViewer.tsx` and `frontend/src/renderer/pages/MatchDatabasePage.tsx` typing accordingly.
+  - Updated replay back-navigation in `frontend/src/renderer/App.tsx` so Team Profile -> Replay -> Back returns to Team Profile with restored `team_id/limit/league quick filter/sort/only-with-download`.
+  - Expanded tests in `frontend/src/renderer/pages/TeamProfilePage.test.tsx` for `With Download Status` and `Latest 20` preset behavior, and added `frontend/src/renderer/App.teamProfileNavigation.test.tsx` for Team Profile replay-return restore flow.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 16 passed.
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`) -> 34 passed.
+- Risks / Follow-ups:
+  - Team Profile context restore remains session-memory only (same as Match Database restore pattern); full refresh/deeplink persistence would require URL/store persistence in a later slice.
+- Next suggested task:
+  - PH4-5 next slice: team identity/header enrichment (team name/tag/logo) on top of stable preset + cross-page restore flow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-7-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-7
+- Status: `DONE`
+- Scope (this session only):
+  - Add Team Profile page-level visible-items jump/export capabilities to shorten analysis-to-action workflow.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with `Open Visible In Match Database` action, mapping current visible state to Match Database context (`team_id` required, optional `leagueid`, optional `has_download=true`).
+  - Added lightweight no-op feedback when visible list is empty before open-jump action.
+  - Added `Export Visible Matches (.txt)` action in `frontend/src/renderer/pages/TeamProfilePage.tsx` using Blob download flow with stable line format `match_id\tstart_time\tleagueid`.
+  - Extended `frontend/src/renderer/App.tsx` Team Profile -> Match Database handoff to accept optional `leagueId` and `hasDownload` mapping into Match Database initial filter state.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with new coverage for visible-jump context mapping and visible-export flow + empty-visible disable.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-7 tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 19 passed.
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`) -> 37 passed.
+- Risks / Follow-ups:
+  - Visible export uses browser anchor-click download in jsdom tests, which logs a non-blocking `navigation` not-implemented warning.
+  - Team Profile -> Match Database handoff remains in-session memory state (no URL persistence), consistent with existing page-restore strategy.
+- Next suggested task:
+  - PH4-5 next slice: Team Profile identity header enrichment (team name/tag/logo) while preserving visible-actions workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-8-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-8
+- Status: `DONE`
+- Scope (this session only):
+  - Add latest-league focus mode and visible-items composite batch action on Team Profile without changing backend APIs.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with `Focus: Latest League` toggle that auto-locks visible groups to the latest-match league from current filtered results and temporarily overrides `League Quick Filter` while preserving quick-filter state for restore on disable.
+  - Added Team Profile page-level composite action `Prepare + Open First Replay (Visible)` that serially triggers `POST /api/v1/admin/match-database/{match_id}/download` (`mode=prepare`) for visible rows, then opens one replay for the first visible row by current sorting, with in-flight guard/disable and summary (`Total/Success/Failed/Opened Replay`).
+  - Kept existing row actions/export/cross-page behavior intact and aligned visible-list ordering to current filtered/sort order for deterministic "first replay" selection.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for latest-league focus lock+restore behavior and composite visible action (multi-prepare calls + single replay navigation).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-8 alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - `Focus: Latest League` currently computes latest by max `start_time` in current filtered list; when all rows have missing `start_time`, focus falls back to the first filtered row's league key.
+- Next suggested task:
+  - PH4-5 next slice: team identity/header enrichment (name/tag/logo) while preserving current focus and visible batch workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-9-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-9
+- Status: `DONE`
+- Scope (this session only):
+  - Add Team Profile league comparison overview and visible-id copy sharing without introducing new APIs.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with a lightweight `League Compare` block (top 5 leagues by match count from current result aggregation) showing `matches`, `avg duration`, and `most recent match`.
+  - Added quick action on each compare row to apply the corresponding `League Quick Filter` directly (and exit `Focus: Latest League` lock for predictable quick-filter behavior).
+  - Added page-level `Copy Visible Match IDs` action in `frontend/src/renderer/pages/TeamProfilePage.tsx` that copies current visible `match_id` list in sorted order as comma-separated text.
+  - Added controlled clipboard failure handling (`clipboard unavailable`/write failure) with lightweight feedback and no uncaught exception.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for league compare top-5 rendering + quick-filter click behavior and visible-id copy action (clipboard call + empty-visible disable).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-9 tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Clipboard action relies on browser environment support (`navigator.clipboard`); unsupported environments now receive controlled feedback but no fallback textarea copy path is introduced in this slice.
+- Next suggested task:
+  - PH4-5 next slice: Team Profile identity/header enrichment (team name/tag/logo) while preserving league compare and visible-share workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-10-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-10
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Team Profile compare/filter linkage and add in-session quick snapshot save/load for frequently reused filter combinations.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` League Compare header with `Pin Top League`, which applies compare top-1 league into `League Quick Filter` when available and disables safely when compare top is unavailable.
+  - Added Team Profile `Quick Preset` controls (`Save Snapshot` / `Load Snapshot`) to capture and restore in-session filter combo (`team_id/limit/league quick filter/sort/only-with-download/focus-latest-league`) without persistence.
+  - Extended Team Profile view-state contract with `quickSnapshot` so snapshot survives in-session page navigation (Team Profile -> Replay -> Back) while still remaining memory-only.
+  - Added frontend feedback messages for quick snapshot save/load and top-league pin action.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for `Pin Top League` quick-filter linkage and quick snapshot save->mutate->load restore behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-10 tracking.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Quick Snapshot currently provides a single recent slot by design; multi-slot naming/history can be added later if workflow complexity grows.
+- Next suggested task:
+  - PH4-5 next slice: Team Profile identity/header enrichment (team name/tag/logo) while preserving compare-linkage and quick snapshot workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-11-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-11
+- Status: `DONE`
+- Scope (this session only):
+  - Upgrade Team Profile quick preset from single snapshot to named multi-snapshot management (max 5) with clear-all cleanup action.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` quick preset state model to `quickSnapshots[] + selectedSnapshotName + snapshotNameInput` and preserved existing in-session restore contract via `TeamProfileViewState`.
+  - Added UI controls in `frontend/src/renderer/pages/TeamProfilePage.tsx`: `Snapshot Name` input, `Save Snapshot`, `Snapshot List` select, `Load Snapshot`, `Delete Snapshot`, and `Clear All Snapshots`.
+  - Implemented controlled snapshot behaviors in `frontend/src/renderer/pages/TeamProfilePage.tsx`: same-name overwrite with `updated` feedback, max-5 unique snapshot guard, delete-selected, and clear-all summary feedback with dropdown/button reset.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with targeted coverage for multi-snapshot save/load-by-name, overwrite semantics, and clear-all reset/disable behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-11 tracking and frontend alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Snapshot names are currently case-sensitive and session-memory only; cross-restart persistence or case-insensitive normalization can be added in later UX slices if needed.
+- Next suggested task:
+  - PH4-5 next slice: Team Profile identity/header enrichment (team name/tag/logo) while preserving multi-snapshot workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-12-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-12
+- Status: `DONE`
+- Scope (this session only):
+  - Add Team Profile snapshot JSON import/export and League Compare multi-select apply/clear filtering while preserving existing quick-filter/focus/batch flows.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` snapshot area with `Export Snapshots (.json)` and `Import Snapshots (.json)` actions (hidden file input), JSON payload transfer model, and import validation/merge logic with same-name overwrite, invalid-item skip summary, and max-5 truncation guard.
+  - Extended Team Profile view-state contract in `frontend/src/renderer/pages/TeamProfilePage.tsx` with compare multi-select state (`selectedLeagueCompareKeys/appliedLeagueCompareFilterKeys`) to preserve in-session behavior.
+  - Extended `League Compare` block in `frontend/src/renderer/pages/TeamProfilePage.tsx` with per-row checkbox selection plus `Apply Selected Leagues` and `Clear Selection`; applying selected leagues now auto-disables `Focus: Latest League` and filters visible groups to selected leagues, while clear restores quick-filter behavior.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for snapshot export+import merge/overwrite flow and League Compare multi-select apply/clear filtering behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-12 tracking/alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Snapshot import currently accepts either top-level array or `{ snapshots: [...] }` payload for compatibility; if stricter schema enforcement is required later, import parser can be hardened to one canonical shape.
+  - Multi-select filtering scope follows current `League Compare` Top-5 list; if wider league selection is needed later, compare source can be expanded beyond Top-5 without backend API change.
+- Next suggested task:
+  - PH4-5 next slice: Team Profile identity/header enrichment (team name/tag/logo) while preserving snapshot transfer and compare multi-select workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-13-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-13
+- Status: `DONE`
+- Scope (this session only):
+  - Add compare-selection batch prepare action and snapshot quick-apply alias on Team Profile while keeping existing guards and cross-page flows stable.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with `Prepare Selected Leagues`, which batch-calls `POST /api/v1/admin/match-database/{match_id}/download` (`mode=prepare`) for League Compare selected leagues intersected with current visible matches; added in-flight guard/disable and `Total/Success/Failed` summary feedback.
+  - Extended Team Profile snapshot controls with `Apply Snapshot` (same apply logic as `Load Snapshot`) and unified snapshot apply path so both labels stay behavior-compatible while giving page-action naming.
+  - Kept existing Team Profile guards intact: no invalid refresh request when snapshot team_id is empty, and no compare batch requests when selection set is empty.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for selected-leagues batch prepare scope+summary and `Apply Snapshot` restore behavior (`team_id` + quick filter + refresh call).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-13 tracking/alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`) -> 31 passed.
+- Risks / Follow-ups:
+  - Compare batch scope intentionally follows current visible set (includes group collapse state). If later product direction expects hidden/collapsed groups to be included, selection scope rule should be expanded explicitly.
+- Next suggested task:
+  - PH4-5 next slice: Team Profile identity/header enrichment (team name/tag/logo) while preserving compare batch and snapshot-apply workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-14-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-14
+- Status: `DONE`
+- Scope (this session only):
+  - Add Team Profile compare-selection export and one-click first-3 replay prep/open flow with run-state guards.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with compare-scoped page actions `Export Compare Selection (.txt)` and `Open Compare First 3 Replays` based on `League Compare` selected leagues intersected with current visible matches.
+  - Added compare export format `match_id\tleagueid\tstart_time` (Blob download), empty-target disable behavior, and controlled export feedback.
+  - Added first-3 replay flow: serial `mode=prepare` calls for top 3 compare-selected visible matches, single replay navigation for first match only, completion feedback `prepared_count/failed_count/opened_match_id`, and in-flight duplicate-trigger guard.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with targeted coverage for compare export download/disable behavior and first-3 replay prepare + single-navigation behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-14 tracking/alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Compare actions are intentionally scoped to currently visible rows (respecting collapse/filter state); if product later expects hidden rows included, selection scope rule should be revised explicitly.
+- Next suggested task:
+  - PH4-5 follow-up slice: team identity/header enrichment (team name/tag/logo) while preserving compare export and replay-list actions.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-15-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-15
+- Status: `DONE`
+- Scope (this session only):
+  - Add Team Profile in-session action history and replay capability for high-frequency page actions without backend API changes.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` with `Action History` panel (max 10 session entries) showing action name, execution time, summary, and per-entry `Replay Action`.
+  - Added action tracking for required page-level actions: `Prepare Visible Matches`, `Prepare Selected Leagues`, `Open Compare First 3 Replays`, and `Open Visible In Match Database`.
+  - Implemented replay flow in `frontend/src/renderer/pages/TeamProfilePage.tsx` to re-trigger action types using recorded parameters with existing run-state guards; added controlled feedback when replay targets are unavailable.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for action-history append after page-level action and replay-triggered API re-execution.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-15 alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`) -> 53 passed.
+- Risks / Follow-ups:
+  - Action history is session-memory only and intentionally resets on full page/app reload.
+  - Replay currently validates against current loaded Team Profile rows; if cross-team replay is needed later, a broader in-session cache would be required.
+- Next suggested task:
+  - PH4-5 next slice: team identity/header enrichment (team name/tag/logo) while preserving action-history replay workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-16-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-16
+- Status: `DONE`
+- Scope (this session only):
+  - Improve Team Profile Action History usability with action-type filter and batch cleanup controls.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` Action History panel with `History Filter` (`All` + 4 tracked action types), plus `Clear Visible History` and `Clear All History` buttons.
+  - Added filtered-history rendering path so filter only affects display and keeps underlying session history intact unless clear actions are triggered.
+  - Implemented batch cleanup behavior with deterministic count feedback (`Cleared <n> visible history record(s).` / `Cleared <n> history record(s).`) and disable guards for empty/no-visible states.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for history filter display behavior and clear visible/all behavior (including disabled-state checks when no filter hits).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-16 tracking/alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Action History remains session-memory only and resets on full reload by design.
+- Next suggested task:
+  - PH4-5 follow-up slice: team identity/header enrichment (team name/tag/logo) while preserving action-history filter/cleanup workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-5-team-profile-page-slice-17-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-5-TEAM-PROFILE-PAGE-SLICE-17
+- Status: `DONE`
+- Scope (this session only):
+  - Upgrade Team Profile Action History replay flow to support filtered batch replay and failed-item retry with per-record run-state tracking.
+- Changes:
+  - Extended `frontend/src/renderer/pages/TeamProfilePage.tsx` Action History record model with `lastRunStatus/lastRunAt/lastRunMessage` and updated write paths to persist run results for page actions.
+  - Added page-level `Replay Visible History` in `frontend/src/renderer/pages/TeamProfilePage.tsx`, replaying current-filter visible records in chronological order with in-flight guard and completion summary (`replayed/succeeded/failed`).
+  - Added failed-record `Retry` button in `frontend/src/renderer/pages/TeamProfilePage.tsx` that reuses replay logic and updates the same history record run status/time/message after retry.
+  - Expanded `frontend/src/renderer/pages/TeamProfilePage.test.tsx` with coverage for visible-history batch replay summary and failed-entry retry behavior.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice-17 tracking/alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - Action History replay remains session-memory only and depends on current loaded Team Profile rows for target validation.
+- Next suggested task:
+  - PH4-5 follow-up slice: team identity/header enrichment (team name/tag/logo) while preserving action-history replay/retry workflow.
+
+- Date: 2026-02-18
+- Session ID: ph4-6-realtime-hud-metrics-slice-1-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-6-REALTIME-HUD-METRICS-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - Add minimal stable backend HUD metrics contract for playback at a single timepoint without changing storage schema.
+- Changes:
+  - Extended `backend/routers/playback.py` with `GET /api/v1/playback/{match_id}/hud` supporting optional `game_time` or `tick` (mutually exclusive, both -> 422).
+  - Implemented snapshot resolution on positions data (latest by default, or nearest <= requested point) and stable hero payload fields `hero/team/level/kills/deaths/assists/net_worth/gpm/xpm/items`.
+  - Added kill/death aggregation from `kills.parquet` up to selected `game_time`; kept stable fallbacks for unavailable metrics (`assists=0`, `net_worth/gpm/xpm=0`, `items=[]`).
+  - Added `backend/tests/test_playback_hud_contract.py` covering endpoint base contract, tick query path, and invalid dual-parameter 422 boundary.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice tracking and API contract notes.
+- Verification:
+  - `py -3 -m pytest tests/test_playback_hud_contract.py tests/test_playback_pause_contract.py` (run in `backend/`).
+  - `py -3 -c "from fastapi.testclient import TestClient; from main import app; client = TestClient(app); r = client.get('/health'); print(r.status_code); print(r.json())"` (run in `backend/`).
+- Risks / Follow-ups:
+  - `items/net_worth/gpm/xpm/assists` currently fallback values; later PH4-6 slices should wire parser/storage stats for full-fidelity HUD.
+  - K/D aggregation currently relies on kills event hero-name normalization; if parser naming expands, normalization rules may need extension.
+- Next suggested task:
+  - PH4-6-REALTIME-HUD-METRICS-SLICE-2: add true net worth/GPM/XPM/items source integration and assists derivation.
+
+- Date: 2026-02-18
+- Session ID: ph4-6-realtime-hud-metrics-slice-2-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-6-REALTIME-HUD-METRICS-SLICE-2
+- Status: `DONE`
+- Scope (this session only):
+  - Add minimal frontend HUD panel integration in RealMatchViewer using existing playback HUD API contract.
+- Changes:
+  - Extended `frontend/src/renderer/api/backend.ts` with typed HUD response models and `getHudMetrics(matchId, { gameTime|tick })` request helper.
+  - Extended `frontend/src/renderer/pages/RealMatchViewer.tsx` with non-blocking HUD metrics flow: time-linked requests against `GET /api/v1/playback/{match_id}/hud?game_time=...`, 500ms throttle, stale-request abort, and fallback-safe error handling.
+  - Added `HUD Metrics` panel to `RealMatchViewer` showing required columns (`Hero/Team/Lvl/K/D/A/NW/GPM/XPM`) plus `items` count and visible loading/empty/error states.
+  - Added `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` covering HUD success render path (columns + hero row) and failure path (error shown while map/timeline remain rendered).
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for slice tracking/alignment.
+- Verification:
+  - `npm run test -- src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run` (run in `frontend/`) -> 60 passed.
+- Risks / Follow-ups:
+  - HUD request currently uses `game_time` mapping with 500ms throttled polling; if future slices require tighter precision around pause boundaries, request trigger can be upgraded to tick-based lookup without changing panel contract.
+  - `items/net_worth/gpm/xpm` fidelity still depends on backend slice-1 fallback values and should be upgraded once parser/storage exposes full stat sources.
+- Next suggested task:
+  - PH4-6 next slice: wire true items/net_worth/gpm/xpm/assists data sources and add value-spot-check tests against known timestamps.
+
+- Date: 2026-02-19
+- Session ID: ph4-fe-localization-slice-1-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-FE-LOCALIZATION-SLICE-1
+- Status: `DONE`
+- Scope (this session only):
+  - 将本阶段新增前端页面入口与页面内用户可见文案统一中文化，并同步可见文本断言与用户文档。
+- Changes:
+  - 本地化 `frontend/src/renderer/App.tsx` 新增入口/返回按钮文案（比赛数据库、战队档案）。
+  - 本地化 `frontend/src/renderer/pages/MatchDatabasePage.tsx`（筛选、按钮、状态提示、空态、表头、任务侧栏文案）。
+  - 本地化 `frontend/src/renderer/pages/TeamProfilePage.tsx`（预设、快照、联赛对比、操作历史、表头、反馈提示等）。
+  - 本地化 `frontend/src/renderer/pages/RealMatchViewer.tsx` HUD 面板与来源提示文案。
+  - 同步更新可见文本断言：`frontend/src/renderer/pages/MatchDatabasePage.test.tsx`、`frontend/src/renderer/pages/TeamProfilePage.test.tsx`、`frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx`、`frontend/src/renderer/App.matchDatabaseNavigation.test.tsx`、`frontend/src/renderer/App.teamProfileNavigation.test.tsx`。
+  - 更新 `docs/user_guide_team_profile_match_database_hud.md`、`PROGRESS.md`、`harness/feature_list.json`。
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --run`（在 `frontend/` 目录执行）。
+- Risks / Follow-ups:
+  - Team Profile 文案与测试断言耦合较多，后续若继续调整 UI 文案需同步更新 aria-label 与文本断言。
+- Next suggested task:
+  - PH4-6 HUD 后续切片：在中文化基线上补充高保真指标（装备明细/净资产与曲线联动）并统一术语。
+
+- Date: 2026-02-19
+- Session ID: ph4-1-opendota-sync-slice-4-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-1-OPENDOTA-SYNC-SLICE-4
+- Status: `DONE`
+- Scope (this session only):
+  - 修复 OpenDota 同步可能出现的 403 风控拦截问题，统一请求头并增强错误提示可诊断性。
+- Changes:
+  - 扩展 `backend/services/opendota_service.py`：为 OpenDota 请求新增统一默认 headers（浏览器样式 `User-Agent`、`Accept: application/json`、`Accept-Language`）。
+  - 让 `_fetch_list_endpoint` 与 `_fetch_dict_endpoint` 使用同一套 headers 构造逻辑，避免端点间行为漂移。
+  - 增强 403 受控错误信息，追加“可能被上游风控拦截，请检查 User-Agent/网络环境”诊断提示，同时保持其他 HTTP 状态错误文案兼容。
+  - 扩展 `backend/tests/test_opendota_service.py`：新增默认 headers 断言与 403 文案断言。
+  - 更新 `PROGRESS.md`、`harness/feature_list.json`、`harness/agent-progress.md` 记录本切片完成状态。
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_admin_opendota_sync.py`（在 `backend/` 目录执行） -> 39 passed。
+  - `py -3 -c "import asyncio, json; from fastapi.testclient import TestClient; from main import app; from routers import admin; admin.opendota_service.fetch_recent_matches = lambda limit: asyncio.sleep(0, result=[{'match_id': 9001}, {'match_id': 9002}]); client = TestClient(app); response = client.post('/api/v1/admin/opendota/sync/recent', json={'dry_run': True, 'limit': 2}); print('status_code=', response.status_code); print(json.dumps(response.json(), ensure_ascii=False))"`（在 `backend/` 目录执行）。
+- Risks / Follow-ups:
+  - 运行环境若配置 SOCKS 代理但缺少 `socksio`，真实外网请求仍可能在 HTTP 层初始化前失败；本切片已提升 403 场景可观测性，但代理依赖问题需单独处理。
+- Next suggested task:
+  - 在部署环境补齐 `httpx[socks]` 或禁用无效 SOCKS 代理变量后，进行一次直连 OpenDota 的端到端 dry-run 验证。
+
+- Date: 2026-02-19
+- Session ID: ph4-4-match-database-page-slice-4-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-4
+- Status: `DONE`
+- Scope (this session only):
+  - 默认切换 OpenDota recent 同步源到职业赛事，并修复比赛数据库默认筛选导致 team/league 筛选不可用的根因。
+- Changes:
+  - 扩展 `backend/services/opendota_service.py` 新增 `fetch_pro_matches(limit)`，并保留 `fetch_recent_matches(limit)` 作为 public 来源。
+  - 扩展 `backend/services/opendota_sync_service.py` `sync_recent_matches(..., pro_only)`：默认 `pro_only=true` 走 `/proMatches`，`pro_only=false` 兼容走 `/publicMatches`。
+  - 扩展 `backend/routers/admin.py`：`POST /api/v1/admin/opendota/sync/recent` 请求模型新增 `pro_only`（默认 true）；`GET /api/v1/admin/match-database` 新增 `professional_only`（默认 true）。
+  - 扩展 `backend/storage/match_database_storage.py`：默认追加 `leagueid` 非空过滤（`professional_only=true`）并保持 `team_id/leagueid/has_download/start_time` 与 total 统计语义一致。
+  - 更新测试 `backend/tests/test_opendota_service.py`、`backend/tests/test_admin_opendota_sync.py`、`backend/tests/test_match_database_storage.py` 覆盖 pro 默认路径、public 兼容路径、professional_only 默认过滤与过滤组合行为。
+  - 更新 `docs/api_specification.md`、`harness/feature_list.json`、`PROGRESS.md` 记录本切片。
+- Verification:
+  - `py -3 -m pytest tests/test_opendota_service.py tests/test_match_database_storage.py tests/test_admin_opendota_sync.py`（在 `backend/` 目录执行）。
+- Risks / Follow-ups:
+  - `professional_only=true` 通过 `leagueid IS NOT NULL AND leagueid > 0` 判断职业赛事；若未来上游存在合法职业赛 `leagueid=0` 的特殊口径，需要同步调整判定规则。
+- Next suggested task:
+  - PH4-2 后续切片可增加 league tier 联动过滤（如仅 `professional/premium`）并评估是否需要前端显式暴露 `professional_only` 开关。
+
+- Date: 2026-02-19
+- Session ID: ph4-4-match-database-page-slice-fe-8-v1
+- Owner: OpenCode (Frontend Specialist)
+- Feature ID: PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-8
+- Status: `DONE`
+- Scope (this session only):
+  - Add a visible professional-only filter toggle on Match Database page and align request defaults with backend `professional_only` contract.
+- Changes:
+  - Extended `frontend/src/renderer/api/matchDatabaseService.ts` `MatchDatabaseListParams` with `professional_only?: boolean` and query passthrough.
+  - Extended `frontend/src/renderer/pages/MatchDatabasePage.tsx` filter state with `professionalOnly` (default `true`), always includes `professional_only` in list requests, adds visible `仅职业联赛` toggle, updates page description copy, and keeps `清空` reset default as enabled.
+  - Added backward-compatible filter normalization in `frontend/src/renderer/pages/MatchDatabasePage.tsx` for older in-session view state missing `professionalOnly`.
+  - Updated `frontend/src/renderer/App.tsx` Team Profile -> Match Database prefilled filter handoff to include `professionalOnly: true`.
+  - Expanded `frontend/src/renderer/pages/MatchDatabasePage.test.tsx` with assertions for default `professional_only=true`, toggle-off `professional_only=false`, and clear-reset behavior.
+  - Updated `docs/user_guide_team_profile_match_database_hud.md`, `PROGRESS.md`, and `harness/feature_list.json` for this slice.
+- Verification:
+  - `npm run test -- src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/App.matchDatabaseNavigation.test.tsx --run` (run in `frontend/`).
+- Risks / Follow-ups:
+  - `仅职业联赛` currently uses backend `leagueid`-based professional classification; if backend criteria evolves (for example league tiers), front-end label/help text should stay synchronized.
+- Next suggested task:
+  - Validate real-data UX with a mixed pro/public dataset and consider adding a lightweight tooltip describing the backend professional-match classification rule.
+
+- Date: 2026-02-19
+- Session ID: ph4-1-opendota-sync-slice-5-v1
+- Owner: OpenCode (Backend Engineer)
+- Feature ID: PH4-1-OPENDOTA-SYNC-SLICE-5
+- Status: `DONE`
+- Scope (this session only):
+  - Add minimal auto reference sync chaining to recent sync endpoint and expose aggregated reference insert/update stats in the same response.
+- Changes:
+  - Extended `backend/routers/admin.py` `OpenDotaSyncRecentRequest` with `sync_reference` (default `true`) and `reference_team_limit/reference_league_limit` (`1..1000`).
+  - Extended `backend/routers/admin.py` `OpenDotaSyncRecentResponse` with `reference_teams_inserted/reference_teams_updated/reference_leagues_inserted/reference_leagues_updated` while keeping existing fields.
+  - Updated recent sync route flow: when `persist=true && dry_run=false && sync_reference=true`, it now calls `sync_reference_data(...)` automatically and aggregates reference upsert stats into response fields.
+  - Updated recent sync `message` to always include explicit diagnostic marker `reference_sync=executed|skipped` with reason.
+  - Expanded `backend/tests/test_admin_opendota_sync.py` for auto reference sync execution path, `sync_reference=false` non-call path, and `reference_team_limit/reference_league_limit` boundary validation.
+  - Updated `docs/api_specification.md`, `harness/feature_list.json`, and `PROGRESS.md` for this slice.
+- Verification:
+  - `py -3 -m pytest tests/test_admin_opendota_sync.py` (run in `backend/`).
+- Risks / Follow-ups:
+  - Current chain treats reference sync as part of recent sync request lifecycle; if reference fetch latency becomes noticeable, a queued/background mode may be needed later.
+- Next suggested task:
+  - Add optional `sync_reference_mode=sync|async` once download/sync orchestration enters higher-concurrency operations.
