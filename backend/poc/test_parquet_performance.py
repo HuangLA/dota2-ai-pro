@@ -155,7 +155,7 @@ def run_poc_tests() -> dict:
     print("POC Test: Parquet Read/Write Performance")
     print("=" * 60)
     
-    output_dir = Path(__file__).parent.parent.parent / 'data' / 'poc_test'
+    output_dir = Path(__file__).parent.parent / 'data' / 'poc_test'
     output_file = output_dir / 'test_ticks.parquet'
     
     results = {}

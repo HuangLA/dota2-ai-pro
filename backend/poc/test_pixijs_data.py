@@ -118,7 +118,7 @@ def generate_stress_test_data(
 
 def run_data_generation():
     """Generate all test data files."""
-    output_dir = Path(__file__).parent.parent.parent / 'data' / 'poc_test'
+    output_dir = Path(__file__).parent.parent / 'data' / 'poc_test'
     output_dir.mkdir(parents=True, exist_ok=True)
     
     print("=" * 60)

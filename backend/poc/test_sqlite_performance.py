@@ -229,7 +229,7 @@ def run_poc_tests() -> dict:
     print("POC Test: SQLite Metadata Performance")
     print("=" * 60)
     
-    db_path = Path(__file__).parent.parent.parent / 'data' / 'poc_test' / 'test.db'
+    db_path = Path(__file__).parent.parent / 'data' / 'poc_test' / 'test.db'
     
     # Clean up previous test
     if db_path.exists():

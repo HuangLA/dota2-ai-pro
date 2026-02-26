@@ -150,7 +150,7 @@ def main() -> None:
     print("-" * 70)
     
     # Save results
-    output_dir = Path(__file__).parent.parent.parent / "data" / "poc_test"
+    output_dir = Path(__file__).parent.parent / "data" / "poc_test"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     results_file = output_dir / "poc_results.json"
