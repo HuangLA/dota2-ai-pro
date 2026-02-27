@@ -1,7 +1,7 @@
 # API 规范文档 - True Sight
 
-> 版本: v1.1 (implementation-aligned)
-> 最后更新: 2026-02-18
+> 版本: v1.2 (implementation-aligned)
+> 最后更新: 2026-02-26
 > 基础 URL: `http://127.0.0.1:8000`
 
 本文件以当前代码实现为准（`backend/routers/*.py`），并明确区分：
@@ -62,7 +62,7 @@
 | GET | `/api/v1/playback/{match_id}/wards` | DONE | 眼位事件与摘要 |
 | GET | `/api/v1/playback/{match_id}/heroes` | DONE | 对局英雄与阵营 |
 | GET | `/api/v1/playback/{match_id}/hud` | DONE | 实时 HUD 指标快照（`game_time` 或 `tick` 二选一；都不传取最新） |
-| GET | `/api/v1/playback/{match_id}/smokes` | STUB | 返回空数组 + 说明 |
+| GET | `/api/v1/playback/{match_id}/smokes` | DONE | 最小可用：支持 `start_time/end_time/team` 过滤，返回 `smokes/time_basis/pause_intervals/summary` |
 
 以下历史接口当前未实现：
 - `GET /api/v1/playback/{match_id}/timeline` (`NOT_IMPLEMENTED`)
@@ -153,7 +153,16 @@ FormData:
 - 顶层固定字段：`status/match_id/game_time/tick/heroes`。
 - `heroes[]` 固定包含：`hero/team/level/kills/deaths/assists/net_worth/gpm/xpm/items`。
 - 当前最小切片中 `items/net_worth/gpm/xpm` 采用稳定 fallback（`[]`/`0`），后续切片将接入真实解析值。
-- `kills/deaths` 由 `kills.parquet` 在目标时间点之前累计得到；`assists` 当前固定为 `0`。
+- `kills/deaths` 由 `kills.parquet` 在目标时间点之前累计得到；`assists` 由 `assist_players` 映射累计（缺失时回退为 `0`）。
+
+### 3.3.1 查询 Smokes
+
+`GET /api/v1/playback/{match_id}/smokes?start_time=-90&end_time=600&team=2`
+
+响应要点：
+- 顶层固定字段：`match_id/smokes/time_basis/pause_intervals/summary`。
+- `summary.source` 表示来源（`parquet` 或 `metadata`）。
+- 当缺少 smoke 数据时返回空数组，但结构保持稳定（非占位 note 文本）。
 
 ### 3.4 查询 matches
 
