@@ -3,15 +3,22 @@
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from typing import Mapping
 
 from main import app
 from routers import playback
 
 
 class _FakeHudParquetStorage:
-    def __init__(self, positions: pd.DataFrame, kills: pd.DataFrame) -> None:
+    def __init__(
+        self,
+        positions: pd.DataFrame,
+        kills: pd.DataFrame,
+        metadata: Mapping[str, object] | None = None,
+    ) -> None:
         self._positions = positions
         self._kills = kills
+        self._metadata = dict(metadata) if metadata is not None else {"game_start_time": 0.0}
 
     def match_exists(self, match_id: int) -> bool:
         return match_id == 1
@@ -23,14 +30,14 @@ class _FakeHudParquetStorage:
         return self._kills.copy()
 
     def get_metadata(self, match_id: int):
-        return {"game_start_time": 0.0}
+        return self._metadata
 
 
 def _build_positions() -> pd.DataFrame:
     radiant = ["axe", "crystal_maiden", "juggernaut", "earthshaker", "lina"]
     dire = ["lion", "juggernaut", "slark", "phantom_assassin", "tiny"]
 
-    rows: list[dict] = []
+    rows: list[dict[str, object]] = []
     handle = 100
     for team, heroes in ((2, radiant), (3, dire)):
         for hero in heroes:
@@ -92,6 +99,38 @@ def client_with_hud_storage(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     return TestClient(app)
 
 
+@pytest.fixture
+def client_with_hud_assist_storage(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    metadata = {
+        "game_start_time": 0.0,
+        "players": [
+            {"hero_name": "npc_dota_hero_axe"},
+            {"hero_name": "npc_dota_hero_crystal_maiden"},
+            {"hero_name": "npc_dota_hero_juggernaut"},
+            {"hero_name": "npc_dota_hero_earthshaker"},
+            {"hero_name": "npc_dota_hero_lina"},
+            {"hero_name": "npc_dota_hero_lion"},
+            {"hero_name": "npc_dota_hero_juggernaut"},
+            {"hero_name": "npc_dota_hero_slark"},
+            {"hero_name": "npc_dota_hero_phantom_assassin"},
+            {"hero_name": "npc_dota_hero_tiny"},
+        ],
+    }
+    kills = pd.DataFrame(
+        [
+            {
+                "time": -88.0,
+                "killer": "npc_dota_hero_axe",
+                "victim": "npc_dota_hero_lion",
+                "assist_players": "[1, 3]",
+            }
+        ]
+    )
+    fake_storage = _FakeHudParquetStorage(_build_positions(), kills, metadata=metadata)
+    monkeypatch.setattr(playback, "parquet_storage", fake_storage)
+    return TestClient(app)
+
+
 def test_hud_endpoint_returns_stable_hero_contract(client_with_hud_storage: TestClient) -> None:
     response = client_with_hud_storage.get("/api/v1/playback/1/hud")
 
@@ -133,6 +172,44 @@ def test_hud_endpoint_supports_tick_query_path(client_with_hud_storage: TestClie
     assert axe["kills"] == 1
     assert axe["deaths"] == 0
     assert lina["deaths"] == 1
+
+
+def test_hud_endpoint_game_time_before_first_sample_clamps_to_earliest_tick(
+    client_with_hud_storage: TestClient,
+) -> None:
+    response = client_with_hud_storage.get("/api/v1/playback/1/hud", params={"game_time": -999.0})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tick"] == 30
+    assert payload["game_time"] == -89.0
+
+
+def test_hud_endpoint_game_time_after_last_sample_clamps_to_latest_tick(
+    client_with_hud_storage: TestClient,
+) -> None:
+    response = client_with_hud_storage.get("/api/v1/playback/1/hud", params={"game_time": 999.0})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tick"] == 60
+    assert payload["game_time"] == -88.0
+
+
+def test_hud_endpoint_maps_assists_from_assist_players(
+    client_with_hud_assist_storage: TestClient,
+) -> None:
+    response = client_with_hud_assist_storage.get("/api/v1/playback/1/hud", params={"tick": 60})
+
+    assert response.status_code == 200
+    payload = response.json()
+    crystal_maiden = next(hero for hero in payload["heroes"] if hero["hero"] == "npc_dota_hero_crystal_maiden")
+    earthshaker = next(hero for hero in payload["heroes"] if hero["hero"] == "npc_dota_hero_earthshaker")
+    lion = next(hero for hero in payload["heroes"] if hero["hero"] == "npc_dota_hero_lion")
+
+    assert crystal_maiden["assists"] == 1
+    assert earthshaker["assists"] == 1
+    assert lion["deaths"] == 1
 
 
 def test_hud_endpoint_rejects_game_time_and_tick_together(client_with_hud_storage: TestClient) -> None:
