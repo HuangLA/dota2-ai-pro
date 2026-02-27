@@ -7,10 +7,11 @@ It handles subprocess communication and converts JSON output to typed dataclasse
 
 import asyncio
 import json
+import locale
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from .models import (
     ParseResult,
@@ -22,6 +23,17 @@ from .models import (
     WardEvent,
     EconomySample,
 )
+
+
+def _decode_bytes(raw: bytes) -> str:
+    """Decode subprocess bytes robustly across Windows locales."""
+    preferred = locale.getpreferredencoding(False) or "utf-8"
+    for encoding in ("utf-8", preferred, "gbk"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
 
 
 class ClarityParserError(Exception):
@@ -119,21 +131,22 @@ class ClarityParser:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
-                text=True,
                 timeout=self.timeout
             )
+            stdout_str = _decode_bytes(result.stdout)
+            stderr_str = _decode_bytes(result.stderr)
             
             # Parse JSON from stdout
-            if not result.stdout.strip():
+            if not stdout_str.strip():
                 raise ClarityParserError(
-                    f"No output from parser. stderr: {result.stderr[:500]}"
+                    f"No output from parser. stderr: {stderr_str[:500]}"
                 )
             
             try:
-                data = json.loads(result.stdout)
+                data = json.loads(stdout_str)
             except json.JSONDecodeError as e:
                 raise ClarityParserError(
-                    f"Failed to parse JSON output: {e}\nOutput: {result.stdout[:500]}"
+                    f"Failed to parse JSON output: {e}\nOutput: {stdout_str[:500]}"
                 )
             
             return self._convert_to_result(data)
@@ -179,11 +192,12 @@ class ClarityParser:
                 timeout=self.timeout
             )
             
-            stdout_str = stdout.decode("utf-8")
+            stdout_str = _decode_bytes(stdout)
+            stderr_str = _decode_bytes(stderr)
             
             if not stdout_str.strip():
                 raise ClarityParserError(
-                    f"No output from parser. stderr: {stderr.decode('utf-8')[:500]}"
+                    f"No output from parser. stderr: {stderr_str[:500]}"
                 )
             
             try:
@@ -202,7 +216,7 @@ class ClarityParser:
                 raise
             raise ClarityParserError(f"Parser failed: {e}")
     
-    def _convert_to_result(self, data: dict) -> ParseResult:
+    def _convert_to_result(self, data: dict[str, Any]) -> ParseResult:
         """Convert raw JSON data to typed ParseResult."""
         
         # Check for error

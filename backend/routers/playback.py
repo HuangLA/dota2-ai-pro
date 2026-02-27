@@ -683,11 +683,8 @@ async def get_wards(
     meta = parquet_storage.get_metadata(match_id)
     wards_df = parquet_storage.get_wards(match_id, ward_type=ward_type, team=team)
 
-    fallback_positions_df: Optional[pd.DataFrame] = None
-    has_game_time = has_non_null_game_time(wards_df)
-    if _coerce_float((meta or {}).get("game_start_time")) is None or not has_game_time:
-        fallback_positions_df = parquet_storage.get_positions(match_id)
-        has_game_time = has_game_time or has_non_null_game_time(fallback_positions_df)
+    fallback_positions_df = parquet_storage.get_positions(match_id)
+    has_game_time = has_non_null_game_time(wards_df) or has_non_null_game_time(fallback_positions_df)
 
     offset_seconds, clock_zero_source = resolve_offset_seconds(meta, wards_df, fallback_positions_df)
     pause_intervals = resolve_pause_intervals(meta, wards_df, fallback_positions_df)
@@ -938,22 +935,108 @@ async def get_advantage(
 
 
 @router.get("/{match_id}/smokes")
-async def get_smokes(match_id: int) -> dict:
-    """
-    Get smoke of deceit usage data.
-    
-    Note: Smoke detection is not yet implemented in the parser.
-    This endpoint returns an empty list until smoke detection is added.
-    """
-    # Check if match exists
+async def get_smokes(
+    match_id: int,
+    start_time: Optional[float] = Query(None, description="Start game_time in seconds"),
+    end_time: Optional[float] = Query(None, description="End game_time in seconds"),
+    team: Optional[int] = Query(None, description="Filter by team (2=Radiant, 3=Dire)"),
+) -> dict[str, object]:
+    """Get smoke events for a match (Parquet-first, metadata fallback)."""
     if not parquet_storage.match_exists(match_id):
         raise HTTPException(
             status_code=404,
-            detail=f"Match {match_id} not found or not parsed"
+            detail=f"Match {match_id} not found or not parsed",
         )
-    
+
+    meta = parquet_storage.get_metadata(match_id)
+    smokes_path = parquet_storage.get_match_dir(match_id) / "smokes.parquet"
+    if smokes_path.exists():
+        smokes_df = pd.read_parquet(smokes_path)
+    else:
+        smokes_df = pd.DataFrame()
+    source = "parquet"
+
+    if smokes_df.empty:
+        source = "metadata"
+        meta_smokes = (meta or {}).get("smokes")
+        if isinstance(meta_smokes, list):
+            smokes_df = pd.DataFrame(meta_smokes)
+
+    positions_df = parquet_storage.get_positions(match_id)
+    has_game_time = has_non_null_game_time(smokes_df) or has_non_null_game_time(positions_df)
+    offset_seconds, clock_zero_source = resolve_offset_seconds(meta, smokes_df, positions_df)
+    pause_intervals = resolve_pause_intervals(meta, smokes_df, positions_df)
+    time_basis = build_time_basis(
+        meta,
+        has_game_time,
+        offset_seconds,
+        clock_zero_source,
+        pause_intervals,
+    )
+
+    smokes: list[dict[str, object]] = []
+    if not smokes_df.empty:
+        if team is not None and "team" in smokes_df.columns:
+            smokes_df = smokes_df[smokes_df["team"] == team]
+
+        for _, row in smokes_df.iterrows():
+            tick_raw = row.get("tick") if "tick" in row.index else None
+            tick_value = _coerce_float(tick_raw)
+            tick_int = int(tick_value) if tick_value is not None else None
+            game_time_value = _coerce_float(row.get("game_time"))
+            if game_time_value is None and tick_int is not None:
+                game_time_value = tick_to_seconds(tick_int) - offset_seconds
+
+            if game_time_value is None:
+                continue
+            if start_time is not None and game_time_value < start_time:
+                continue
+            if end_time is not None and game_time_value > end_time:
+                continue
+
+            item: dict[str, object] = {
+                "game_time": game_time_value,
+                "time": game_time_value + offset_seconds,
+            }
+            if tick_int is not None:
+                item["tick"] = tick_int
+            team_value = _coerce_float(row.get("team"))
+            if team_value is not None:
+                team_int = int(team_value)
+                item["team"] = team_int
+                item["team_name"] = "Radiant" if team_int == 2 else "Dire"
+
+            type_value = row.get("type")
+            if isinstance(type_value, str) and type_value.strip():
+                item["type"] = type_value
+
+            start_tick_value = _coerce_float(row.get("start_tick"))
+            if start_tick_value is not None:
+                item["start_tick"] = int(start_tick_value)
+
+            end_tick_value = _coerce_float(row.get("end_tick"))
+            if end_tick_value is not None:
+                item["end_tick"] = int(end_tick_value)
+
+            duration_value = _coerce_float(row.get("duration_seconds"))
+            if duration_value is not None:
+                item["duration_seconds"] = duration_value
+
+            smokes.append(item)
+
+    smokes.sort(key=lambda x: float(cast(float, x["game_time"])))
+
     return {
         "match_id": match_id,
-        "smokes": [],
-        "note": "Smoke detection not yet implemented"
+        "smokes": smokes,
+        "time_basis": time_basis,
+        "pause_intervals": pause_intervals,
+        "summary": {
+            "total": len(smokes),
+            "source": source,
+            "teams": {
+                "radiant": len([s for s in smokes if s.get("team") == 2]),
+                "dire": len([s for s in smokes if s.get("team") == 3]),
+            },
+        },
     }

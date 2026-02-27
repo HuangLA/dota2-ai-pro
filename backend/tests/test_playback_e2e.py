@@ -84,6 +84,57 @@ class TestTicksEndpoint:
         assert payload["ticks"] == []
         assert payload["total_samples"] == 0
 
+    def test_two_sample_matches_have_negative_game_time(self, client: TestClient) -> None:
+        """Both sample matches include negative game_time before timeline zero."""
+        for match_id in (MATCH_ID_PRIMARY, MATCH_ID_SECONDARY):
+            response = client.get(f"/api/v1/playback/{match_id}/ticks")
+            assert response.status_code == 200
+            payload = as_object_dict(cast(object, response.json()))
+            ticks = as_dict_list(cast(object, payload["ticks"]))
+            game_times = [cast(float, tick["game_time"]) for tick in ticks]
+            assert min(game_times) < 0.0
+
+    def test_two_sample_matches_have_near_zero_alignment(self, client: TestClient) -> None:
+        """Both sample matches expose at least one sample close to game_time zero."""
+        for match_id in (MATCH_ID_PRIMARY, MATCH_ID_SECONDARY):
+            response = client.get(f"/api/v1/playback/{match_id}/ticks")
+            assert response.status_code == 200
+            payload = as_object_dict(cast(object, response.json()))
+            ticks = as_dict_list(cast(object, payload["ticks"]))
+            game_times = [abs(cast(float, tick["game_time"])) for tick in ticks]
+            assert min(game_times) <= 1.0
+
+    def test_pause_intervals_consistent_across_ticks_wards_and_advantage(self, client: TestClient) -> None:
+        """Primary sample keeps pause intervals aligned across major playback endpoints."""
+        ticks_response = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/ticks")
+        wards_response = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/wards")
+        advantage_response = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/advantage")
+
+        assert ticks_response.status_code == 200
+        assert wards_response.status_code == 200
+        assert advantage_response.status_code == 200
+
+        ticks_payload = as_object_dict(cast(object, ticks_response.json()))
+        wards_payload = as_object_dict(cast(object, wards_response.json()))
+        advantage_payload = as_object_dict(cast(object, advantage_response.json()))
+
+        ticks_pause = as_object_list(cast(object, ticks_payload["pause_intervals"]))
+        assert ticks_pause, "Expected primary sample to include pause intervals"
+        assert as_object_list(cast(object, wards_payload["pause_intervals"])) == ticks_pause
+        ticks_time_basis = as_object_dict(cast(object, ticks_payload["time_basis"]))
+        wards_time_basis = as_object_dict(cast(object, wards_payload["time_basis"]))
+        advantage_time_basis = as_object_dict(cast(object, advantage_payload["time_basis"]))
+        assert as_object_list(cast(object, ticks_time_basis["pause_intervals"])) == ticks_pause
+        assert as_object_list(cast(object, wards_time_basis["pause_intervals"])) == ticks_pause
+        assert as_object_list(cast(object, advantage_time_basis["pause_intervals"])) == ticks_pause
+
+    def test_secondary_sample_reports_no_pause_intervals(self, client: TestClient) -> None:
+        """Secondary sample acts as no-pause control case for pause metadata."""
+        ticks_response = client.get(f"/api/v1/playback/{MATCH_ID_SECONDARY}/ticks")
+        assert ticks_response.status_code == 200
+        payload = as_object_dict(cast(object, ticks_response.json()))
+        assert as_object_list(cast(object, payload["pause_intervals"])) == []
+
 
 class TestEventsEndpoint:
     """Regression tests for GET /api/v1/playback/{match_id}/events."""
@@ -222,6 +273,26 @@ class TestHudEndpoint:
         response = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/hud", params={"tick": -1})
         assert response.status_code == 422
 
+    def test_hud_snapshot_stable_for_pause_game_time(self, client: TestClient) -> None:
+        """HUD lookup remains stable when requested at a paused game_time value."""
+        ticks_response = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/ticks")
+        assert ticks_response.status_code == 200
+        ticks_payload = as_object_dict(cast(object, ticks_response.json()))
+        pause_intervals = as_dict_list(cast(object, ticks_payload["pause_intervals"]))
+        assert pause_intervals, "Expected pause interval in primary sample"
+
+        paused_game_time = cast(float, pause_intervals[0]["game_time"])
+        hud_a = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/hud", params={"game_time": paused_game_time})
+        hud_b = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/hud", params={"game_time": paused_game_time})
+
+        assert hud_a.status_code == 200
+        assert hud_b.status_code == 200
+
+        payload_a = as_object_dict(cast(object, hud_a.json()))
+        payload_b = as_object_dict(cast(object, hud_b.json()))
+        assert payload_a["tick"] == payload_b["tick"]
+        assert payload_a["game_time"] == payload_b["game_time"]
+
 
 class TestAdvantageEndpoint:
     """Regression tests for GET /api/v1/playback/{match_id}/advantage."""
@@ -281,12 +352,26 @@ class TestAdvantageEndpoint:
 class TestSmokesEndpoint:
     """Regression tests for GET /api/v1/playback/{match_id}/smokes."""
 
-    def test_smokes_stub_response_shape(self, client: TestClient) -> None:
-        """Returns empty smokes array with stub note."""
+    def test_smokes_response_shape(self, client: TestClient) -> None:
+        """Returns normalized smokes payload shape with time contract metadata."""
         response = client.get(f"/api/v1/playback/{MATCH_ID_PRIMARY}/smokes")
         assert response.status_code == 200
 
         payload = as_object_dict(cast(object, response.json()))
         assert payload["match_id"] == MATCH_ID_PRIMARY
-        assert payload["smokes"] == []
-        assert isinstance(payload["note"], str)
+        assert isinstance(payload["smokes"], list)
+        assert isinstance(payload["time_basis"], dict)
+        assert isinstance(payload["pause_intervals"], list)
+        assert isinstance(payload["summary"], dict)
+
+        summary = as_object_dict(cast(object, payload["summary"]))
+        assert {"total", "source", "teams"}.issubset(summary.keys())
+        assert isinstance(summary["total"], int)
+        assert summary["source"] in {"parquet", "metadata"}
+        teams = as_object_dict(cast(object, summary["teams"]))
+        assert {"radiant", "dire"}.issubset(teams.keys())
+
+    def test_smokes_missing_match_returns_404(self, client: TestClient) -> None:
+        """Returns 404 for unknown match_id."""
+        response = client.get(f"/api/v1/playback/{MISSING_MATCH_ID}/smokes")
+        assert response.status_code == 404

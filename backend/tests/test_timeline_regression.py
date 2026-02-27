@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +12,10 @@ import pytest
 from parsers.models import PositionSample, WardEvent
 from routers.playback import build_time_basis, resolve_game_time, resolve_offset_seconds
 from storage.parquet_storage import ParquetStorage
+
+
+REPO_MATCH_SAMPLES = [8674716612, 8689321714]
+REPO_MATCHES_DIR = Path(__file__).resolve().parents[1] / "data" / "matches"
 
 
 @pytest.fixture
@@ -343,3 +348,66 @@ class TestOffsetResolution:
         )
         assert offset == pytest.approx(0.0)
         assert source == "fallback"
+
+
+class TestTwoSampleTimeAxisRegression:
+    """SN-3 regression checks on two parsed sample matches."""
+
+    @pytest.mark.parametrize("match_id", REPO_MATCH_SAMPLES)
+    def test_sample_has_negative_game_time_before_zero(self, match_id: int) -> None:
+        """Each sample must contain pre-zero negative game_time values."""
+        positions_path = REPO_MATCHES_DIR / str(match_id) / "positions.parquet"
+        if not positions_path.exists():
+            pytest.skip(f"Sample match {match_id} positions.parquet not found")
+
+        df = pd.read_parquet(positions_path, columns=["game_time"])
+        assert not df.empty
+        assert float(df["game_time"].min()) < 0.0
+
+    @pytest.mark.parametrize("match_id", REPO_MATCH_SAMPLES)
+    def test_sample_has_near_zero_alignment_point(self, match_id: int) -> None:
+        """Each sample must include a point near game_time=0 for timeline alignment."""
+        positions_path = REPO_MATCHES_DIR / str(match_id) / "positions.parquet"
+        if not positions_path.exists():
+            pytest.skip(f"Sample match {match_id} positions.parquet not found")
+
+        df = pd.read_parquet(positions_path, columns=["game_time"])
+        assert not df.empty
+        closest = float(df["game_time"].abs().min())
+        assert closest <= 1.0
+
+    @pytest.mark.parametrize("match_id", REPO_MATCH_SAMPLES)
+    def test_sample_game_time_non_decreasing_by_tick(self, match_id: int) -> None:
+        """game_time should be non-decreasing by tick (allowing pause freeze)."""
+        positions_path = REPO_MATCHES_DIR / str(match_id) / "positions.parquet"
+        if not positions_path.exists():
+            pytest.skip(f"Sample match {match_id} positions.parquet not found")
+
+        df = pd.read_parquet(positions_path, columns=["tick", "game_time"])
+        assert not df.empty
+
+        tick_series = (
+            df[["tick", "game_time"]]
+            .dropna(subset=["tick", "game_time"])
+            .sort_values("tick")
+            .drop_duplicates(subset=["tick"], keep="first")
+        )
+        deltas = tick_series["game_time"].diff().dropna()
+        assert bool((deltas >= -1e-4).all())
+
+    @pytest.mark.parametrize("match_id", REPO_MATCH_SAMPLES)
+    def test_sample_metadata_pause_intervals_shape(self, match_id: int) -> None:
+        """Metadata pause_intervals payload should keep normalized required fields."""
+        meta_path = REPO_MATCHES_DIR / str(match_id) / "meta.json"
+        if not meta_path.exists():
+            pytest.skip(f"Sample match {match_id} meta.json not found")
+
+        with meta_path.open("r", encoding="utf-8") as f:
+            metadata = json.load(f)
+
+        pause_intervals = metadata.get("pause_intervals") or []
+        assert isinstance(pause_intervals, list)
+        for interval in pause_intervals:
+            assert {"replay_start_time", "replay_end_time", "game_time", "duration_seconds"}.issubset(
+                interval.keys()
+            )

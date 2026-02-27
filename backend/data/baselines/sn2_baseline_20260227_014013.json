@@ -1,0 +1,138 @@
+{
+  "generated_at": "2026-02-26T17:39:33.714238+00:00",
+  "sample_inputs": {
+    "replay_path": "N:\\dota2-ai-pro\\backend\\data\\replays\\8674716612.dem",
+    "match_id": 8674716612,
+    "include_remote": true
+  },
+  "metrics": {
+    "parse_sync": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 3401.78,
+      "payload_summary": {
+        "keys": [
+          "error",
+          "kill_events",
+          "match_id",
+          "parse_time_ms",
+          "position_samples",
+          "success",
+          "total_ticks",
+          "ward_events"
+        ],
+        "success": true
+      },
+      "attempts": [
+        {
+          "replay_path": "N:\\dota2-ai-pro\\backend\\data\\replays\\8674716612.dem",
+          "ok": true,
+          "latency_ms": 3401.78,
+          "status_code": 200,
+          "error": null
+        }
+      ]
+    },
+    "query_ticks_10min": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 202.58,
+      "payload_summary": {
+        "keys": [
+          "end_time",
+          "interval",
+          "match_id",
+          "pause_intervals",
+          "start_time",
+          "ticks",
+          "time_basis",
+          "total_samples"
+        ],
+        "ticks_len": 482
+      }
+    },
+    "query_advantage": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 21.32,
+      "payload_summary": {
+        "keys": [
+          "data",
+          "match_id",
+          "summary",
+          "time_basis"
+        ],
+        "data_len": 746
+      }
+    },
+    "first_frame_ticks": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 1297.55,
+      "payload_summary": {
+        "keys": [
+          "end_time",
+          "interval",
+          "match_id",
+          "pause_intervals",
+          "start_time",
+          "ticks",
+          "time_basis",
+          "total_samples"
+        ],
+        "ticks_len": 3631
+      }
+    },
+    "first_frame_hud": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 11.72,
+      "payload_summary": {
+        "keys": [
+          "game_time",
+          "heroes",
+          "match_id",
+          "message",
+          "status",
+          "tick"
+        ],
+        "heroes_len": 10,
+        "status": "ok"
+      }
+    },
+    "remote_sync_probe": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 1459.24,
+      "payload_summary": {
+        "keys": [
+          "fetched",
+          "inserted",
+          "message",
+          "reference",
+          "status",
+          "total_inserted",
+          "total_updated",
+          "updated"
+        ],
+        "status": "ok"
+      }
+    },
+    "remote_ingest_probe": {
+      "ok": true,
+      "status_code": 200,
+      "latency_ms": 33101.76,
+      "payload_summary": {
+        "keys": [
+          "failed",
+          "results",
+          "status",
+          "succeeded",
+          "total"
+        ],
+        "results_len": 1,
+        "status": "ok"
+      }
+    }
+  }
+}

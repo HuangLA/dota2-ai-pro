@@ -10,8 +10,8 @@
 | 字段 | 值 |
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
-| 当前阶段 | Phase 4 - 数据化回放与职业战队数据库 🚀 |
-| 最后更新 | 2026-02-24 |
+| 当前阶段 | Phase 4.5 收尾 + S-Next 稳定性冲刺 🚀 |
+| 最后更新 | 2026-02-26 |
 | 更新者 | OpenCode |
 
 ---
@@ -20,12 +20,33 @@
 
 ### 当前执行基线（优先阅读）
 1. **当前冲刺 (Current Sprint)**：查看 Phase 4 目标与 PH4-1 ~ PH4-7
-2. **下一步计划 (Phase 3 -> Phase 4)**：查看 Phase 4 里程碑和执行顺序
-3. **API 实现状态**：确认当前可调用端点与 Stub 缺口
+2. **S-Next 执行看板（新增）**：查看 SN-1 ~ SN-8 当前完成状态
+3. **下一步计划 (Phase 3 -> Phase 4)**：查看 Phase 4 里程碑和执行顺序
+4. **API 实现状态**：确认当前可调用端点与 Stub 缺口
 
 ### 历史内容说明（保留原文，不删除）
 - 文档中仍保留了 Phase 3 时期的任务表、路线图和前端 TODO，作为历史追溯依据。
 - 当历史内容与 Phase 4 计划冲突时，以 `当前冲刺` + `Phase 4 里程碑` 为准。
+
+---
+
+## 当前进展摘要（2026-02-26）
+
+### S-Next 执行看板（补充）
+| ID | 任务 | 状态 | 结果摘要 |
+|----|------|------|----------|
+| SN-1 | 全链路回归测试矩阵 | `DONE` | 核心后端回归稳定通过 |
+| SN-2 | 性能基线落地 | `DONE` | 产出 `backend/data/baselines/sn2_baseline_20260227_014013.json` |
+| SN-3 | 两场样本时间轴回归 | `DONE` | 负时间/近 0:00/pause 契约通过 |
+| SN-4 | 前端时间轴最终对齐 | `TODO` | 待收尾 |
+| SN-5 | Pause-aware 边缘场景收口 | `DONE` | ticks/wards/advantage 与 HUD 暂停点一致性通过 |
+| SN-6 | smokes 最小可用实现 | `DONE` | `/playback/{match_id}/smokes` 已非占位化 |
+| SN-7 | 文档状态对齐 | `DONE` | `docs/api_specification.md` 与实现对齐 |
+| SN-8 | 冲刺验收与 Phase 5 准入清单 | `TODO` | 待输出验收包 |
+
+### 最近一次回归验证
+- 命令: `py -m pytest tests/test_playback_e2e.py tests/test_timeline_regression.py tests/test_playback_pause_contract.py tests/test_playback_hud_contract.py tests/test_replay_download_service.py tests/test_replay_download_storage.py -q`
+- 结果: `79 passed`
 
 ---
 
@@ -343,7 +364,7 @@
 | /api/v1/playback/{id}/events | GET | `DONE` | `TODO` | v1.0 |
 | /api/v1/playback/{id}/wards | GET | `DONE` | `TODO` | v1.5 |
 | /api/v1/playback/{id}/heroes | GET | `DONE` | `TODO` | v1.0 |
-| /api/v1/playback/{id}/smokes | GET | `STUB` | `TODO` | v1.5 |
+| /api/v1/playback/{id}/smokes | GET | `DONE` | `TODO` | v1.5 |
 
 ### 可视化 API
 | 端点 | 方法 | 后端 | 前端调用 | MVP |
