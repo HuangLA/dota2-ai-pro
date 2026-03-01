@@ -115,8 +115,10 @@
 | RB-3 | 构建 ingest pipeline（下载→解析→索引） | Backend | `DONE` | 已提供 `POST /api/v1/remote/ingest` 支持任意 match_id 批量入库 |
 | RB-4 | 实现 Replay Library API（仅 parsed） | Backend | `DONE` | 已提供 `GET /api/v1/library/matches` 与删除接口 |
 | RB-5 | 拆分前端为 Live + Library 双页面 | Frontend | `DONE` | 已新增 OpenDota Live / Replay Library 页面与入口 |
-| RB-6 | 图标资源接入（league/team）与占位策略 | Frontend | `IN_PROGRESS` | 已接入 icon URL + 占位样式，后续优化资源质量 |
-| RB-7 | 回归测试与性能基线 | Both | `TODO` | 同步/下载/解析/检索链路稳定 |
+| RB-6 | 图标资源接入（league/team）与占位策略 | Frontend | `DONE` | 已接入 icon URL + 占位样式，后续优化资源质量 |
+| RB-7 | 现代化桌面级美化 (UI Polish) | Frontend | `DONE` | 全量引入 Glassmorphism 面板、全局渐变背景及悬浮交互 |
+| RB-8 | 导航栏与组件中文化 | Frontend | `DONE` | 完成侧边栏全面汉化与页面内文案统一 |
+| RB-9 | 回归测试与性能基线 | Both | `TODO` | 同步/下载/解析/检索链路稳定 |
 
 ### Option2 执行看板：回放解析重构（进行中）
 **目标**: 以最小风险方式重构解析链路，统一时间契约并为 HUD/曲线扩展铺路。  
@@ -471,6 +473,7 @@ print(f"Kill events: {len(result.kills)}")
 
 | 日期 | 更新内容 | 更新者 |
 |------|----------|--------|
+| 2026-03-01 | **Phase 4.1 前端桌面化重构 (UI Redesign)**: ① 移除旧有网格式 Homepage，引入常驻侧边栏（Sidebar）布局及图标导航 ② 引入全局径向渐变背景，定制深色模式 Tailwind 色板 ③ 承载型面板全面采用玻璃磨砂质感 (Glassmorphism) 替换生硬色块 ④ 按钮全量替换现代质感渐变与 hover 反馈 ⑤ 取消 OpenDota Live 和 Match Database 表格定宽限制，新增 `whitespace-nowrap` 防折行 ⑥ 文案全面中文化（侧边栏、表格表头、时间精简至分钟），修复所有报错前端测试。 | OpenCode (Frontend Specialist) |
 | 2026-02-26 | **Phase 4 收尾冲刺完成 (PH4-7 + 可视化 + 测试 + 技术债务)**: ① Java解析器新增 CDOTA_DataRadiant/Dire 经济数据提取，输出 economy JSON数组 ② Python EconomySample 模型 + economy.parquet 存储 + clarity_parser 解析 ③ GET /playback/{match_id}/advantage API 端点 ④ Recharts AdvantageChart 组件(金线+经验线+Timeline同步) ⑤ PixiJS击杀标记(T-006)、热力图覆盖(T-004)、移动轨迹(T-005) ⑥ 20项 timeline 回归测试 + 19项 E2E 端点测试 ⑦ Zustand store 状态管理(T-007) ⑧ React Router HashRouter路由(T-008)。前端 Vite build 通过，后端 154/155 测试通过(1项预存在失败)。 | OpenCode |
 | 2026-02-26 | **新增 playback API E2E 回归测试**: 新增 `backend/tests/test_playback_e2e.py`，基于真实样本比赛 `8674716612/8689321714` 覆盖 `ticks/events/wards/heroes/hud/advantage/smokes` 端点的响应结构、数据字段、404 与查询边界（含空结果）校验；`py -m pytest tests/test_playback_e2e.py -v` 19 项全部通过。 | OpenCode |
 | 2026-02-26 | **SimpleDemoParser 新增经济时间线提取**: 在 `CDOTA_DataRadiant/CDOTA_DataDire` 上按 30 tick 采样 `m_vecDataTeam.0000-0004` 的 `m_iTotalEarnedGold/m_iTotalEarnedXP/m_iNetWorth`，输出顶层 `economy` 数组（含双方总量、优势值与每槽位净资产），并保持 positions/kills/wards 与 pause-aware game_time 逻辑不变；重建 shadowJar 并用 `8674716612.dem` 验证通过。 | OpenCode |
