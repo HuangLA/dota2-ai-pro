@@ -33,12 +33,15 @@ export default {
           900: '#7f1d1d',
         },
         'dota': {
-          'bg': '#1a1a2e',
-          'surface': '#16213e',
-          'primary': '#0f3460',
-          'accent': '#e94560',
-          'gold': '#ffd700',
+          'bg': '#0f1423',
+          'surface': '#1b223c',
+          'primary': '#2a4365',
+          'accent': '#e11d48',
+          'gold': '#fbbf24',
         },
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       fontFamily: {
         'dota': ['Reaver', 'Radiance', 'sans-serif'],
