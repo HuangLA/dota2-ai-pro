@@ -96,7 +96,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
       }
     } catch (err) {
       console.error('Error fetching matches:', err);
-       setError('加载比赛列表失败，请重试。');
+      setError('加载比赛列表失败，请重试。');
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
   };
 
   const handleDelete = async (id: number) => {
-     if (!window.confirm(`确定要删除比赛 ${id} 吗？`)) {
+    if (!window.confirm(`确定要删除比赛 ${id} 吗？`)) {
       return;
     }
 
@@ -124,11 +124,11 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
       if (success) {
         fetchMatches(); // Refresh list
       } else {
-         alert('删除比赛失败。');
-       }
-     } catch (err) {
-       console.error('Error deleting match:', err);
-       alert('删除比赛时出错。');
+        alert('删除比赛失败。');
+      }
+    } catch (err) {
+      console.error('Error deleting match:', err);
+      alert('删除比赛时出错。');
     }
   };
 
@@ -139,8 +139,8 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
   };
 
   const formatTimeAgo = (timestampOrString: string | number | undefined) => {
-     if (!timestampOrString) return '未知';
-    
+    if (!timestampOrString) return '未知';
+
     let timestamp: number;
     if (typeof timestampOrString === 'string') {
       timestamp = new Date(timestampOrString).getTime();
@@ -148,38 +148,38 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
       // If it's a Unix timestamp in seconds, convert to milliseconds
       timestamp = timestampOrString > 1e10 ? timestampOrString : timestampOrString * 1000;
     } else {
-       return '未知';
+      return '未知';
     }
-    
+
     const now = Date.now();
     const diffSeconds = Math.floor((now - timestamp) / 1000);
 
-     if (diffSeconds < 60) return `${diffSeconds} 秒前`;
-     const diffMinutes = Math.floor(diffSeconds / 60);
-     if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
-     const diffHours = Math.floor(diffMinutes / 60);
-     if (diffHours < 24) return `${diffHours} 小时前`;
-     const diffDays = Math.floor(diffHours / 24);
-     return `${diffDays} 天前`;
+    if (diffSeconds < 60) return `${diffSeconds} 秒前`;
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} 小时前`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} 天前`;
   };
 
   return (
-    <div className="p-6 text-white min-h-screen bg-dota-bg">
+    <div className="p-6 text-white min-h-full bg-dota-bg">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-           <h1 className="text-3xl font-bold text-dota-gold">比赛管理</h1>
-           <p className="text-gray-400 mt-1">上传录像、搜索比赛、管理你的游戏数据</p>
+          <h1 className="text-3xl font-bold text-dota-gold">比赛管理</h1>
+          <p className="text-gray-400 mt-1">上传录像、搜索比赛、管理你的游戏数据</p>
         </div>
 
         {/* Replay Uploader */}
         <ReplayUploader onTaskCompleted={fetchMatches} />
 
         {/* Search Bar */}
-        <div className="bg-dota-surface p-6 rounded-lg mb-6 shadow-lg border border-gray-700">
-           <h2 className="text-lg font-semibold text-gray-200 mb-4">搜索筛选</h2>
+        <div className="card mb-6 p-6">
+          <h2 className="text-lg font-semibold text-gray-200 mb-4">搜索筛选</h2>
           <form onSubmit={handleSearch} className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[150px]">
-               <label className="block text-sm text-gray-400 mb-1.5">比赛 ID</label>
+              <label className="block text-sm text-gray-400 mb-1.5">比赛 ID</label>
               <input
                 type="text"
                 value={matchIdInput}
@@ -190,7 +190,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
             </div>
 
             <div className="flex-1 min-w-[150px]">
-               <label className="block text-sm text-gray-400 mb-1.5">玩家账号 ID</label>
+              <label className="block text-sm text-gray-400 mb-1.5">玩家账号 ID</label>
               <input
                 type="text"
                 value={accountIdInput}
@@ -201,16 +201,16 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
             </div>
 
             <div className="flex-1 min-w-[180px]">
-               <label className="block text-sm text-gray-400 mb-1.5">英雄筛选</label>
+              <label className="block text-sm text-gray-400 mb-1.5">英雄筛选</label>
               <select
                 value={selectedHeroId || ''}
                 onChange={(e) => setSelectedHeroId(e.target.value ? parseInt(e.target.value) : undefined)}
                 className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-dota-primary focus:ring-1 focus:ring-dota-primary transition-colors"
               >
-                 <option value="">全部英雄</option>
-                 {heroes.map(hero => (
-                   <option key={hero.id} value={hero.id}>
-                     {hero.chineseName}
+                <option value="">全部英雄</option>
+                {heroes.map(hero => (
+                  <option key={hero.id} value={hero.id}>
+                    {hero.chineseName}
                   </option>
                 ))}
               </select>
@@ -220,7 +220,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
               type="submit"
               className="bg-dota-primary hover:bg-blue-600 text-white px-6 py-2 rounded transition-colors font-medium shadow-md hover:shadow-lg"
             >
-               搜索
+              搜索
             </button>
 
             <button
@@ -234,15 +234,15 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
               }}
               className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded transition-colors text-sm"
             >
-               清除筛选
+              清除筛选
             </button>
           </form>
-          
+
           {/* Search tips */}
           <div className="mt-4 text-xs text-gray-500 bg-gray-800/50 p-3 rounded">
-             <span className="font-semibold text-gray-400">提示:</span> 
-             {' '}比赛 ID 为精确搜索。玩家/英雄筛选为全局搜索。
-             {' '}筛选条件可组合使用（例如指定英雄 + 玩家）。
+            <span className="font-semibold text-gray-400">提示:</span>
+            {' '}比赛 ID 为精确搜索。玩家/英雄筛选为全局搜索。
+            {' '}筛选条件可组合使用（例如指定英雄 + 玩家）。
           </div>
         </div>
 
@@ -254,29 +254,29 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
         )}
 
         {/* Data Table */}
-        <div className="bg-dota-surface rounded-lg shadow-xl overflow-hidden border border-gray-700">
+        <div className="card overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 text-sm uppercase">
                 <tr>
-                   <th className="px-6 py-4 font-semibold">比赛 ID</th>
-                   <th className="px-6 py-4 font-semibold">获胜方</th>
-                   <th className="px-6 py-4 font-semibold">时长</th>
-                   <th className="px-6 py-4 font-semibold">解析时间</th>
-                   <th className="px-6 py-4 font-semibold text-right">操作</th>
+                  <th className="px-6 py-4 font-semibold">比赛 ID</th>
+                  <th className="px-6 py-4 font-semibold">获胜方</th>
+                  <th className="px-6 py-4 font-semibold">时长</th>
+                  <th className="px-6 py-4 font-semibold">解析时间</th>
+                  <th className="px-6 py-4 font-semibold text-right">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
                 {loading ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
-                       加载中...
+                      加载中...
                     </td>
                   </tr>
                 ) : matches.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
-                       暂无比赛数据。
+                      暂无比赛数据。
                     </td>
                   </tr>
                 ) : (
@@ -287,15 +287,14 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                            match.winner_team === 2
-                              ? 'bg-green-900/40 text-green-400 border border-green-800'
-                              : match.winner_team === 3
+                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${match.winner_team === 2
+                            ? 'bg-green-900/40 text-green-400 border border-green-800'
+                            : match.winner_team === 3
                               ? 'bg-red-900/40 text-red-400 border border-red-800'
                               : 'bg-gray-700 text-gray-400'
                             }`}
                         >
-                           {match.winner_name || (match.winner_team === 2 ? '天辉' : match.winner_team === 3 ? '夜魇' : '未知')}
+                          {match.winner_name || (match.winner_team === 2 ? '天辉' : match.winner_team === 3 ? '夜魇' : '未知')}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-300">
@@ -310,13 +309,13 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                             onClick={() => onWatch(match.match_id)}
                             className="text-blue-400 hover:text-blue-300 font-medium transition-colors text-sm px-4 py-1.5 rounded hover:bg-blue-900/30 border border-blue-700/50 hover:border-blue-500/50"
                           >
-                             观看
+                            观看
                           </button>
                           <button
                             onClick={() => handleDelete(match.match_id)}
                             className="text-red-400 hover:text-red-300 font-medium transition-colors text-sm px-4 py-1.5 rounded hover:bg-red-900/30 border border-red-700/50 hover:border-red-500/50"
                           >
-                             删除
+                            删除
                           </button>
                         </div>
                       </td>
@@ -332,12 +331,12 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
             <div className="text-sm text-gray-400">
               {matches.length > 0 ? (
                 <>
-                   显示第 <span className="text-white font-medium">{offset + 1}</span> 到{' '}
-                   <span className="text-white font-medium">{Math.min(offset + matches.length, total)}</span> 条，共{' '}
-                   <span className="text-white font-medium">{total}</span> 场比赛
+                  显示第 <span className="text-white font-medium">{offset + 1}</span> 到{' '}
+                  <span className="text-white font-medium">{Math.min(offset + matches.length, total)}</span> 条，共{' '}
+                  <span className="text-white font-medium">{total}</span> 场比赛
                 </>
               ) : (
-                 '暂无比赛数据'
+                '暂无比赛数据'
               )}
             </div>
             <div className="flex space-x-2">
@@ -346,14 +345,14 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                 disabled={offset === 0}
                 className="px-4 py-2 rounded bg-gray-700 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors text-sm font-medium border border-gray-600 hover:border-gray-500"
               >
-                 上一页
+                上一页
               </button>
               <button
                 onClick={() => setOffset(offset + limit)}
                 disabled={offset + matches.length >= total}
                 className="px-4 py-2 rounded bg-gray-700 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors text-sm font-medium border border-gray-600 hover:border-gray-500"
               >
-                 下一页
+                下一页
               </button>
             </div>
           </div>

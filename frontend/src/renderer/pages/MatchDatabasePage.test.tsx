@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import React from 'react';
+
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import MatchDatabasePage, { MatchDatabaseViewState } from './MatchDatabasePage';
@@ -195,7 +195,7 @@ describe('MatchDatabasePage', () => {
     ).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(
       2,
       '0'
-    )}:${String(date.getSeconds()).padStart(2, '0')}`;
+    )}`;
 
     expect(formatUnixTimestampLocal(timestamp)).toBe(expected);
   });
@@ -741,10 +741,10 @@ describe('MatchDatabasePage', () => {
     const createObjectUrlSpy = vi
       .spyOn(URL, 'createObjectURL')
       .mockReturnValue('blob:match-database-failed-items');
-    const revokeObjectUrlSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const revokeObjectUrlSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => { });
     const anchorClickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { });
 
     render(<MatchDatabasePage />);
 

@@ -268,7 +268,7 @@ export function MatchDatabasePage({
     if (!normalizedName) {
       setFeedback({
         type: 'error',
-          message: '预设名称不能为空。',
+        message: '预设名称不能为空。',
       });
       return;
     }
@@ -306,7 +306,7 @@ export function MatchDatabasePage({
     if (!selectedPreset) {
       setFeedback({
         type: 'error',
-          message: `未找到预设：${selectedPresetName}`,
+        message: `未找到预设：${selectedPresetName}`,
       });
       return;
     }
@@ -631,7 +631,7 @@ export function MatchDatabasePage({
   }, [fetchTaskDetails, taskDetails?.status, taskDetailsTaskId]);
 
   return (
-    <div className="p-6 text-white min-h-screen bg-dota-bg relative">
+    <div className="p-6 text-white min-h-full bg-dota-bg relative">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-dota-gold">比赛数据库</h1>
@@ -640,7 +640,7 @@ export function MatchDatabasePage({
           </p>
         </div>
 
-        <div className="bg-dota-surface p-6 rounded-lg mb-6 shadow-lg border border-gray-700">
+        <div className="card mb-6 p-6">
           <h2 className="text-lg font-semibold text-gray-200 mb-4">筛选条件</h2>
           <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
             <div>
@@ -753,24 +753,24 @@ export function MatchDatabasePage({
               >
                 清空
               </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleBatchAction();
-                  }}
-                  disabled={batchActionsDisabled || activeBatchMode !== null}
-                  className="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {activeBatchMode === 'prepare_and_execute' ? '正在批量下载（勾选项）...' : '批量下载（勾选项）'}
-                </button>
-                <span className="text-sm text-gray-300">
-                  {allCurrentPageMatchIds.length === 0
-                    ? '当前页无可选比赛。'
-                    : selectedMatchCount === 0
-                      ? '请先勾选要批量下载的比赛。'
-                      : `已勾选 ${selectedMatchCount} 场比赛`}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleBatchAction();
+                }}
+                disabled={batchActionsDisabled || activeBatchMode !== null}
+                className="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {activeBatchMode === 'prepare_and_execute' ? '正在批量下载（勾选项）...' : '批量下载（勾选项）'}
+              </button>
+              <span className="text-sm text-gray-300">
+                {allCurrentPageMatchIds.length === 0
+                  ? '当前页无可选比赛。'
+                  : selectedMatchCount === 0
+                    ? '请先勾选要批量下载的比赛。'
+                    : `已勾选 ${selectedMatchCount} 场比赛`}
+              </span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-[1.2fr_auto_1fr_auto] gap-2 xl:col-span-6">
               <input
                 aria-label="预设名称"
@@ -784,7 +784,7 @@ export function MatchDatabasePage({
                 onClick={handleSavePreset}
                 className="bg-indigo-700 hover:bg-indigo-600 text-white px-4 py-2 rounded transition-colors"
               >
-                 保存预设
+                保存预设
               </button>
               <select
                 aria-label="预设"
@@ -813,17 +813,16 @@ export function MatchDatabasePage({
 
         {feedback && (
           <div
-            className={`mb-4 px-4 py-3 rounded border ${
-              feedback.type === 'success'
-                ? 'bg-green-900/30 border-green-600 text-green-200'
-                : 'bg-red-900/30 border-red-600 text-red-200'
-            }`}
+            className={`mb-4 px-4 py-3 rounded border ${feedback.type === 'success'
+              ? 'bg-green-900/30 border-green-600 text-green-200'
+              : 'bg-red-900/30 border-red-600 text-red-200'
+              }`}
           >
             {feedback.message}
           </div>
         )}
 
-        <div className="mb-4 bg-dota-surface border border-gray-700 rounded px-4 py-3">
+        <div className="card mb-4 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -853,9 +852,9 @@ export function MatchDatabasePage({
           <div className="mb-4 px-4 py-3 rounded border bg-red-900/30 border-red-600 text-red-200">{error}</div>
         )}
 
-        <div className="bg-dota-surface rounded-lg shadow-xl overflow-hidden border border-gray-700">
+        <div className="card overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="min-w-[980px] w-full text-left">
+            <table className="w-full text-left table-auto">
               <thead className="bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 text-sm uppercase">
                 <tr>
                   <th className="px-4 py-3 font-semibold">
@@ -874,15 +873,15 @@ export function MatchDatabasePage({
                       className="h-4 w-4 accent-dota-primary disabled:opacity-40"
                     />
                   </th>
-                  <th className="px-4 py-3 font-semibold">比赛 ID</th>
-                  <th className="px-4 py-3 font-semibold">开始时间</th>
-                  <th className="px-4 py-3 font-semibold">时长</th>
-                  <th className="px-4 py-3 font-semibold">Radiant</th>
-                  <th className="px-4 py-3 font-semibold">Dire</th>
+                  <th className="px-4 py-3 font-semibold whitespace-nowrap">比赛 ID</th>
+                  <th className="px-4 py-3 font-semibold whitespace-nowrap">开始时间</th>
+                  <th className="px-4 py-3 font-semibold whitespace-nowrap">时长</th>
+                  <th className="px-4 py-3 font-semibold">天辉</th>
+                  <th className="px-4 py-3 font-semibold">夜魇</th>
                   <th className="px-4 py-3 font-semibold">联赛</th>
-                  <th className="px-4 py-3 font-semibold">下载状态</th>
-                  <th className="px-4 py-3 font-semibold">尝试次数</th>
-                  <th className="px-4 py-3 font-semibold text-right">操作</th>
+                  <th className="px-4 py-3 font-semibold whitespace-nowrap">下载状态</th>
+                  <th className="px-4 py-3 font-semibold whitespace-nowrap">尝试次数</th>
+                  <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
@@ -902,11 +901,10 @@ export function MatchDatabasePage({
                   matches.map((match) => (
                     <tr
                       key={match.match_id}
-                      className={`transition-colors ${
-                        highlightedMatchId === match.match_id
-                          ? 'bg-emerald-900/30 ring-1 ring-emerald-500/40'
-                          : 'hover:bg-white/5'
-                      }`}
+                      className={`transition-colors ${highlightedMatchId === match.match_id
+                        ? 'bg-emerald-900/30 ring-1 ring-emerald-500/40'
+                        : 'hover:bg-white/5'
+                        }`}
                     >
                       <td className="px-4 py-3">
                         <input
@@ -918,43 +916,42 @@ export function MatchDatabasePage({
                           className="h-4 w-4 accent-dota-primary disabled:opacity-40"
                         />
                       </td>
-                      <td className="px-4 py-3 font-mono text-dota-gold font-semibold">{match.match_id}</td>
+                      <td className="px-4 py-3 font-mono text-dota-gold font-semibold whitespace-nowrap">{match.match_id}</td>
                       <td
-                        className="px-4 py-3 text-gray-300"
+                        className="px-4 py-3 text-gray-300 whitespace-nowrap"
                         title={match.start_time !== undefined && match.start_time !== null ? String(match.start_time) : '--'}
                       >
                         {formatUnixTimestampLocal(match.start_time)}
                       </td>
-                      <td className="px-4 py-3 text-gray-300">{formatDurationClock(match.duration)}</td>
-                      <td className="px-4 py-3 text-gray-300">
+                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">{formatDurationClock(match.duration)}</td>
+                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                         {getTeamLabel(match.radiant_team_name, match.radiant_team_id)}
                       </td>
-                      <td className="px-4 py-3 text-gray-300">
+                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                         {getTeamLabel(match.dire_team_name, match.dire_team_id)}
                       </td>
-                      <td className="px-4 py-3 text-gray-300">
+                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                         {getLeagueLabel(match.league_name, match.leagueid)}
                       </td>
-                      <td className="px-4 py-3 text-gray-300">
+                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                         <span
                           data-testid={`download-status-${match.match_id}`}
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${
-                            getDownloadStatusMeta(match.download_status).className
-                          }`}
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${getDownloadStatusMeta(match.download_status).className
+                            }`}
                           title={normalizeDownloadStatus(match.download_status)}
                         >
                           {getDownloadStatusMeta(match.download_status).label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-300">{match.download_attempt_count ?? 0}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-gray-300 whitespace-nowrap">{match.download_attempt_count ?? 0}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleOpenReplay(match)}
                             disabled={activeBatchMode !== null}
                             className="text-amber-300 hover:text-amber-200 border border-amber-700/50 hover:border-amber-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                             打开回放
+                            打开回放
                           </button>
                           <button
                             onClick={() => {
@@ -969,7 +966,7 @@ export function MatchDatabasePage({
                             disabled={!match.download_task_id || activeBatchMode !== null}
                             className="text-cyan-300 hover:text-cyan-200 border border-cyan-700/50 hover:border-cyan-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                             任务详情
+                            任务详情
                           </button>
                           <button
                             onClick={() => handleAction(match.match_id)}
@@ -980,7 +977,7 @@ export function MatchDatabasePage({
                             }
                             className="text-green-300 hover:text-green-200 border border-green-700/50 hover:border-green-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-50"
                           >
-                             下载录像
+                            下载录像
                           </button>
                           <button
                             onClick={() => {
@@ -994,7 +991,7 @@ export function MatchDatabasePage({
                             }
                             className="text-red-300 hover:text-red-200 border border-red-700/50 hover:border-red-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-50"
                           >
-                             删除录像
+                            删除录像
                           </button>
                         </div>
                       </td>
@@ -1016,14 +1013,14 @@ export function MatchDatabasePage({
                 disabled={offset === 0}
                 className="px-4 py-2 rounded bg-gray-700 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors text-sm font-medium border border-gray-600"
               >
-                 上一页
+                上一页
               </button>
               <button
                 onClick={() => setOffset((prev) => prev + DEFAULT_LIMIT)}
                 disabled={offset + matches.length >= total}
                 className="px-4 py-2 rounded bg-gray-700 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors text-sm font-medium border border-gray-600"
               >
-                 下一页
+                下一页
               </button>
             </div>
           </div>
