@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import React from 'react';
+
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TeamProfilePage from './TeamProfilePage';
@@ -645,7 +645,7 @@ describe('TeamProfilePage', () => {
   });
 
   it('still opens replay when prepare fails in Prepare + Open Replay action', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => { });
     vi.spyOn(teamProfileService, 'getTeamMatches').mockResolvedValue({
       status: 'ok',
       total: 1,
@@ -969,8 +969,8 @@ describe('TeamProfilePage', () => {
 
     await waitFor(() => {
       expect(
-          screen.getByRole('button', { name: '导出可见比赛（.txt）' }).getAttribute('disabled')
-        ).not.toBeNull();
+        screen.getByRole('button', { name: '导出可见比赛（.txt）' }).getAttribute('disabled')
+      ).not.toBeNull();
     });
   });
 
@@ -1264,7 +1264,7 @@ describe('TeamProfilePage', () => {
       .mockResolvedValueOnce({ status: 'ok', message: 'prepared', task: null })
       .mockRejectedValueOnce(new Error('HTTP 500'));
 
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => { });
 
     render(<TeamProfilePage />);
 
@@ -1327,7 +1327,7 @@ describe('TeamProfilePage', () => {
       ],
     });
 
-    const createObjectURLMock = vi.fn(() => 'blob:compare-export');
+    const createObjectURLMock = vi.fn((_: Blob) => 'blob:compare-export');
     const revokeObjectURLMock = vi.fn();
     Object.defineProperty(window.URL, 'createObjectURL', {
       value: createObjectURLMock,
@@ -1417,7 +1417,7 @@ describe('TeamProfilePage', () => {
       ],
     });
 
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => { });
     const triggerSpy = vi
       .spyOn(matchDatabaseService, 'triggerDownloadAction')
       .mockResolvedValueOnce({ status: 'ok', message: 'prepared', task: null })
@@ -1704,7 +1704,7 @@ describe('TeamProfilePage', () => {
       ],
     });
 
-    const createObjectURLMock = vi.fn(() => 'blob:snapshot-export');
+    const createObjectURLMock = vi.fn((_: Blob) => 'blob:snapshot-export');
     const revokeObjectURLMock = vi.fn();
     Object.defineProperty(window.URL, 'createObjectURL', {
       value: createObjectURLMock,
@@ -1895,8 +1895,8 @@ describe('TeamProfilePage', () => {
 
     await waitFor(() => {
       expect(
-          screen.getByRole('button', { name: '复制可见比赛 ID' }).getAttribute('disabled')
-        ).not.toBeNull();
+        screen.getByRole('button', { name: '复制可见比赛 ID' }).getAttribute('disabled')
+      ).not.toBeNull();
     });
   });
 

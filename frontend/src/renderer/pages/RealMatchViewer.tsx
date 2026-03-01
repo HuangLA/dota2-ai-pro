@@ -239,16 +239,16 @@ export interface RealMatchViewerProps {
 export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatchViewerProps) {
   const [matches, setMatches] = useState<Match[]>([]);
   const { selectedMatch, setSelectedMatch, currentTime, setCurrentTime, currentDisplayGameTime, setCurrentDisplayGameTime, isPauseActive, setIsPauseActive, loading, setLoading, error, setError } = usePlaybackStore();
-  
+
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [activeKillMarkers, setActiveKillMarkers] = useState<KillMarkerData[]>([]);
   const [showPaths, setShowPaths] = useState(false);
-  
+
 
   const [timelineMinTime, setTimelineMinTime] = useState(0);
   const [timelineMaxTime, setTimelineMaxTime] = useState(DEFAULT_DURATION);
-  
+
 
 
   const [showCalibration, setShowCalibration] = useState(false);
@@ -265,7 +265,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const [heatmapType, setHeatmapType] = useState<'none' | 'movement' | 'kill' | 'death'>('none');
   const [heatmapGrid, setHeatmapGrid] = useState<number[][] | null>(null);
   const [heatmapBounds, setHeatmapBounds] = useState<HeatmapBounds | null>(null);
-  
+
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
   const gameClockMapperRef = useRef<GameClockMapper>(createGameClockMapper([]));
@@ -403,7 +403,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
-    
+
     setLoading(true);
     setError(null);
     setTimeBasisSource('fallback');
@@ -424,24 +424,24 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     setHeatmapType('none');
     setHeatmapGrid(null);
     setHeatmapBounds(null);
-    
+
     try {
       const matchDetail = await backendAPI.getMatchDetail(matchId);
       const duration = matchDetail?.duration || DEFAULT_DURATION;
-      
+
       console.log(`[RealMatchViewer] 加载比赛 ${matchId} 的完整数据...`);
       const fullData = await backendAPI.getHeroPositions(
         matchId,
         -PRE_GAME_FETCH_SECONDS,
         duration + POST_GAME_FETCH_BUFFER_SECONDS
       );
-      
+
       if (fullData?.ticks) {
         allTicksRef.current = fullData.ticks;
         setTeamLineups(extractTeamLineups(fullData.ticks));
         console.log(`[RealMatchViewer] 已加载 ${fullData.ticks.length} 个 tick`);
       }
-      
+
       const wardsData = await backendAPI.getWards(matchId);
       allWardsRef.current = wardsData;
 
@@ -492,7 +492,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
         updateDisplayForTime(gameStartSourceTime);
         scheduleHudMetricsFetch(gameStartSourceTime);
       }
-      
+
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         return;
@@ -511,7 +511,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       setTimelineMaxTime(DEFAULT_DURATION);
       loadAllMatchData(selectedMatch);
     }
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -533,11 +533,11 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     if (ticks.length === 0) {
       return { prev: null, next: null, t: 0 };
     }
-    
+
     // 二分查找
     let left = 0;
     let right = ticks.length - 1;
-    
+
     // 边界情况
     if (time <= mapper.getSourceTime(ticks[0])) {
       return { prev: ticks[0], next: ticks[0], t: 0 };
@@ -545,7 +545,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     if (time >= mapper.getSourceTime(ticks[ticks.length - 1])) {
       return { prev: ticks[ticks.length - 1], next: ticks[ticks.length - 1], t: 0 };
     }
-    
+
     // 找到 time 之前的最大 tick
     while (left < right) {
       const mid = Math.floor((left + right + 1) / 2);
@@ -555,16 +555,16 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
         right = mid - 1;
       }
     }
-    
+
     const prevTick = ticks[left];
     const nextTick = ticks[Math.min(left + 1, ticks.length - 1)];
-    
+
     // 计算插值系数
     const prevTime = mapper.getSourceTime(prevTick);
     const nextTime = mapper.getSourceTime(nextTick);
     const timeDiff = nextTime - prevTime;
     const t = timeDiff > 0 ? (time - prevTime) / timeDiff : 0;
-    
+
     return { prev: prevTick, next: nextTick, t };
   }, []);
 
@@ -575,11 +575,11 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     const mapper = gameClockMapperRef.current;
     const gameClockDisplayShift = getGameClockDisplayShift(mapper, allTicksRef.current);
     const { prev, next, t } = findTicksForInterpolation(time);
-    
+
     if (!prev) {
       return;
     }
-    
+
     // 如果 prev 和 next 相同，或者 t 为 0，直接使用 prev
     if (prev === next || t === 0 || !next) {
       const positions = prev.heroes.map((hero) => ({
@@ -598,11 +598,11 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     } else {
       // 插值计算位置
       const positions: HeroPosition[] = [];
-      
+
       for (const prevHero of prev.heroes) {
         // 在 next 中找到对应的英雄
         const nextHero = next.heroes.find(h => h.handle === prevHero.handle);
-        
+
         if (nextHero) {
           // 插值计算
           positions.push({
@@ -629,12 +629,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           });
         }
       }
-      
+
       // 过滤掉已阵亡的英雄 (hp <= 0)
       const alivePositions = positions.filter(p => p.hp > 0);
       setHeroPositions(alivePositions);
     }
-    
+
     // 眼位不需要插值，直接过滤
     const roundedTime = Math.floor(time);
     const wardsData = allWardsRef.current;
@@ -658,7 +658,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           y: ward.y!,
           placed: true,
         }));
-      
+
       setWards(activeWards);
     }
 
@@ -894,9 +894,8 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   <img
                     src={hero.portraitUrl}
                     alt={heroLabel}
-                    className={`h-full w-full object-contain transition duration-200 ${
-                      isDead ? 'grayscale brightness-75' : 'grayscale-0 brightness-100'
-                    }`}
+                    className={`h-full w-full object-contain transition duration-200 ${isDead ? 'grayscale brightness-75' : 'grayscale-0 brightness-100'
+                      }`}
                   />
                 </div>
                 <div className="group relative mt-1.5">
@@ -955,15 +954,15 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1 space-y-4">
-            <div className="bg-dota-surface p-4 rounded-lg">
-                 <h3 className="text-lg font-medium mb-3">选择比赛</h3>
-              
+            <div className="card p-4">
+              <h3 className="text-lg font-medium mb-3">选择比赛</h3>
+
               {matches.length === 0 ? (
                 <div className="text-gray-400 text-sm">
                   <p className="mb-2">暂无已解析的比赛</p>
                   <p className="text-xs">请先解析 .dem 文件:</p>
-                  <a 
-                    href="http://localhost:8000/docs" 
+                  <a
+                    href="http://localhost:8000/docs"
                     target="_blank"
                     rel="noreferrer"
                     className="text-dota-accent hover:underline text-xs"
@@ -980,7 +979,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   {matches.map((match) => (
                     <option key={match.match_id} value={match.match_id}>
                       比赛 {match.match_id}
-                      {match.radiant_win !== undefined && 
+                      {match.radiant_win !== undefined &&
                         ` - ${match.radiant_win ? '天辉' : '夜魇'}胜`}
                     </option>
                   ))}
@@ -997,7 +996,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               )}
             </div>
 
-            <div className="bg-dota-surface p-4 rounded-lg">
+            <div className="card p-4">
               <h3 className="text-lg font-medium mb-3">当前状态</h3>
               <div className="text-sm text-gray-400 space-y-2">
                 <div className="flex justify-between">
@@ -1058,24 +1057,23 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             </div>
 
             {heroPositions.length > 0 && (
-              <div className="bg-dota-surface p-4 rounded-lg">
+              <div className="card p-4">
                 <h3 className="text-lg font-medium mb-3">英雄</h3>
                 <div className="space-y-1 text-xs">
                   {heroPositions.map((hero) => (
-                    <div 
+                    <div
                       key={hero.hero_id}
-                      className={`flex justify-between items-center py-1 px-2 rounded ${
-                        hero.team === 'radiant' ? 'bg-green-900/30' : 'bg-red-900/30'
-                      }`}
+                      className={`flex justify-between items-center py-1 px-2 rounded ${hero.team === 'radiant' ? 'bg-green-900/30' : 'bg-red-900/30'
+                        }`}
                     >
-                       <span className="truncate" title={hero.hero_name}>
-                         {(() => {
-                           const heroData = getHeroByName(hero.hero_name || '');
-                           return heroData?.chineseName || hero.hero_name?.replace('npc_dota_hero_', '') || `英雄 ${hero.hero_id}`;
-                         })()}
-                       </span>
-                       <span className="text-gray-400">
-                         Lv.{hero.level}
+                      <span className="truncate" title={hero.hero_name}>
+                        {(() => {
+                          const heroData = getHeroByName(hero.hero_name || '');
+                          return heroData?.chineseName || hero.hero_name?.replace('npc_dota_hero_', '') || `英雄 ${hero.hero_id}`;
+                        })()}
+                      </span>
+                      <span className="text-gray-400">
+                        Lv.{hero.level}
                       </span>
                     </div>
                   ))}
@@ -1085,7 +1083,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           </div>
 
           <div className="lg:col-span-3 space-y-4">
-            <div className="bg-dota-surface p-4 rounded-lg">
+            <div className="card p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-medium">地图视图</h2>
                 <div className="flex items-center gap-4">
@@ -1151,11 +1149,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       <button
                         key={opt.key}
                         onClick={() => setHeatmapType(opt.key)}
-                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                          heatmapType === opt.key
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${heatmapType === opt.key
                             ? 'bg-dota-gold/20 text-dota-gold border border-dota-gold/50'
                             : 'bg-gray-800/80 text-gray-400 border border-gray-700/60 hover:bg-gray-700/80 hover:text-gray-200'
-                        }`}
+                          }`}
                       >
                         {opt.label}
                       </button>
@@ -1209,7 +1206,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               />
             )}
 
-            <div className="bg-dota-surface p-4 rounded-lg">
+            <div className="card p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-lg font-medium">HUD 指标</h3>
                 {hudMetricsLoading && (

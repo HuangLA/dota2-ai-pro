@@ -97,23 +97,23 @@ type ActionHistoryFilterKey = 'all' | ActionHistoryType;
 
 type ActionHistoryPayload =
   | {
-      type: 'prepare_visible_matches' | 'prepare_selected_leagues';
-      matchIds: number[];
-    }
+    type: 'prepare_visible_matches' | 'prepare_selected_leagues';
+    matchIds: number[];
+  }
   | {
-      type: 'open_compare_first_3_replays';
-      matchIds: number[];
-      openedMatchId: number | null;
-    }
+    type: 'open_compare_first_3_replays';
+    matchIds: number[];
+    openedMatchId: number | null;
+  }
   | {
-      type: 'open_visible_in_match_database';
-      context: {
-        teamId: number;
-        leagueId?: number;
-        hasDownload?: boolean;
-      };
-      visibleCount: number;
+    type: 'open_visible_in_match_database';
+    context: {
+      teamId: number;
+      leagueId?: number;
+      hasDownload?: boolean;
     };
+    visibleCount: number;
+  };
 
 interface ActionHistoryEntry {
   id: string;
@@ -146,12 +146,12 @@ const ACTION_HISTORY_FILTER_OPTIONS: Array<{
   key: ActionHistoryFilterKey;
   label: string;
 }> = [
-  { key: 'all', label: '全部' },
-  { key: 'prepare_visible_matches', label: '准备当前可见比赛' },
-  { key: 'prepare_selected_leagues', label: '准备已选联赛' },
-  { key: 'open_compare_first_3_replays', label: '打开对比首 3 场回放' },
-  { key: 'open_visible_in_match_database', label: '在比赛数据库打开当前可见项' },
-];
+    { key: 'all', label: '全部' },
+    { key: 'prepare_visible_matches', label: '准备当前可见比赛' },
+    { key: 'prepare_selected_leagues', label: '准备已选联赛' },
+    { key: 'open_compare_first_3_replays', label: '打开对比首 3 场回放' },
+    { key: 'open_visible_in_match_database', label: '在比赛数据库打开当前可见项' },
+  ];
 
 function toOptionalPositiveInt(value: string): number | undefined {
   if (!value.trim()) {
@@ -166,7 +166,7 @@ function toOptionalPositiveInt(value: string): number | undefined {
   return parsed;
 }
 
-function getTeamTag(match: TeamProfileMatchRecord, teamId: number): 'Radiant' | 'Dire' | '-' {
+function getTeamTag(match: TeamProfileMatchRecord, teamId: number): '天辉' | '夜魇' | '-' {
   if (match.radiant_team_id === teamId) {
     return '天辉';
   }
@@ -465,12 +465,12 @@ export function TeamProfilePage({
       current.map((entry) =>
         entry.id === entryId
           ? {
-              ...entry,
-              lastRunStatus: result.status,
-              lastRunAt: now,
-              lastRunMessage: result.message,
-              ...(options?.bumpExecutedAt ? { executedAtMs: now } : {}),
-            }
+            ...entry,
+            lastRunStatus: result.status,
+            lastRunAt: now,
+            lastRunMessage: result.message,
+            ...(options?.bumpExecutedAt ? { executedAtMs: now } : {}),
+          }
           : entry
       )
     );
@@ -821,17 +821,16 @@ export function TeamProfilePage({
 
     appendActionHistory({
       type: 'open_visible_in_match_database',
-       actionName: '在比赛数据库打开当前可见项',
-      summary: `Visible ${visibleMatches.length} / team ${mappedContext.teamId}${
-        mappedContext.leagueId !== undefined ? ` / league ${mappedContext.leagueId}` : ''
-      }${mappedContext.hasDownload ? ' / has_download=true' : ''}`,
+      actionName: '在比赛数据库打开当前可见项',
+      summary: `Visible ${visibleMatches.length} / team ${mappedContext.teamId}${mappedContext.leagueId !== undefined ? ` / league ${mappedContext.leagueId}` : ''
+        }${mappedContext.hasDownload ? ' / has_download=true' : ''}`,
       payload: {
         type: 'open_visible_in_match_database',
         context: mappedContext,
         visibleCount: visibleMatches.length,
       },
       lastRunStatus: 'succeeded',
-       lastRunMessage: '已触发跳转。',
+      lastRunMessage: '已触发跳转。',
     });
   };
 
@@ -1550,7 +1549,7 @@ export function TeamProfilePage({
       if (matchIds.length === 0) {
         return {
           status: 'failed',
-            message: `重放已跳过：${entry.actionName} 未记录目标。`,
+          message: `重放已跳过：${entry.actionName} 未记录目标。`,
         };
       }
 
@@ -1559,7 +1558,7 @@ export function TeamProfilePage({
       if (replayTargets.length === 0) {
         return {
           status: 'failed',
-            message: '重放已跳过：记录的目标在当前会话数据中已不可见。',
+          message: '重放已跳过：记录的目标在当前会话数据中已不可见。',
         };
       }
 
@@ -1799,7 +1798,7 @@ export function TeamProfilePage({
   };
 
   return (
-    <div className="min-h-screen bg-dota-bg p-6 text-white">
+    <div className="min-h-full bg-dota-bg p-6 text-white">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
@@ -1816,7 +1815,7 @@ export function TeamProfilePage({
           </button>
         </div>
 
-        <div className="mb-5 rounded-lg border border-gray-700 bg-dota-surface p-5">
+        <div className="card mb-5 p-5">
           <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
             <div>
               <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
@@ -1856,11 +1855,10 @@ export function TeamProfilePage({
                 onClick={() => {
                   void applyPreset('all_matches');
                 }}
-                className={`rounded border px-3 py-1.5 text-sm ${
-                  activePresetKey === 'all_matches'
-                    ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
-                    : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
-                }`}
+                className={`rounded border px-3 py-1.5 text-sm ${activePresetKey === 'all_matches'
+                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
+                  : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
+                  }`}
               >
                 全部比赛
               </button>
@@ -1870,11 +1868,10 @@ export function TeamProfilePage({
                 onClick={() => {
                   void applyPreset('with_download_status');
                 }}
-                className={`rounded border px-3 py-1.5 text-sm ${
-                  activePresetKey === 'with_download_status'
-                    ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
-                    : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
-                }`}
+                className={`rounded border px-3 py-1.5 text-sm ${activePresetKey === 'with_download_status'
+                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
+                  : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
+                  }`}
               >
                 仅有下载状态
               </button>
@@ -1884,11 +1881,10 @@ export function TeamProfilePage({
                 onClick={() => {
                   void applyPreset('latest_20');
                 }}
-                className={`rounded border px-3 py-1.5 text-sm ${
-                  activePresetKey === 'latest_20'
-                    ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
-                    : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
-                }`}
+                className={`rounded border px-3 py-1.5 text-sm ${activePresetKey === 'latest_20'
+                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
+                  : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
+                  }`}
               >
                 最近 20 场
               </button>
@@ -1896,7 +1892,7 @@ export function TeamProfilePage({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-gray-300">快速快照</span>
               <label className="sr-only" htmlFor="team-profile-snapshot-name">
-                 快照名称
+                快照名称
               </label>
               <input
                 id="team-profile-snapshot-name"
@@ -1915,7 +1911,7 @@ export function TeamProfilePage({
                 保存快照
               </button>
               <label className="sr-only" htmlFor="team-profile-snapshot-list">
-                 快照列表
+                快照列表
               </label>
               <select
                 id="team-profile-snapshot-list"
@@ -1926,7 +1922,7 @@ export function TeamProfilePage({
                 className="w-48 rounded border border-gray-600 bg-dota-bg px-2.5 py-1.5 text-sm text-gray-200 focus:border-dota-primary focus:outline-none disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
               >
                 {quickSnapshots.length === 0 ? (
-                    <option value="">暂无快照</option>
+                  <option value="">暂无快照</option>
                 ) : (
                   quickSnapshots.map((snapshot) => (
                     <option key={snapshot.name} value={snapshot.name}>
@@ -2128,24 +2124,24 @@ export function TeamProfilePage({
               ? '准备当前可见比赛完成：'
               : visiblePrepareSummary.action === 'prepare_selected_leagues'
                 ? '准备已选联赛完成：'
-              : '准备并打开首场回放（可见）完成：'}{' '}
+                : '准备并打开首场回放（可见）完成：'}{' '}
             总计 {visiblePrepareSummary.total} / 成功 {visiblePrepareSummary.success} / 失败{' '}
             {visiblePrepareSummary.failed}
             {visiblePrepareSummary.action === 'prepare_open_first_visible' &&
-            typeof visiblePrepareSummary.openedMatchId === 'number'
+              typeof visiblePrepareSummary.openedMatchId === 'number'
               ? ` / 已打开回放 ${visiblePrepareSummary.openedMatchId}`
               : ''}
           </div>
         )}
 
-        <div className="mb-5 rounded-lg border border-gray-700 bg-dota-surface p-5">
+        <div className="card mb-5 p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-dota-gold">操作历史</h2>
-              <span className="text-xs text-gray-500">仅会话内有效，最多保留最近 {ACTION_HISTORY_LIMIT} 条。</span>
+            <h2 className="text-xl font-semibold text-dota-gold">操作历史</h2>
+            <span className="text-xs text-gray-500">仅会话内有效，最多保留最近 {ACTION_HISTORY_LIMIT} 条。</span>
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-sm text-gray-300">
-                <span>历史筛选</span>
+              <span>历史筛选</span>
               <select
                 aria-label="历史筛选"
                 value={historyFilterKey}
@@ -2161,7 +2157,7 @@ export function TeamProfilePage({
             </label>
             <button
               type="button"
-                aria-label="重放可见历史"
+              aria-label="重放可见历史"
               onClick={() => {
                 void handleReplayVisibleHistory();
               }}
@@ -2176,30 +2172,30 @@ export function TeamProfilePage({
             </button>
             <button
               type="button"
-               aria-label="清除可见历史"
+              aria-label="清除可见历史"
               onClick={handleClearVisibleHistory}
               disabled={visibleActionHistory.length === 0}
               className="rounded border border-orange-700/60 bg-orange-900/20 px-3 py-1.5 text-xs text-orange-200 hover:border-orange-500/60 hover:text-orange-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
             >
-               清除可见历史
+              清除可见历史
             </button>
             <button
               type="button"
-               aria-label="清除全部历史"
+              aria-label="清除全部历史"
               onClick={handleClearAllHistory}
               disabled={actionHistory.length === 0}
               className="rounded border border-rose-700/60 bg-rose-900/20 px-3 py-1.5 text-xs text-rose-200 hover:border-rose-500/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
             >
-               清除全部历史
+              清除全部历史
             </button>
           </div>
           {actionHistory.length === 0 ? (
             <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
-               暂无操作记录。
+              暂无操作记录。
             </div>
           ) : visibleActionHistory.length === 0 ? (
             <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
-               当前筛选下无历史记录。
+              当前筛选下无历史记录。
             </div>
           ) : (
             <div className="space-y-2" data-testid="action-history-list">
@@ -2222,7 +2218,7 @@ export function TeamProfilePage({
                     {entry.lastRunStatus === 'failed' && (
                       <button
                         type="button"
-                         aria-label={`重试操作 ${entry.actionName}`}
+                        aria-label={`重试操作 ${entry.actionName}`}
                         onClick={() => {
                           void handleReplayAction(entry, 'retry');
                         }}
@@ -2234,7 +2230,7 @@ export function TeamProfilePage({
                     )}
                     <button
                       type="button"
-                       aria-label={`重放操作 ${entry.actionName}`}
+                      aria-label={`重放操作 ${entry.actionName}`}
                       onClick={() => {
                         void handleReplayAction(entry);
                       }}
@@ -2251,7 +2247,7 @@ export function TeamProfilePage({
         </div>
 
         {currentTeamId !== null && (
-          <div className="mb-5 rounded-lg border border-gray-700 bg-dota-surface p-5">
+          <div className="card mb-5 p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-dota-gold">赛事摘要</h2>
               <span className="text-xs text-gray-500">
@@ -2280,31 +2276,31 @@ export function TeamProfilePage({
         )}
 
         {currentTeamId !== null && (
-          <div className="mb-5 rounded-lg border border-gray-700 bg-dota-surface p-5" data-testid="league-compare">
+          <div className="card mb-5 p-5" data-testid="league-compare">
             <div className="mb-3 flex items-center justify-between gap-3">
-               <h2 className="text-xl font-semibold text-dota-gold">联赛对比</h2>
+              <h2 className="text-xl font-semibold text-dota-gold">联赛对比</h2>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                   aria-label="固定榜首联赛"
+                  aria-label="固定榜首联赛"
                   onClick={handlePinTopLeague}
                   disabled={!canPinTopLeague}
                   className="rounded border border-cyan-700/50 px-3 py-1.5 text-xs text-cyan-200 hover:border-cyan-500/50 hover:text-cyan-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
-                   固定榜首联赛
+                  固定榜首联赛
                 </button>
                 <button
                   type="button"
-                   aria-label="应用已选联赛"
+                  aria-label="应用已选联赛"
                   onClick={handleApplySelectedLeagues}
                   disabled={leagueCompareItems.length === 0 || selectedLeagueCompareKeys.length === 0}
                   className="rounded border border-emerald-700/50 px-3 py-1.5 text-xs text-emerald-200 hover:border-emerald-500/50 hover:text-emerald-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
-                   应用已选联赛
+                  应用已选联赛
                 </button>
                 <button
                   type="button"
-                   aria-label="准备已选联赛"
+                  aria-label="准备已选联赛"
                   onClick={() => {
                     void handlePrepareSelectedLeagues();
                   }}
@@ -2319,18 +2315,18 @@ export function TeamProfilePage({
                 </button>
                 <button
                   type="button"
-                   aria-label="导出对比选择（.txt）"
+                  aria-label="导出对比选择（.txt）"
                   onClick={handleExportCompareSelection}
                   disabled={
                     selectedLeagueCompareVisibleMatches.length === 0 || isVisibleBatchActionRunning
                   }
                   className="rounded border border-orange-700/50 px-3 py-1.5 text-xs text-orange-200 hover:border-orange-500/50 hover:text-orange-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
-                   导出对比选择（.txt）
+                  导出对比选择（.txt）
                 </button>
                 <button
                   type="button"
-                   aria-label="打开对比首 3 场回放"
+                  aria-label="打开对比首 3 场回放"
                   onClick={() => {
                     void handleOpenCompareFirst3Replays();
                   }}
@@ -2343,7 +2339,7 @@ export function TeamProfilePage({
                 </button>
                 <button
                   type="button"
-                   aria-label="清除选择"
+                  aria-label="清除选择"
                   onClick={handleClearLeagueSelection}
                   disabled={
                     leagueCompareItems.length === 0 &&
@@ -2352,37 +2348,37 @@ export function TeamProfilePage({
                   }
                   className="rounded border border-gray-600 px-3 py-1.5 text-xs text-gray-200 hover:border-gray-500 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
-                   清除选择
+                  清除选择
                 </button>
                 <span className="text-xs text-gray-500">
-                   当前结果集中按比赛数排序的前 5 联赛。
+                  当前结果集中按比赛数排序的前 5 联赛。
                 </span>
                 {selectedLeagueCompareKeys.length > 0 && (
                   <span className="text-xs text-gray-500">
-                     已选可见比赛：{selectedLeagueCompareVisibleMatches.length}
+                    已选可见比赛：{selectedLeagueCompareVisibleMatches.length}
                   </span>
                 )}
               </div>
             </div>
             {appliedLeagueCompareFilterKeys.length > 0 && (
               <div className="mb-3 rounded border border-emerald-700/40 bg-emerald-900/20 px-3 py-2 text-xs text-emerald-100">
-                 联赛对比多选筛选已启用：已选择 {appliedLeagueCompareFilterKeys.length} 个联赛。
+                联赛对比多选筛选已启用：已选择 {appliedLeagueCompareFilterKeys.length} 个联赛。
               </div>
             )}
             {leagueCompareItems.length === 0 ? (
               <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
-                 暂无联赛对比数据。
+                暂无联赛对比数据。
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-[700px] w-full text-left text-sm">
                   <thead className="bg-gradient-to-r from-gray-900 to-gray-800 uppercase text-gray-300">
                     <tr>
-                       <th className="px-3 py-2.5 font-semibold">选择</th>
-                       <th className="px-3 py-2.5 font-semibold">联赛</th>
-                       <th className="px-3 py-2.5 font-semibold">场次</th>
-                       <th className="px-3 py-2.5 font-semibold">平均时长</th>
-                       <th className="px-3 py-2.5 font-semibold">最近比赛</th>
+                      <th className="px-3 py-2.5 font-semibold">选择</th>
+                      <th className="px-3 py-2.5 font-semibold">联赛</th>
+                      <th className="px-3 py-2.5 font-semibold">场次</th>
+                      <th className="px-3 py-2.5 font-semibold">平均时长</th>
+                      <th className="px-3 py-2.5 font-semibold">最近比赛</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
@@ -2391,7 +2387,7 @@ export function TeamProfilePage({
                         <td className="px-3 py-2.5">
                           <input
                             type="checkbox"
-                             aria-label={`选择联赛对比 ${item.label}`}
+                            aria-label={`选择联赛对比 ${item.label}`}
                             checked={selectedLeagueCompareKeys.includes(item.key)}
                             onChange={(event) =>
                               handleToggleLeagueCompareSelection(item.key, event.target.checked)
@@ -2402,7 +2398,7 @@ export function TeamProfilePage({
                         <td className="px-3 py-2.5">
                           <button
                             type="button"
-                             aria-label={`应用联赛对比筛选 ${item.label}`}
+                            aria-label={`应用联赛对比筛选 ${item.label}`}
                             onClick={() => handleApplyLeagueQuickFilter(item.key)}
                             className="rounded border border-cyan-700/50 px-2.5 py-1 text-left text-cyan-200 hover:border-cyan-500/50 hover:text-cyan-100"
                           >
@@ -2441,67 +2437,67 @@ export function TeamProfilePage({
 
         {loading ? (
           <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
-             加载中...
+            加载中...
           </div>
         ) : currentTeamId === null ? (
           <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
-             请输入战队 ID 并点击查询。
+            请输入战队 ID 并点击查询。
           </div>
         ) : matches.length === 0 ? (
           <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
-             未找到 team_id 为 {currentTeamId} 的近期比赛。
+            未找到 team_id 为 {currentTeamId} 的近期比赛。
           </div>
         ) : groupedMatches.length === 0 ? (
           <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
-             当前筛选条件下没有匹配比赛。
+            当前筛选条件下没有匹配比赛。
           </div>
         ) : (
           <div className="space-y-4">
             {onlyWithDownloadStatus && !hasAnyDownloadMetadata && (
               <div className="rounded border border-yellow-700/50 bg-yellow-900/20 px-4 py-3 text-yellow-200">
-                 当前数据不包含下载状态字段，已展示全部比赛。
+                当前数据不包含下载状态字段，已展示全部比赛。
               </div>
             )}
             {groupedMatches.map((group) => (
               <div
                 key={group.key}
                 data-testid={`league-group-${group.key}`}
-                className="overflow-hidden rounded-lg border border-gray-700 bg-dota-surface shadow-lg"
+                className="card overflow-hidden p-0"
               >
                 <div className="flex items-center justify-between border-b border-gray-700 bg-gray-900/50 px-4 py-3">
                   <div>
                     <h2 className="text-lg font-semibold text-dota-gold">{group.label}</h2>
                     <p className="text-xs text-gray-400">
-                       最近比赛：{formatUnixTimestampLocal(group.matches[0]?.start_time)}
+                      最近比赛：{formatUnixTimestampLocal(group.matches[0]?.start_time)}
                     </p>
                     <p className="text-xs text-gray-500">
-                       {group.matches.length} 场 | 平均时长：{getGroupAverageDuration(group)}
+                      {group.matches.length} 场 | 平均时长：{getGroupAverageDuration(group)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                       aria-label={`在比赛数据库打开联赛 ${group.label}`}
+                      aria-label={`在比赛数据库打开联赛 ${group.label}`}
                       onClick={() => handleOpenInMatchDatabase(group.leagueId)}
                       disabled={!currentTeamId || group.leagueId === undefined || group.leagueId === null}
                       title={
                         group.leagueId === undefined || group.leagueId === null
-                           ? '不可用：该分组缺少 leagueid。'
-                           : '在比赛数据库中打开该战队 + 联赛筛选。'
+                          ? '不可用：该分组缺少 leagueid。'
+                          : '在比赛数据库中打开该战队 + 联赛筛选。'
                       }
                       className="rounded border border-cyan-700/50 px-3 py-1.5 text-xs text-cyan-200 hover:border-cyan-500/50 hover:text-cyan-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                     >
-                       在比赛数据库中打开
+                      在比赛数据库中打开
                     </button>
                     <button
                       type="button"
-                       aria-label={`切换分组 ${group.label}`}
+                      aria-label={`切换分组 ${group.label}`}
                       onClick={() => toggleGroupCollapsed(group.key)}
                       className="rounded border border-gray-600 px-2.5 py-1 text-xs text-gray-200 hover:border-gray-500"
                     >
-                       {getGroupViewState(group.key) === 'expanded' ? '折叠' : '展开'} |{' '}
-                       {getGroupViewState(group.key) === 'expanded' ? '已展开' : '已折叠'} |{' '}
-                       {group.matches.length} 场
+                      {getGroupViewState(group.key) === 'expanded' ? '折叠' : '展开'} |{' '}
+                      {getGroupViewState(group.key) === 'expanded' ? '已展开' : '已折叠'} |{' '}
+                      {group.matches.length} 场
                     </button>
                   </div>
                 </div>
@@ -2510,14 +2506,14 @@ export function TeamProfilePage({
                     <table className="min-w-[960px] w-full text-left">
                       <thead className="bg-gradient-to-r from-gray-900 to-gray-800 text-sm uppercase text-gray-300">
                         <tr>
-                           <th className="px-4 py-3 font-semibold">比赛 ID</th>
-                           <th className="px-4 py-3 font-semibold">开始时间</th>
-                           <th className="px-4 py-3 font-semibold">时长</th>
-                           <th className="px-4 py-3 font-semibold">阵营</th>
-                           <th className="px-4 py-3 font-semibold">天辉战队 ID</th>
-                           <th className="px-4 py-3 font-semibold">夜魇战队 ID</th>
-                           <th className="px-4 py-3 font-semibold">联赛 ID</th>
-                           <th className="px-4 py-3 font-semibold text-right">操作</th>
+                          <th className="px-4 py-3 font-semibold">比赛 ID</th>
+                          <th className="px-4 py-3 font-semibold">开始时间</th>
+                          <th className="px-4 py-3 font-semibold">时长</th>
+                          <th className="px-4 py-3 font-semibold">阵营</th>
+                          <th className="px-4 py-3 font-semibold">天辉战队 ID</th>
+                          <th className="px-4 py-3 font-semibold">夜魇战队 ID</th>
+                          <th className="px-4 py-3 font-semibold">联赛 ID</th>
+                          <th className="px-4 py-3 font-semibold text-right">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-700">
@@ -2586,7 +2582,7 @@ export function TeamProfilePage({
                     </table>
                   </div>
                 ) : (
-                   <div className="px-4 py-3 text-sm text-gray-400">分组已折叠。</div>
+                  <div className="px-4 py-3 text-sm text-gray-400">分组已折叠。</div>
                 )}
               </div>
             ))}
