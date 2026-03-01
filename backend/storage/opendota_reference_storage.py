@@ -14,7 +14,7 @@ class OpenDotaReferenceStorage:
     def upsert_teams(self, teams: list[dict[str, Any]]) -> tuple[int, int]:
         """Upsert teams and return (inserted, updated)."""
         normalized: list[
-            tuple[int, str | None, str | None, str | None, str | None, int, int]
+            tuple[int, str | None, str | None, str | None, str | None, str | None, int, int]
         ] = []
         for raw in teams:
             team_id = self._as_int(raw.get("team_id"))
@@ -26,6 +26,8 @@ class OpenDotaReferenceStorage:
                     team_id,
                     self._as_str(raw.get("name")),
                     self._as_str(raw.get("tag")),
+                    # OpenDota teams 返回 logo_url，我们将其作为 icon_url
+                    self._as_str(raw.get("logo_url") or raw.get("logo")),
                     self._as_str(raw.get("logo_url") or raw.get("logo")),
                     self._as_str(raw.get("logo_sponsor_url") or raw.get("logo_sponsor")),
                     self._as_int(raw.get("wins")) or 0,
@@ -42,17 +44,18 @@ class OpenDotaReferenceStorage:
         placeholders = ",".join("?" for _ in normalized)
         cursor.execute(
             f"""
-            SELECT team_id, name, tag, logo_url, logo_sponsor_url, wins, losses
+            SELECT team_id, name, tag, icon_url, logo_url, logo_sponsor_url, wins, losses
             FROM opendota_teams
             WHERE team_id IN ({placeholders})
             """,
             [row[0] for row in normalized],
         )
         existing_rows = cursor.fetchall()
-        existing_by_id: dict[int, tuple[str | None, str | None, str | None, str | None, int, int]] = {
+        existing_by_id: dict[int, tuple[str | None, str | None, str | None, str | None, str | None, int, int]] = {
             int(row["team_id"]): (
                 row["name"],
                 row["tag"],
+                row["icon_url"],
                 row["logo_url"],
                 row["logo_sponsor_url"],
                 int(row["wins"]),
@@ -63,8 +66,8 @@ class OpenDotaReferenceStorage:
 
         inserted = 0
         updated = 0
-        for team_id, name, tag, logo_url, logo_sponsor_url, wins, losses in normalized:
-            current = (name, tag, logo_url, logo_sponsor_url, wins, losses)
+        for team_id, name, tag, icon_url, logo_url, logo_sponsor_url, wins, losses in normalized:
+            current = (name, tag, icon_url, logo_url, logo_sponsor_url, wins, losses)
             existing = existing_by_id.get(team_id)
             if existing is None:
                 inserted += 1
@@ -75,12 +78,13 @@ class OpenDotaReferenceStorage:
         cursor.executemany(
             """
             INSERT INTO opendota_teams (
-                team_id, name, tag, logo_url, logo_sponsor_url, wins, losses, last_synced_at
+                team_id, name, tag, icon_url, logo_url, logo_sponsor_url, wins, losses, last_synced_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_id) DO UPDATE SET
                 name = excluded.name,
                 tag = excluded.tag,
+                icon_url = excluded.icon_url,
                 logo_url = excluded.logo_url,
                 logo_sponsor_url = excluded.logo_sponsor_url,
                 wins = excluded.wins,
@@ -95,7 +99,7 @@ class OpenDotaReferenceStorage:
     def upsert_leagues(self, leagues: list[dict[str, Any]]) -> tuple[int, int]:
         """Upsert leagues and return (inserted, updated)."""
         normalized: list[
-            tuple[int, str | None, str | None, str | None, str | None, str | None]
+            tuple[int, str | None, str | None, str | None, str | None, str | None, str | None]
         ] = []
         for raw in leagues:
             leagueid = self._as_int(raw.get("leagueid"))
@@ -107,7 +111,9 @@ class OpenDotaReferenceStorage:
                     leagueid,
                     self._as_str(raw.get("name")),
                     self._as_str(raw.get("tier")),
-                    self._as_str(raw.get("icon_url")),
+                    # OpenDota leagues 返回 image_url/logo_url，我们优先使用 image_url 作为 icon
+                    self._as_str(raw.get("image_url") or raw.get("logo_url")),
+                    self._as_str(raw.get("logo_url")),
                     self._as_str(raw.get("image_url")),
                     self._as_str(raw.get("banner_url") or raw.get("banner")),
                 )
@@ -122,18 +128,19 @@ class OpenDotaReferenceStorage:
         placeholders = ",".join("?" for _ in normalized)
         cursor.execute(
             f"""
-            SELECT leagueid, name, tier, icon_url, image_url, banner_url
+            SELECT leagueid, name, tier, icon_url, logo_url, image_url, banner_url
             FROM opendota_leagues
             WHERE leagueid IN ({placeholders})
             """,
             [row[0] for row in normalized],
         )
         existing_rows = cursor.fetchall()
-        existing_by_id: dict[int, tuple[str | None, str | None, str | None, str | None, str | None]] = {
+        existing_by_id: dict[int, tuple[str | None, str | None, str | None, str | None, str | None, str | None]] = {
             int(row["leagueid"]): (
                 row["name"],
                 row["tier"],
                 row["icon_url"],
+                row["logo_url"],
                 row["image_url"],
                 row["banner_url"],
             )
@@ -142,8 +149,8 @@ class OpenDotaReferenceStorage:
 
         inserted = 0
         updated = 0
-        for leagueid, name, tier, icon_url, image_url, banner_url in normalized:
-            current = (name, tier, icon_url, image_url, banner_url)
+        for leagueid, name, tier, icon_url, logo_url, image_url, banner_url in normalized:
+            current = (name, tier, icon_url, logo_url, image_url, banner_url)
             existing = existing_by_id.get(leagueid)
             if existing is None:
                 inserted += 1
@@ -154,13 +161,14 @@ class OpenDotaReferenceStorage:
         cursor.executemany(
             """
             INSERT INTO opendota_leagues (
-                leagueid, name, tier, icon_url, image_url, banner_url, last_synced_at
+                leagueid, name, tier, icon_url, logo_url, image_url, banner_url, last_synced_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(leagueid) DO UPDATE SET
                 name = excluded.name,
                 tier = excluded.tier,
                 icon_url = excluded.icon_url,
+                logo_url = excluded.logo_url,
                 image_url = excluded.image_url,
                 banner_url = excluded.banner_url,
                 last_synced_at = excluded.last_synced_at
@@ -180,7 +188,7 @@ class OpenDotaReferenceStorage:
 
         cursor.execute(
             """
-            SELECT team_id, name, tag, logo_url, logo_sponsor_url, wins, losses, last_synced_at
+            SELECT team_id, name, tag, icon_url, logo_url, logo_sponsor_url, wins, losses, last_synced_at
             FROM opendota_teams
             ORDER BY team_id ASC
             LIMIT ? OFFSET ?
@@ -193,6 +201,7 @@ class OpenDotaReferenceStorage:
                 "team_id": int(row["team_id"]),
                 "name": row["name"],
                 "tag": row["tag"],
+                "icon_url": row["icon_url"],
                 "logo_url": row["logo_url"],
                 "logo_sponsor_url": row["logo_sponsor_url"],
                 "wins": int(row["wins"]),
@@ -213,7 +222,7 @@ class OpenDotaReferenceStorage:
 
         cursor.execute(
             """
-            SELECT leagueid, name, tier, icon_url, image_url, banner_url, last_synced_at
+            SELECT leagueid, name, tier, icon_url, logo_url, image_url, banner_url, last_synced_at
             FROM opendota_leagues
             ORDER BY leagueid ASC
             LIMIT ? OFFSET ?
@@ -227,6 +236,7 @@ class OpenDotaReferenceStorage:
                 "name": row["name"],
                 "tier": row["tier"],
                 "icon_url": row["icon_url"],
+                "logo_url": row["logo_url"],
                 "image_url": row["image_url"],
                 "banner_url": row["banner_url"],
                 "last_synced_at": int(row["last_synced_at"]),

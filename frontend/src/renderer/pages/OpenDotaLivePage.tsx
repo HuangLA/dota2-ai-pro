@@ -115,7 +115,7 @@ function MatchIcon({ url, label }: { url?: string | null; label: string }) {
     return (
       <div
         title={`${label} 图标缺失`}
-        className="h-8 w-8 rounded-lg border border-dashed border-slate-500 bg-slate-800/90"
+        className="h-7 w-7 shrink-0 rounded border border-dashed border-slate-500/40 bg-slate-800/50"
       />
     );
   }
@@ -124,7 +124,7 @@ function MatchIcon({ url, label }: { url?: string | null; label: string }) {
     <img
       src={url}
       alt={`${label} 图标`}
-      className="h-8 w-8 rounded-lg border border-slate-500/70 bg-slate-900 object-cover"
+      className="max-h-7 max-w-[56px] shrink-0 rounded border border-slate-600/40 bg-slate-900/60 object-contain"
       onError={() => setBroken(true)}
     />
   );
@@ -523,8 +523,8 @@ export function OpenDotaLivePage() {
                         </td>
                         <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatUnixTimestampLocal(match.start_time)}</td>
                         <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDurationClock(match.duration)}</td>
-                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 py-2.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-1 min-w-[64px]">
                             <MatchIcon
                               label="Radiant"
                               url={pickAssetUrl(
@@ -533,11 +533,11 @@ export function OpenDotaLivePage() {
                                 match.radiant_logo_sponsor_url
                               )}
                             />
-                            <span>{radiantName}</span>
+                            <span className="text-[11px] text-center leading-tight max-w-[96px] truncate text-slate-300" title={radiantName}>{radiantName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 py-2.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-1 min-w-[64px]">
                             <MatchIcon
                               label="Dire"
                               url={pickAssetUrl(
@@ -546,11 +546,11 @@ export function OpenDotaLivePage() {
                                 match.dire_logo_sponsor_url
                               )}
                             />
-                            <span>{direName}</span>
+                            <span className="text-[11px] text-center leading-tight max-w-[96px] truncate text-slate-300" title={direName}>{direName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 py-2.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-1 min-w-[64px]">
                             <MatchIcon
                               label="League"
                               url={pickAssetUrl(
@@ -560,7 +560,7 @@ export function OpenDotaLivePage() {
                                 match.league_logo_url
                               )}
                             />
-                            <span>{leagueName}</span>
+                            <span className="text-[11px] text-center leading-tight max-w-[96px] truncate text-slate-300" title={leagueName}>{leagueName}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-200 whitespace-nowrap">{getSourceLabel(match.source)}</td>

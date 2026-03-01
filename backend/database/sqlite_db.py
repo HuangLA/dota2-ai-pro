@@ -364,8 +364,17 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
     if "dire_logo_url" not in columns:
         cursor.execute("ALTER TABLE opendota_matches ADD COLUMN dire_logo_url TEXT")
 
+    if "radiant_icon_url" not in columns:
+        cursor.execute("ALTER TABLE opendota_matches ADD COLUMN radiant_icon_url TEXT")
+
+    if "dire_icon_url" not in columns:
+        cursor.execute("ALTER TABLE opendota_matches ADD COLUMN dire_icon_url TEXT")
+
     if "league_icon_url" not in columns:
         cursor.execute("ALTER TABLE opendota_matches ADD COLUMN league_icon_url TEXT")
+
+    if "league_logo_url" not in columns:
+        cursor.execute("ALTER TABLE opendota_matches ADD COLUMN league_logo_url TEXT")
 
     if "league_image_url" not in columns:
         cursor.execute("ALTER TABLE opendota_matches ADD COLUMN league_image_url TEXT")
@@ -399,9 +408,12 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
                 radiant_team_name TEXT,
                 dire_team_name TEXT,
                 league_name TEXT,
+                radiant_icon_url TEXT,
+                dire_icon_url TEXT,
                 radiant_logo_url TEXT,
                 dire_logo_url TEXT,
                 league_icon_url TEXT,
+                league_logo_url TEXT,
                 league_image_url TEXT,
                 league_banner_url TEXT,
                 radiant_logo_sponsor_url TEXT,
@@ -423,9 +435,12 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
                 radiant_team_name,
                 dire_team_name,
                 league_name,
+                radiant_icon_url,
+                dire_icon_url,
                 radiant_logo_url,
                 dire_logo_url,
                 league_icon_url,
+                league_logo_url,
                 league_image_url,
                 league_banner_url,
                 radiant_logo_sponsor_url,
@@ -446,13 +461,16 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
                 radiant_team_name,
                 dire_team_name,
                 league_name,
+                NULL,  -- radiant_icon_url
+                NULL,  -- dire_icon_url
                 radiant_logo_url,
                 dire_logo_url,
                 league_icon_url,
-                NULL,
-                NULL,
-                NULL,
-                NULL,
+                NULL,  -- league_logo_url
+                NULL,  -- league_image_url
+                NULL,  -- league_banner_url
+                NULL,  -- radiant_logo_sponsor_url
+                NULL,  -- dire_logo_sponsor_url
                 last_synced_at
             FROM opendota_matches_legacy
             """
@@ -464,6 +482,9 @@ def _ensure_opendota_reference_columns(cursor: sqlite3.Cursor) -> None:
     """Ensure opendota reference tables support icon/logo fields."""
     cursor.execute("PRAGMA table_info(opendota_teams)")
     team_columns = {str(row["name"]) for row in cursor.fetchall()}
+    if "icon_url" not in team_columns:
+        cursor.execute("ALTER TABLE opendota_teams ADD COLUMN icon_url TEXT")
+
     if "logo_url" not in team_columns:
         cursor.execute("ALTER TABLE opendota_teams ADD COLUMN logo_url TEXT")
 
@@ -474,6 +495,9 @@ def _ensure_opendota_reference_columns(cursor: sqlite3.Cursor) -> None:
     league_columns = {str(row["name"]) for row in cursor.fetchall()}
     if "icon_url" not in league_columns:
         cursor.execute("ALTER TABLE opendota_leagues ADD COLUMN icon_url TEXT")
+
+    if "logo_url" not in league_columns:
+        cursor.execute("ALTER TABLE opendota_leagues ADD COLUMN logo_url TEXT")
 
     if "image_url" not in league_columns:
         cursor.execute("ALTER TABLE opendota_leagues ADD COLUMN image_url TEXT")

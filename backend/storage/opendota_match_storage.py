@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 """Storage helpers for OpenDota recent match persistence."""
 
-from __future__ import annotations
+from utils.steam_cdn import get_team_logo_url, get_league_icon_url, get_dotabuff_league_url
 
 import time
 from typing import Any
@@ -42,6 +44,10 @@ class OpenDotaMatchStorage:
                 str | None,
                 str | None,
                 str | None,
+                str | None,
+                str | None,
+                str | None,
+                str | None,
             ]
         ] = []
         for raw in matches:
@@ -53,13 +59,22 @@ class OpenDotaMatchStorage:
             duration = self._as_int(raw.get("duration")) or 0
             radiant_team_id = self._as_int(raw.get("radiant_team_id"))
             if radiant_team_id is None:
-                radiant_team_id = self._as_int(raw.get("radiant_team"))
+                # radiant_team 是嵌套对象，需要提取 team_id
+                radiant_team = raw.get("radiant_team")
+                if isinstance(radiant_team, dict):
+                    radiant_team_id = self._as_int(radiant_team.get("team_id"))
             dire_team_id = self._as_int(raw.get("dire_team_id"))
             if dire_team_id is None:
-                dire_team_id = self._as_int(raw.get("dire_team"))
+                # dire_team 是嵌套对象，需要提取 team_id
+                dire_team = raw.get("dire_team")
+                if isinstance(dire_team, dict):
+                    dire_team_id = self._as_int(dire_team.get("team_id"))
             leagueid = self._as_int(raw.get("leagueid"))
             if leagueid is None:
-                leagueid = self._as_int(raw.get("league_id"))
+                # league 可能是嵌套对象
+                league = raw.get("league")
+                if isinstance(league, dict):
+                    leagueid = self._as_int(league.get("leagueid") or league.get("league_id"))
             radiant_team_name = self._extract_name(
                 raw,
                 direct_keys=("radiant_team_name", "radiant_name"),
@@ -75,6 +90,17 @@ class OpenDotaMatchStorage:
                 direct_keys=("league_name",),
                 nested_keys=(("league", "name"),),
             )
+            # OpenDota API 返回 logo_url，我们将其映射到 icon_url（前端优先使用）
+            radiant_icon_url = self._extract_url(
+                raw,
+                direct_keys=("radiant_icon_url", "radiant_team_icon", "radiant_team_logo"),
+                nested_keys=(("radiant_team", "logo_url"), ("radiant_team", "logo"), ("radiant_team", "icon_url")),
+            )
+            dire_icon_url = self._extract_url(
+                raw,
+                direct_keys=("dire_icon_url", "dire_team_icon", "dire_team_logo"),
+                nested_keys=(("dire_team", "logo_url"), ("dire_team", "logo"), ("dire_team", "icon_url")),
+            )
             radiant_logo_url = self._extract_url(
                 raw,
                 direct_keys=("radiant_logo_url", "radiant_team_logo"),
@@ -85,10 +111,16 @@ class OpenDotaMatchStorage:
                 direct_keys=("dire_logo_url", "dire_team_logo"),
                 nested_keys=(("dire_team", "logo_url"), ("dire_team", "logo")),
             )
+            # OpenDota API 返回 image_url/logo_url，我们优先使用 image_url 作为 icon
             league_icon_url = self._extract_url(
                 raw,
-                direct_keys=("league_icon_url",),
-                nested_keys=(("league", "image_url"), ("league", "logo_url"), ("league", "icon")),
+                direct_keys=("league_icon_url", "league_image_url"),
+                nested_keys=(("league", "image_url"), ("league", "logo_url"), ("league", "icon_url")),
+            )
+            league_logo_url = self._extract_url(
+                raw,
+                direct_keys=("league_logo_url",),
+                nested_keys=(("league", "logo_url"), ("league", "logo")),
             )
             league_image_url = self._extract_url(
                 raw,
@@ -123,9 +155,12 @@ class OpenDotaMatchStorage:
                     radiant_team_name,
                     dire_team_name,
                     league_name,
+                    radiant_icon_url,
+                    dire_icon_url,
                     radiant_logo_url,
                     dire_logo_url,
                     league_icon_url,
+                    league_logo_url,
                     league_image_url,
                     league_banner_url,
                     radiant_logo_sponsor_url,
@@ -152,9 +187,12 @@ class OpenDotaMatchStorage:
                 radiant_team_name,
                 dire_team_name,
                 league_name,
+                radiant_icon_url,
+                dire_icon_url,
                 radiant_logo_url,
                 dire_logo_url,
                 league_icon_url,
+                league_logo_url,
                 league_image_url,
                 league_banner_url,
                 radiant_logo_sponsor_url,
@@ -183,6 +221,9 @@ class OpenDotaMatchStorage:
                 str | None,
                 str | None,
                 str | None,
+                str | None,
+                str | None,
+                str | None,
             ],
         ] = {
             int(row["match_id"]): (
@@ -195,9 +236,12 @@ class OpenDotaMatchStorage:
                 row["radiant_team_name"],
                 row["dire_team_name"],
                 row["league_name"],
+                row["radiant_icon_url"],
+                row["dire_icon_url"],
                 row["radiant_logo_url"],
                 row["dire_logo_url"],
                 row["league_icon_url"],
+                row["league_logo_url"],
                 row["league_image_url"],
                 row["league_banner_url"],
                 row["radiant_logo_sponsor_url"],
@@ -224,12 +268,13 @@ class OpenDotaMatchStorage:
             INSERT INTO opendota_matches (
                 match_id, start_time, duration, radiant_team_id,
                 dire_team_id, leagueid, source, radiant_team_name,
-                dire_team_name, league_name, radiant_logo_url,
-                dire_logo_url, league_icon_url, league_image_url,
+                dire_team_name, league_name, radiant_icon_url,
+                dire_icon_url, radiant_logo_url, dire_logo_url,
+                league_icon_url, league_logo_url, league_image_url,
                 league_banner_url, radiant_logo_sponsor_url,
                 dire_logo_sponsor_url, last_synced_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(match_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 duration = excluded.duration,
@@ -240,9 +285,12 @@ class OpenDotaMatchStorage:
                 radiant_team_name = excluded.radiant_team_name,
                 dire_team_name = excluded.dire_team_name,
                 league_name = excluded.league_name,
+                radiant_icon_url = excluded.radiant_icon_url,
+                dire_icon_url = excluded.dire_icon_url,
                 radiant_logo_url = excluded.radiant_logo_url,
                 dire_logo_url = excluded.dire_logo_url,
                 league_icon_url = excluded.league_icon_url,
+                league_logo_url = excluded.league_logo_url,
                 league_image_url = excluded.league_image_url,
                 league_banner_url = excluded.league_banner_url,
                 radiant_logo_sponsor_url = excluded.radiant_logo_sponsor_url,
@@ -354,9 +402,12 @@ class OpenDotaMatchStorage:
                 COALESCE(m.radiant_team_name, rt.name) AS radiant_team_name,
                 COALESCE(m.dire_team_name, dt.name) AS dire_team_name,
                 COALESCE(m.league_name, l.name) AS league_name,
+                COALESCE(m.radiant_icon_url, rt.icon_url) AS radiant_icon_url,
+                COALESCE(m.dire_icon_url, dt.icon_url) AS dire_icon_url,
                 COALESCE(m.radiant_logo_url, rt.logo_url) AS radiant_logo_url,
                 COALESCE(m.dire_logo_url, dt.logo_url) AS dire_logo_url,
                 COALESCE(m.league_icon_url, l.icon_url) AS league_icon_url,
+                COALESCE(m.league_logo_url, l.logo_url) AS league_logo_url,
                 COALESCE(m.radiant_logo_sponsor_url, rt.logo_sponsor_url) AS radiant_logo_sponsor_url,
                 COALESCE(m.dire_logo_sponsor_url, dt.logo_sponsor_url) AS dire_logo_sponsor_url,
                 COALESCE(m.league_image_url, l.image_url) AS league_image_url,
@@ -384,21 +435,47 @@ class OpenDotaMatchStorage:
         cursor.execute(data_query, tuple(data_query_params))
         rows = cursor.fetchall()
 
-        records = [
-            {
+        records = []
+        for row in rows:
+            # Apply Steam CDN fallback for missing team/league icons
+            radiant_team_id = row["radiant_team_id"]
+            dire_team_id = row["dire_team_id"]
+            leagueid = row["leagueid"]
+            
+            # 战队图片回退：DB值（Steam UGC URL from /teams/{id} API） → Steam CDN → None
+            # 优先使用数据库中存储的完整 UGC URL（例如 cdn.steamusercontent.com）
+            radiant_icon_url = row["radiant_icon_url"] or get_team_logo_url(radiant_team_id)
+            dire_icon_url = row["dire_icon_url"] or get_team_logo_url(dire_team_id)
+            radiant_logo_url = row["radiant_logo_url"] or get_team_logo_url(radiant_team_id)
+            dire_logo_url = row["dire_logo_url"] or get_team_logo_url(dire_team_id)
+            
+            # 联赛图片回退：Dotabuff CDN（100%可用） → DB值 → Steam CDN（低覆盖率） → None
+            league_icon_url = (
+                get_dotabuff_league_url(leagueid)
+                or row["league_icon_url"]
+                or row["league_image_url"]
+                or get_league_icon_url(leagueid)
+                or row["league_banner_url"]  # banner 通常为 null，但作为最后备选
+            )
+            league_logo_url = row["league_logo_url"] or row["league_image_url"]
+            
+            records.append({
                 "match_id": int(row["match_id"]),
                 "start_time": int(row["start_time"]),
                 "duration": int(row["duration"]),
-                "radiant_team_id": row["radiant_team_id"],
-                "dire_team_id": row["dire_team_id"],
-                "leagueid": row["leagueid"],
+                "radiant_team_id": radiant_team_id,
+                "dire_team_id": dire_team_id,
+                "leagueid": leagueid,
                 "source": row["source"],
                 "radiant_team_name": row["radiant_team_name"],
                 "dire_team_name": row["dire_team_name"],
                 "league_name": row["league_name"],
-                "radiant_logo_url": row["radiant_logo_url"],
-                "dire_logo_url": row["dire_logo_url"],
-                "league_icon_url": row["league_icon_url"],
+                "radiant_icon_url": radiant_icon_url,
+                "dire_icon_url": dire_icon_url,
+                "radiant_logo_url": radiant_logo_url,
+                "dire_logo_url": dire_logo_url,
+                "league_icon_url": league_icon_url,
+                "league_logo_url": league_logo_url,
                 "radiant_logo_sponsor_url": row["radiant_logo_sponsor_url"],
                 "dire_logo_sponsor_url": row["dire_logo_sponsor_url"],
                 "league_image_url": row["league_image_url"],
@@ -412,9 +489,7 @@ class OpenDotaMatchStorage:
                 "local_parse_status": row["local_parse_status"],
                 "local_replay_path": row["local_replay_path"],
                 "last_synced_at": int(row["last_synced_at"]),
-            }
-            for row in rows
-        ]
+            })
 
         return total, records
 

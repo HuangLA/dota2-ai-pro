@@ -46,9 +46,12 @@ class RemoteMatchRecord(BaseModel):
     league_name: str | None = None
     source: str
     last_synced_at: int
+    radiant_icon_url: str | None = None
+    dire_icon_url: str | None = None
     radiant_logo_url: str | None = None
     dire_logo_url: str | None = None
     league_icon_url: str | None = None
+    league_logo_url: str | None = None
     radiant_logo_sponsor_url: str | None = None
     dire_logo_sponsor_url: str | None = None
     league_image_url: str | None = None

@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4.5 收尾 + S-Next 稳定性冲刺 🚀 |
-| 最后更新 | 2026-02-26 |
+| 最后更新 | 2026-03-02 |
 | 更新者 | OpenCode |
 
 ---
@@ -30,7 +30,7 @@
 
 ---
 
-## 当前进展摘要（2026-02-26）
+## 当前进展摘要（2026-03-02）
 
 ### S-Next 执行看板（补充）
 | ID | 任务 | 状态 | 结果摘要 |
@@ -47,6 +47,22 @@
 ### 最近一次回归验证
 - 命令: `py -m pytest tests/test_playback_e2e.py tests/test_timeline_regression.py tests/test_playback_pause_contract.py tests/test_playback_hud_contract.py tests/test_replay_download_service.py tests/test_replay_download_storage.py -q`
 - 结果: `79 passed`
+
+### 最新完成任务（2026-03-02）
+**✅ OpenDota Live 战队/联赛图标显示修复**
+- **问题**: 职业比赛的战队图标和联赛图标大量缺失
+- **根因**: OpenDota API `/proMatches` 返回嵌套对象 (`radiant_team.team_id`)，原代码尝试将对象转为整数导致 NULL
+- **修复**:
+  - 修正嵌套对象提取逻辑 (`opendota_match_storage.py` lines 60-77)
+  - 实现多层回退策略：DB icon_url → Steam CDN → Dotabuff CDN
+  - 新增 `utils/steam_cdn.py` 工具模块（Steam CDN + Dotabuff CDN URL 构建）
+  - 添加 `/teams/{id}` 和 `/leagues/{id}` 单个资源查询 API
+  - 创建 `sync_teams_simple.py` 脚本同步缺失的战队/联赛参考数据
+- **成果**:
+  - 战队图标覆盖率: **93.5%** (261/279 teams with icon_url)
+  - 联赛图标覆盖率: **100%** (via Dotabuff CDN fallback)
+  - 前端布局优化: 调整 OpenDotaLivePage 表格列宽，图标尺寸统一为 24x24px
+- **技术债清理**: 删除 11+ 临时测试脚本，保持项目目录整洁
 
 ---
 

@@ -54,6 +54,20 @@ class OpenDotaService:
         bounded_limit = max(1, min(limit, 200))
         return await self._fetch_list_endpoint(path="/leagues", bounded_limit=bounded_limit)
 
+    async def fetch_team_by_id(self, team_id: int) -> dict[str, Any] | None:
+        """Fetch single team by ID from OpenDota."""
+        try:
+            return await self._fetch_dict_endpoint(path=f"/teams/{team_id}")
+        except OpenDotaServiceError:
+            return None
+
+    async def fetch_league_by_id(self, league_id: int) -> dict[str, Any] | None:
+        """Fetch single league by ID from OpenDota."""
+        try:
+            return await self._fetch_dict_endpoint(path=f"/leagues/{league_id}")
+        except OpenDotaServiceError:
+            return None
+
     async def fetch_match_details(self, match_id: int) -> dict[str, Any]:
         """Fetch OpenDota match details for replay preparation."""
         return await self._fetch_dict_endpoint(path=f"/matches/{match_id}")
