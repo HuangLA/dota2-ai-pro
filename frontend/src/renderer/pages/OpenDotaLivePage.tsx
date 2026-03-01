@@ -165,10 +165,10 @@ export function OpenDotaLivePage() {
       setStatusPanel((current) =>
         current && current.matchId === matchId
           ? {
-              ...current,
-              loading: true,
-              error: null,
-            }
+            ...current,
+            loading: true,
+            error: null,
+          }
           : current
       );
     }
@@ -194,11 +194,11 @@ export function OpenDotaLivePage() {
       setStatusPanel((current) =>
         current && current.matchId === matchId
           ? {
-              ...current,
-              loading: false,
-              error: '状态详情加载失败。',
-              autoPolling: false,
-            }
+            ...current,
+            loading: false,
+            error: '状态详情加载失败。',
+            autoPolling: false,
+          }
           : current
       );
     }
@@ -329,7 +329,7 @@ export function OpenDotaLivePage() {
     selectedMatchIds.length > 0 && selectedMatchIds.length < currentPageMatchIds.length;
 
   return (
-    <div className="p-6 text-white min-h-screen bg-dota-bg">
+    <div className="p-6 text-white min-h-full bg-dota-bg">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-950/50 p-5 shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -349,7 +349,7 @@ export function OpenDotaLivePage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-700 bg-dota-surface p-5 shadow-lg">
+        <div className="card p-5">
           <h2 className="mb-4 text-lg font-semibold text-slate-100">筛选条件</h2>
           <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
             <label className="flex h-[42px] items-center gap-2 rounded border border-slate-600 bg-dota-bg px-3">
@@ -413,11 +413,10 @@ export function OpenDotaLivePage() {
 
         {feedback && (
           <div
-            className={`rounded border px-4 py-3 text-sm ${
-              feedback.type === 'success'
-                ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
-                : 'border-red-500/60 bg-red-900/20 text-red-200'
-            }`}
+            className={`rounded border px-4 py-3 text-sm ${feedback.type === 'success'
+              ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
+              : 'border-red-500/60 bg-red-900/20 text-red-200'
+              }`}
           >
             {feedback.message}
           </div>
@@ -425,7 +424,7 @@ export function OpenDotaLivePage() {
 
         {error && <div className="rounded border border-red-600 bg-red-900/20 px-4 py-3 text-red-200">{error}</div>}
 
-        <div className="rounded-xl border border-slate-700 bg-dota-surface shadow-xl">
+        <div className="card p-0 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-5 py-4">
             <div className="text-sm text-slate-300">
               当前页可选 <span className="font-semibold text-white">{currentPageMatchIds.length}</span> 场，
@@ -443,7 +442,7 @@ export function OpenDotaLivePage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1320px] w-full text-left">
+            <table className="w-full text-left table-auto">
               <thead className="bg-gradient-to-r from-slate-900 to-slate-800 text-xs uppercase tracking-wide text-slate-300">
                 <tr>
                   <th className="px-4 py-3">
@@ -467,16 +466,16 @@ export function OpenDotaLivePage() {
                       className="h-4 w-4 accent-cyan-500"
                     />
                   </th>
-                  <th className="px-4 py-3 whitespace-nowrap w-[140px]">match_id</th>
-                  <th className="px-4 py-3">开始时间</th>
-                  <th className="px-4 py-3">时长</th>
-                  <th className="px-4 py-3">Radiant</th>
-                  <th className="px-4 py-3">Dire</th>
-                  <th className="px-4 py-3">联赛</th>
-                  <th className="px-4 py-3">source</th>
-                  <th className="px-4 py-3 whitespace-nowrap w-[120px]">下载状态</th>
-                  <th className="px-4 py-3 whitespace-nowrap w-[120px]">解析状态</th>
-                  <th className="px-4 py-3 text-right whitespace-nowrap w-[240px]">操作</th>
+                  <th className="px-4 py-3 whitespace-nowrap">比赛 ID</th>
+                  <th className="px-4 py-3 whitespace-nowrap">开始时间</th>
+                  <th className="px-4 py-3 whitespace-nowrap">时长</th>
+                  <th className="px-4 py-3 whitespace-nowrap">天辉</th>
+                  <th className="px-4 py-3 whitespace-nowrap">夜魇</th>
+                  <th className="px-4 py-3 whitespace-nowrap">联赛</th>
+                  <th className="px-4 py-3 whitespace-nowrap">来源</th>
+                  <th className="px-4 py-3 whitespace-nowrap">下载状态</th>
+                  <th className="px-4 py-3 whitespace-nowrap">解析状态</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/80">
@@ -522,9 +521,9 @@ export function OpenDotaLivePage() {
                         <td className="px-4 py-3 font-mono font-semibold text-dota-gold whitespace-nowrap">
                           {match.match_id}
                         </td>
-                        <td className="px-4 py-3 text-slate-300">{formatUnixTimestampLocal(match.start_time)}</td>
-                        <td className="px-4 py-3 text-slate-300">{formatDurationClock(match.duration)}</td>
-                        <td className="px-4 py-3 text-slate-200">
+                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatUnixTimestampLocal(match.start_time)}</td>
+                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDurationClock(match.duration)}</td>
+                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <MatchIcon
                               label="Radiant"
@@ -537,7 +536,7 @@ export function OpenDotaLivePage() {
                             <span>{radiantName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-200">
+                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <MatchIcon
                               label="Dire"
@@ -550,7 +549,7 @@ export function OpenDotaLivePage() {
                             <span>{direName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-200">
+                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <MatchIcon
                               label="League"
@@ -564,21 +563,19 @@ export function OpenDotaLivePage() {
                             <span>{leagueName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-200">{getSourceLabel(match.source)}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">{getSourceLabel(match.source)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold leading-5 ${
-                              getDownloadStatusBadge(match.download_status).className
-                            }`}
+                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold leading-5 ${getDownloadStatusBadge(match.download_status).className
+                              }`}
                           >
                             {getDownloadStatusBadge(match.download_status).label}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold leading-5 ${
-                              getParseStatusBadge(match.local_parse_status).className
-                            }`}
+                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold leading-5 ${getParseStatusBadge(match.local_parse_status).className
+                              }`}
                           >
                             {getParseStatusBadge(match.local_parse_status).label}
                           </span>

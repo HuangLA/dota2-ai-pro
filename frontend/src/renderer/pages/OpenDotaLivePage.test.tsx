@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import React from 'react';
+
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OpenDotaLivePage from './OpenDotaLivePage';

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { libraryService, LibraryMatchRecord } from '../api/libraryService';
 import { formatDurationClock, formatUnixTimestampLocal } from './matchDatabaseFormatting';
 
@@ -113,14 +113,14 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
   };
 
   return (
-    <div className="p-6 text-white min-h-screen bg-dota-bg">
+    <div className="p-6 text-white min-h-full bg-dota-bg">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950/40 p-5 shadow-xl">
           <h1 className="text-3xl font-bold text-dota-gold">Replay Library</h1>
           <p className="mt-1 text-sm text-emerald-100/80">仅展示已解析完成（completed）的本地录像。</p>
         </div>
 
-        <div className="rounded-xl border border-slate-700 bg-dota-surface p-5 shadow-lg">
+        <div className="card p-5">
           <h2 className="mb-4 text-lg font-semibold text-slate-100">筛选条件</h2>
           <form
             onSubmit={(event) => {
@@ -175,11 +175,10 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
 
         {feedback && (
           <div
-            className={`rounded border px-4 py-3 text-sm ${
-              feedback.type === 'success'
-                ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
-                : 'border-red-500/60 bg-red-900/20 text-red-200'
-            }`}
+            className={`rounded border px-4 py-3 text-sm ${feedback.type === 'success'
+              ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
+              : 'border-red-500/60 bg-red-900/20 text-red-200'
+              }`}
           >
             {feedback.message}
           </div>
@@ -187,7 +186,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
 
         {error && <div className="rounded border border-red-600 bg-red-900/20 px-4 py-3 text-red-200">{error}</div>}
 
-        <div className="rounded-xl border border-slate-700 bg-dota-surface shadow-xl">
+        <div className="card p-0 overflow-hidden mt-6">
           <div className="overflow-x-auto">
             <table className="min-w-[1120px] w-full text-left">
               <thead className="bg-gradient-to-r from-slate-900 to-slate-800 text-xs uppercase tracking-wide text-slate-300">
