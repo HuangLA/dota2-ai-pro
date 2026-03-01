@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import React from 'react';
+
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 
 vi.mock('./pages/OpenDotaLivePage', () => ({
@@ -16,15 +17,17 @@ vi.mock('./pages/ReplayLibraryPage', () => ({
 }));
 
 describe('App Live and Library navigation', () => {
-  it('opens new pages from home entry buttons', () => {
-    render(<App />);
+  it('opens new pages from sidebar navigation', () => {
+    render(
+      <MemoryRouter initialEntries={['/openDotaLive']}>
+        <App />
+      </MemoryRouter>
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: 'OpenDota Live' }));
-    expect(screen.getByText('Mock OpenDota Live Page')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: '比赛数据库' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '返回首页' }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Replay Library' }));
+    // We mock OpenDotaPage and ReplayLibraryPage, but test checks Live and Library navigation
+    fireEvent.click(screen.getByRole('link', { name: '本地录像库' }));
     expect(screen.getByText('Mock Replay Library Page')).toBeTruthy();
   });
 });

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import React from 'react';
+
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 
 vi.mock('./pages/MatchDatabasePage', () => ({
@@ -67,16 +68,20 @@ vi.mock('./pages/RealMatchViewer', () => ({
 
 describe('App Team Profile replay navigation', () => {
   it('returns to Team Profile and restores in-session view state', () => {
-    render(<App />);
+    render(
+      <MemoryRouter initialEntries={['/teamProfile']}>
+        <App />
+      </MemoryRouter>
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: '战队档案' }));
+    fireEvent.click(screen.getByRole('link', { name: '战队档案' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mock Open Replay From Team Profile' }));
 
     expect(screen.getByTestId('viewer-match').textContent).toBe('8674716612');
     expect(screen.getByTestId('viewer-source').textContent).toBe('team_profile');
-    expect(screen.getByRole('button', { name: '返回战队档案' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '← 返回' })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: '返回战队档案' }));
+    fireEvent.click(screen.getByRole('button', { name: '← 返回' }));
 
     expect(screen.getByTestId('team-profile-state-team-id').textContent).toBe('15');
     expect(screen.getByTestId('team-profile-state-league-filter').textContent).toBe('league-15475');
