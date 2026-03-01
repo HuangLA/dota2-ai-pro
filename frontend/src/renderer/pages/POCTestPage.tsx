@@ -31,7 +31,7 @@ export function POCTestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-dota-bg p-8">
+    <div className="min-h-full bg-dota-bg p-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-dota-gold mb-2">
           技术验证 POC
@@ -44,31 +44,28 @@ export function POCTestPage() {
         <div className="flex gap-2 mb-6 border-b border-gray-700">
           <button
             onClick={() => setActiveTab('pixijs')}
-            className={`px-4 py-2 -mb-px ${
-              activeTab === 'pixijs'
-                ? 'border-b-2 border-dota-accent text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
+            className={`px-4 py-2 -mb-px ${activeTab === 'pixijs'
+              ? 'border-b-2 border-dota-accent text-white'
+              : 'text-gray-400 hover:text-white'
+              }`}
           >
             PixiJS 渲染
           </button>
           <button
             onClick={() => setActiveTab('api')}
-            className={`px-4 py-2 -mb-px ${
-              activeTab === 'api'
-                ? 'border-b-2 border-dota-accent text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
+            className={`px-4 py-2 -mb-px ${activeTab === 'api'
+              ? 'border-b-2 border-dota-accent text-white'
+              : 'text-gray-400 hover:text-white'
+              }`}
           >
             后端 API
           </button>
           <button
             onClick={() => setActiveTab('summary')}
-            className={`px-4 py-2 -mb-px ${
-              activeTab === 'summary'
-                ? 'border-b-2 border-dota-accent text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
+            className={`px-4 py-2 -mb-px ${activeTab === 'summary'
+              ? 'border-b-2 border-dota-accent text-white'
+              : 'text-gray-400 hover:text-white'
+              }`}
           >
             总结
           </button>
@@ -78,7 +75,7 @@ export function POCTestPage() {
         {activeTab === 'pixijs' && <PixiJSStressTest />}
 
         {activeTab === 'api' && (
-          <div className="bg-dota-surface p-6 rounded-lg">
+          <div className="card p-6">
             <h2 className="text-xl font-bold text-dota-gold mb-4">
               后端 API 测试
             </h2>
@@ -106,15 +103,13 @@ export function POCTestPage() {
                 </div>
 
                 {healthResult && (
-                  <div className={`mt-3 p-3 rounded ${
-                    healthResult.success 
-                      ? 'bg-green-900/30 border border-green-700' 
-                      : 'bg-red-900/30 border border-red-700'
-                  }`}>
+                  <div className={`mt-3 p-3 rounded ${healthResult.success
+                    ? 'bg-green-900/30 border border-green-700'
+                    : 'bg-red-900/30 border border-red-700'
+                    }`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        healthResult.success ? 'bg-green-500' : 'bg-red-500'
-                      }`}></span>
+                      <span className={`w-2 h-2 rounded-full ${healthResult.success ? 'bg-green-500' : 'bg-red-500'
+                        }`}></span>
                       <span className="font-medium">
                         {healthResult.success ? '成功' : '失败'}
                       </span>
@@ -155,15 +150,13 @@ export function POCTestPage() {
                 </div>
 
                 {matchesResult && (
-                  <div className={`mt-3 p-3 rounded ${
-                    matchesResult.success 
-                      ? 'bg-green-900/30 border border-green-700' 
-                      : 'bg-red-900/30 border border-red-700'
-                  }`}>
+                  <div className={`mt-3 p-3 rounded ${matchesResult.success
+                    ? 'bg-green-900/30 border border-green-700'
+                    : 'bg-red-900/30 border border-red-700'
+                    }`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        matchesResult.success ? 'bg-green-500' : 'bg-red-500'
-                      }`}></span>
+                      <span className={`w-2 h-2 rounded-full ${matchesResult.success ? 'bg-green-500' : 'bg-red-500'
+                        }`}></span>
                       <span className="font-medium">
                         {matchesResult.success ? '成功' : '失败'}
                       </span>
@@ -189,8 +182,8 @@ export function POCTestPage() {
               <div className="bg-dota-primary/20 border border-dota-primary p-4 rounded">
                 <h4 className="font-medium mb-2">后端状态</h4>
                 <p className="text-sm text-gray-300">
-                  {healthResult?.success 
-                    ? '后端运行正常！' 
+                  {healthResult?.success
+                    ? '后端运行正常！'
                     : '请确保后端正在运行: '}
                   {!healthResult?.success && (
                     <code className="bg-dota-bg px-2 py-1 rounded ml-1">
@@ -204,7 +197,7 @@ export function POCTestPage() {
         )}
 
         {activeTab === 'summary' && (
-          <div className="bg-dota-surface p-6 rounded-lg">
+          <div className="card p-6">
             <h2 className="text-xl font-bold text-dota-gold mb-4">
               POC 总结
             </h2>
@@ -239,9 +232,8 @@ export function POCTestPage() {
                   <h3 className="font-medium text-lg mb-3">后端</h3>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        healthResult?.success ? 'bg-green-500' : 'bg-gray-500'
-                      }`}></span>
+                      <span className={`w-2 h-2 rounded-full ${healthResult?.success ? 'bg-green-500' : 'bg-gray-500'
+                        }`}></span>
                       FastAPI 服务器
                       {healthResult?.success && (
                         <span className="text-xs text-green-400">
@@ -250,9 +242,8 @@ export function POCTestPage() {
                       )}
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        matchesResult?.success ? 'bg-green-500' : 'bg-gray-500'
-                      }`}></span>
+                      <span className={`w-2 h-2 rounded-full ${matchesResult?.success ? 'bg-green-500' : 'bg-gray-500'
+                        }`}></span>
                       SQLite 数据库
                       {matchesResult?.success && (
                         <span className="text-xs text-green-400">
@@ -275,18 +266,17 @@ export function POCTestPage() {
               </div>
 
               {/* Test Status */}
-              <div className={`p-4 rounded border ${
-                healthResult?.success && matchesResult?.success
-                  ? 'bg-green-900/20 border-green-700'
-                  : 'bg-yellow-900/20 border-yellow-700'
-              }`}>
+              <div className={`p-4 rounded border ${healthResult?.success && matchesResult?.success
+                ? 'bg-green-900/20 border-green-700'
+                : 'bg-yellow-900/20 border-yellow-700'
+                }`}>
                 <h4 className="font-medium mb-2">整体状态</h4>
                 <p className="text-sm text-gray-300">
                   {healthResult?.success && matchesResult?.success ? (
                     <>
                       所有核心系统已验证并正常运行！<br />
                       <span className="text-xs text-gray-400 mt-1 block">
-                        前后端通信: 正常 | 
+                        前后端通信: 正常 |
                         API 响应时间: ~{((healthResult.responseTime || 0) + (matchesResult.responseTime || 0)) / 2}ms 平均
                       </span>
                     </>
