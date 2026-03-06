@@ -153,8 +153,14 @@ class ClarityParser:
             
         except subprocess.TimeoutExpired:
             raise ClarityParserError(f"Parser timed out after {self.timeout} seconds")
+        except ClarityParserError:
+            # Re-raise ClarityParserError as-is
+            raise
         except Exception as e:
-            raise ClarityParserError(f"Parser failed: {e}")
+            # Preserve full error details
+            error_msg = str(e) or repr(e)
+            error_type = type(e).__name__
+            raise ClarityParserError(f"Parser failed: [{error_type}] {error_msg}")
     
     async def parse_async(self, replay_path: str, minimal: bool = False) -> ParseResult:
         """
@@ -209,12 +215,16 @@ class ClarityParser:
             
             return self._convert_to_result(data)
             
+        except ClarityParserError:
+            # Re-raise ClarityParserError as-is
+            raise
         except asyncio.TimeoutError:
             raise ClarityParserError(f"Parser timed out after {self.timeout} seconds")
         except Exception as e:
-            if isinstance(e, ClarityParserError):
-                raise
-            raise ClarityParserError(f"Parser failed: {e}")
+            # Preserve full error details
+            error_msg = str(e) or repr(e)
+            error_type = type(e).__name__
+            raise ClarityParserError(f"Parser failed: [{error_type}] {error_msg}")
     
     def _convert_to_result(self, data: dict[str, Any]) -> ParseResult:
         """Convert raw JSON data to typed ParseResult."""

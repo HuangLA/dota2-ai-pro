@@ -5,14 +5,34 @@ from pathlib import Path
 from typing import Optional
 
 _connection: Optional[sqlite3.Connection] = None
+_db_path: Optional[str] = None  # Store path for auto-reconnection
 
 
 def get_connection() -> sqlite3.Connection:
-    """Get the global database connection."""
-    global _connection
+    """Get the global database connection. Auto-initialize if needed."""
+    global _connection, _db_path
+    
+    # Auto-reconnect if connection was lost
     if _connection is None:
-        raise RuntimeError("Database not initialized. Call init_database() first.")
-    return _connection
+        if _db_path is None:
+            raise RuntimeError("Database not initialized. Call init_database() first.")
+        # Auto-reconnect using stored path
+        import logging
+        logging.warning(f"Database connection lost. Auto-reconnecting to {_db_path}")
+        return init_database(_db_path)
+    
+    # Verify connection is still alive
+    try:
+        _connection.execute("SELECT 1")
+        return _connection
+    except sqlite3.Error:
+        # Connection is dead, reconnect
+        import logging
+        logging.warning(f"Database connection dead. Reconnecting to {_db_path}")
+        _connection = None
+        if _db_path is None:
+            raise RuntimeError("Database path lost. Cannot reconnect.")
+        return init_database(_db_path)
 
 
 def init_database(db_path: str) -> sqlite3.Connection:
@@ -20,7 +40,10 @@ def init_database(db_path: str) -> sqlite3.Connection:
     Initialize SQLite database with schema.
     Creates database file and tables if they don't exist.
     """
-    global _connection
+    global _connection, _db_path
+    
+    # Store path for auto-reconnection
+    _db_path = db_path
     
     # Ensure directory exists
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)

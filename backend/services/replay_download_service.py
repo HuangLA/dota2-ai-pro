@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import bz2
 from pathlib import Path
 import shutil
@@ -38,6 +40,7 @@ class ReplayDownloadService:
         self.parse_service = parse_service or ParseService(replays_dir=str(self.replays_dir))
         self.opendota_match_storage = opendota_match_storage or OpenDotaMatchStorage()
 
+        self.logger = logging.getLogger(__name__)
     def _decompress_replay_archive(self, archive_path: Path, match_id: int) -> Path:
         replay_path = self.replays_dir / f"{match_id}.dem"
         with bz2.open(archive_path, "rb") as compressed:
@@ -159,15 +162,26 @@ class ReplayDownloadService:
                 parse_result = await self.parse_service.parse_replay_async(str(replay_path))
                 if not parse_result.success:
                     parse_error = parse_result.error or "Unknown parse error."
+                    self.logger.error(
+                        f"Parse failed for match {match_id}: {parse_error}",
+                        extra={"match_id": match_id, "task_id": task_id}
+                    )
                     return self.replay_download_storage.mark_failed(
                         task_id=task_id,
                         error_message=f"Replay parse failed: {parse_error}",
                         error_code="PARSE_FAILED",
                     )
             except Exception as exc:
+                # Capture full exception details for debugging
+                error_msg = str(exc) or repr(exc) or "Unknown parsing error occurred"
+                error_type = type(exc).__name__
+                self.logger.exception(
+                    f"Parse exception for match {match_id}: [{error_type}] {error_msg}",
+                    extra={"match_id": match_id, "task_id": task_id}
+                )
                 return self.replay_download_storage.mark_failed(
                     task_id=task_id,
-                    error_message=f"Replay parse failed: {exc}",
+                    error_message=f"Replay parse failed: [{error_type}] {error_msg}",
                     error_code="PARSE_FAILED",
                 )
 
