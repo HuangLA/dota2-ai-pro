@@ -108,6 +108,12 @@ function isTerminalDownloadStatus(status: string | null | undefined): boolean {
   return normalized === 'completed' || normalized === 'failed';
 }
 
+interface LiveMatchStatus {
+  downloadStatus: string;   // 'downloading' | 'parsing' | 'completed' | 'failed' | ...
+  downloadProgress: number; // 0-100
+  parseStatus: string | null;
+}
+
 function MatchIcon({ url, label }: { url?: string | null; label: string }) {
   const [broken, setBroken] = useState(false);
 
@@ -159,6 +165,7 @@ export function OpenDotaLivePage() {
     detail: RemoteMatchStatusResponse | null;
     autoPolling: boolean;
   } | null>(null);
+  const [liveStatus, setLiveStatus] = useState<Map<number, LiveMatchStatus>>(new Map());
 
   const refreshStatusPanel = useCallback(async (matchId: number, withLoading = true) => {
     if (withLoading) {
@@ -222,6 +229,18 @@ export function OpenDotaLivePage() {
       });
       setMatches(result.matches ?? []);
       setTotal(result.total ?? 0);
+    // Seed liveStatus for active downloads so progress tracking survives page refresh
+    setLiveStatus((prev) => {
+      const next = new Map(prev);
+      for (const m of result.matches ?? []) {
+        if (next.has(m.match_id)) continue;
+        const rawStatus = (m.download_status ?? '').toLowerCase();
+        if (!rawStatus || rawStatus === 'completed' || rawStatus === 'failed') continue;
+        const progress = rawStatus === 'parsing' ? 50 : rawStatus === 'prepared' ? 5 : 10;
+        next.set(m.match_id, { downloadStatus: rawStatus, downloadProgress: progress, parseStatus: null });
+      }
+      return next;
+    });
     } catch (fetchError) {
       console.error('Failed to fetch remote matches:', fetchError);
       setMatches([]);
@@ -255,6 +274,47 @@ export function OpenDotaLivePage() {
 
     return () => window.clearTimeout(timer);
   }, [statusPanel, refreshStatusPanel]);
+
+  // Per-row live status polling (same pattern as statusPanel auto-polling above)
+  useEffect(() => {
+    // Find active (non-terminal) entries that still need polling
+    const activeIds: number[] = [];
+    liveStatus.forEach((entry, matchId) => {
+      if (entry.downloadStatus !== 'completed' && entry.downloadStatus !== 'failed') {
+        activeIds.push(matchId);
+      }
+    });
+
+    if (activeIds.length === 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      const updates = new Map(liveStatus);
+      let changed = false;
+
+      for (const matchId of activeIds) {
+        try {
+          const resp = await remoteService.getMatchStatus(matchId);
+          const dlStatus = (resp.download_task?.status || 'downloading').toLowerCase();
+          const dlProgress = resp.download_task?.progress ?? (dlStatus === 'parsing' ? 60 : dlStatus === 'completed' ? 100 : 10);
+          const parseStatus = resp.local_parse_status ?? null;
+          updates.set(matchId, { downloadStatus: dlStatus, downloadProgress: dlProgress, parseStatus });
+          changed = true;
+        } catch {
+          // On error, mark failed so we stop polling this entry
+          updates.set(matchId, { downloadStatus: 'failed', downloadProgress: 0, parseStatus: null });
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        setLiveStatus(updates);
+      }
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [liveStatus]);
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -298,6 +358,15 @@ export function OpenDotaLivePage() {
       setBatchLoading(true);
     }
 
+    // Immediately set live status so UI shows progress without waiting for API response
+    setLiveStatus((prev) => {
+      const next = new Map(prev);
+      for (const id of matchIds) {
+        next.set(id, { downloadStatus: 'downloading', downloadProgress: 10, parseStatus: null });
+      }
+      return next;
+    });
+
     try {
       const result = await remoteService.ingestMatches(matchIds);
       setFeedback({
@@ -314,9 +383,33 @@ export function OpenDotaLivePage() {
             ? `比赛 ${singleMatchId} 入库失败。`
             : `批量入库失败（${matchIds.length} 场）。`,
       });
+      // Clear live status for failed ingest calls
+      setLiveStatus((prev) => {
+        const next = new Map(prev);
+        for (const id of matchIds) {
+          next.delete(id);
+        }
+        return next;
+      });
     } finally {
       setActionMatchId(null);
       setBatchLoading(false);
+    }
+  };
+
+  const handleCancel = async (matchId: number) => {
+    try {
+      await remoteService.cancelMatchDownload(matchId);
+      setLiveStatus((prev) => {
+        const next = new Map(prev);
+        next.delete(matchId);
+        return next;
+      });
+      setFeedback({ type: 'success', message: `比赛 ${matchId} 下载已取消。` });
+      await fetchMatches();
+    } catch (cancelError) {
+      console.error('Failed to cancel download:', cancelError);
+      setFeedback({ type: 'error', message: '取消下载失败，请稍后重试。' });
     }
   };
 
@@ -445,7 +538,7 @@ export function OpenDotaLivePage() {
             <table className="w-full text-left table-auto">
               <thead className="bg-gradient-to-r from-slate-900 to-slate-800 text-xs uppercase tracking-wide text-slate-300">
                 <tr>
-                  <th className="px-4 py-3">
+                  <th className="px-2 py-2">
                     <input
                       aria-label="全选当前页"
                       type="checkbox"
@@ -466,16 +559,16 @@ export function OpenDotaLivePage() {
                       className="h-4 w-4 accent-cyan-500"
                     />
                   </th>
-                  <th className="px-4 py-3 whitespace-nowrap">比赛 ID</th>
-                  <th className="px-4 py-3 whitespace-nowrap">开始时间</th>
-                  <th className="px-4 py-3 whitespace-nowrap">时长</th>
-                  <th className="px-4 py-3 whitespace-nowrap">天辉</th>
-                  <th className="px-4 py-3 whitespace-nowrap">夜魇</th>
-                  <th className="px-4 py-3 whitespace-nowrap">联赛</th>
-                  <th className="px-4 py-3 whitespace-nowrap">来源</th>
-                  <th className="px-4 py-3 whitespace-nowrap">下载状态</th>
-                  <th className="px-4 py-3 whitespace-nowrap">解析状态</th>
-                  <th className="px-4 py-3 text-right whitespace-nowrap">操作</th>
+                  <th className="px-2 py-2 whitespace-nowrap">比赛 ID</th>
+                  <th className="px-2 py-2 whitespace-nowrap">开始时间</th>
+                  <th className="px-2 py-2 whitespace-nowrap">时长</th>
+                  <th className="px-2 py-2 whitespace-nowrap">天辉</th>
+                  <th className="px-2 py-2 whitespace-nowrap">夜魇</th>
+                  <th className="px-2 py-2 whitespace-nowrap">联赛</th>
+                  <th className="px-2 py-2 whitespace-nowrap">来源</th>
+                  <th className="px-2 py-2 whitespace-nowrap">下载状态</th>
+                  <th className="px-2 py-2 whitespace-nowrap">解析状态</th>
+                  <th className="px-2 py-2 text-right whitespace-nowrap">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/80">
@@ -500,10 +593,11 @@ export function OpenDotaLivePage() {
                     const direName = getTeamLabel(match.dire_team_name ?? match.dire_name, match.dire_team_id);
                     const leagueName = getLeagueLabel(match.league_name, match.leagueid);
                     const ingesting = actionMatchId === match.match_id;
+                    const live = liveStatus.get(match.match_id);
 
                     return (
                       <tr key={match.match_id} className="hover:bg-slate-800/40">
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-2">
                           <input
                             aria-label={`选择比赛 ${match.match_id}`}
                             type="checkbox"
@@ -518,13 +612,13 @@ export function OpenDotaLivePage() {
                             className="h-4 w-4 accent-cyan-500"
                           />
                         </td>
-                        <td className="px-4 py-3 font-mono font-semibold text-dota-gold whitespace-nowrap">
+                        <td className="px-2 py-2 font-mono font-semibold text-dota-gold whitespace-nowrap">
                           {match.match_id}
                         </td>
-                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatUnixTimestampLocal(match.start_time)}</td>
-                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDurationClock(match.duration)}</td>
-                        <td className="px-3 py-2.5 text-slate-200">
-                          <div className="flex flex-col items-center gap-1 min-w-[64px]">
+                        <td className="px-2 py-2 text-slate-300 whitespace-nowrap">{formatUnixTimestampLocal(match.start_time)}</td>
+                        <td className="px-2 py-2 text-slate-300 whitespace-nowrap">{formatDurationClock(match.duration)}</td>
+                        <td className="px-2 py-1.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
                             <MatchIcon
                               label="Radiant"
                               url={pickAssetUrl(
@@ -533,11 +627,11 @@ export function OpenDotaLivePage() {
                                 match.radiant_logo_sponsor_url
                               )}
                             />
-                            <span className="text-[11px] text-center leading-tight max-w-[96px] truncate text-slate-300" title={radiantName}>{radiantName}</span>
+                            <span className="text-[10px] text-center leading-tight max-w-[60px] truncate text-slate-300" title={radiantName}>{radiantName}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 text-slate-200">
-                          <div className="flex flex-col items-center gap-1 min-w-[64px]">
+                        <td className="px-2 py-1.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
                             <MatchIcon
                               label="Dire"
                               url={pickAssetUrl(
@@ -546,11 +640,11 @@ export function OpenDotaLivePage() {
                                 match.dire_logo_sponsor_url
                               )}
                             />
-                            <span className="text-[11px] text-center leading-tight max-w-[96px] truncate text-slate-300" title={direName}>{direName}</span>
+                            <span className="text-[10px] text-center leading-tight max-w-[60px] truncate text-slate-300" title={direName}>{direName}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 text-slate-200">
-                          <div className="flex flex-col items-center gap-1 min-w-[64px]">
+                        <td className="px-2 py-1.5 text-slate-200">
+                          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
                             <MatchIcon
                               label="League"
                               url={pickAssetUrl(
@@ -560,34 +654,67 @@ export function OpenDotaLivePage() {
                                 match.league_logo_url
                               )}
                             />
-                            <span className="text-[11px] text-center leading-tight max-w-[96px] truncate text-slate-300" title={leagueName}>{leagueName}</span>
+                            <span className="text-[10px] text-center leading-tight max-w-[60px] truncate text-slate-300" title={leagueName}>{leagueName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-200 whitespace-nowrap">{getSourceLabel(match.source)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold leading-5 ${getDownloadStatusBadge(match.download_status).className
-                              }`}
-                          >
-                            {getDownloadStatusBadge(match.download_status).label}
-                          </span>
+                        <td className="px-2 py-2 text-slate-200 whitespace-nowrap">{getSourceLabel(match.source)}</td>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {live?.downloadStatus === 'downloading' ? (
+                            <div className="group relative h-5 w-[72px] rounded-full bg-slate-700">
+                              <div className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500" style={{ width: `${live.downloadProgress}%` }} />
+                              <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
+                                {live.downloadProgress}%
+                              </span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); void handleCancel(match.match_id); }}
+                                title="取消下载"
+                                className="absolute inset-y-0 right-0 z-20 flex w-[18px] items-center justify-center rounded-r-full bg-red-600/90 hover:bg-red-500 text-[9px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              >✕</button>
+                            </div>
+                          ) : live ? (
+                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${
+                              live.downloadStatus === 'failed'
+                                ? 'border-red-500/60 bg-red-900/30 text-red-200'
+                                : 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200'
+                            }`}>
+                              {live.downloadStatus === 'failed' ? '下载失败' : '下载成功'}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getDownloadStatusBadge(match.download_status).className}`}>
+                              {getDownloadStatusBadge(match.download_status).label}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold leading-5 ${getParseStatusBadge(match.local_parse_status).className
-                              }`}
-                          >
-                            {getParseStatusBadge(match.local_parse_status).label}
-                          </span>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {live?.downloadStatus === 'parsing' ? (
+                            <div className="relative h-5 w-[56px] rounded-full bg-slate-700">
+                              <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
+                              <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
+                                解析中
+                              </span>
+                            </div>
+                          ) : live ? (
+                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${
+                              live.downloadStatus === 'completed'
+                                ? 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200'
+                                : 'border-slate-500/60 bg-slate-800/60 text-slate-300'
+                            }`}>
+                              {live.downloadStatus === 'completed' ? '解析成功' : '--'}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getParseStatusBadge(match.local_parse_status).className}`}>
+                              {getParseStatusBadge(match.local_parse_status).label}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="flex flex-nowrap items-center justify-end gap-2">
+                        <td className="px-2 py-2 text-right whitespace-nowrap">
+                          <div className="flex flex-nowrap items-center justify-end gap-1">
                             <button
                               onClick={() => {
                                 void handleIngest([match.match_id]);
                               }}
                               disabled={ingesting || batchLoading}
-                              className="rounded border border-emerald-500/60 px-3 py-1.5 text-sm whitespace-nowrap text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded border border-emerald-500/60 px-2 py-1 text-xs whitespace-nowrap text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {ingesting ? '入库中...' : '下载并入库'}
                             </button>
@@ -602,7 +729,7 @@ export function OpenDotaLivePage() {
                                 });
                                 await refreshStatusPanel(match.match_id, false);
                               }}
-                              className="rounded border border-cyan-500/60 px-3 py-1.5 text-sm whitespace-nowrap text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
+                              className="rounded border border-cyan-500/60 px-2 py-1 text-xs whitespace-nowrap text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
                             >
                               状态详情
                             </button>
