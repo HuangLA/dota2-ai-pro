@@ -141,6 +141,13 @@ async def root() -> dict[str, str]:
     }
 
 
+# On Windows, ensure ProactorEventLoop is used so asyncio subprocesses work.
+# SelectorEventLoop (which uvicorn may default to) raises NotImplementedError
+# when asyncio.create_subprocess_exec is called.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+
 if __name__ == "__main__":
     import uvicorn
     

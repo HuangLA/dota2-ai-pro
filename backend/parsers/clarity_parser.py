@@ -166,6 +166,10 @@ class ClarityParser:
         """
         Parse a replay file asynchronously.
         
+        Runs the synchronous parse() in a thread pool to avoid Windows asyncio
+        SelectorEventLoop incompatibility with create_subprocess_exec, which
+        raises NotImplementedError() on Windows when uvicorn uses SelectorEventLoop.
+        
         Args:
             replay_path: Path to the .dem replay file
             minimal: If True, only extract basic metadata (faster)
@@ -177,55 +181,8 @@ class ClarityParser:
             ClarityParserError: If parsing fails
             FileNotFoundError: If replay file doesn't exist
         """
-        replay_file = Path(replay_path)
-        if not replay_file.exists():
-            raise FileNotFoundError(f"Replay file not found: {replay_path}")
-        
-        # Build command
-        cmd = [str(self.java_path), "-jar", str(self.jar_path), str(replay_file)]
-        if minimal:
-            cmd.append("--minimal")
-        
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=self.timeout
-            )
-            
-            stdout_str = _decode_bytes(stdout)
-            stderr_str = _decode_bytes(stderr)
-            
-            if not stdout_str.strip():
-                raise ClarityParserError(
-                    f"No output from parser. stderr: {stderr_str[:500]}"
-                )
-            
-            try:
-                data = json.loads(stdout_str)
-            except json.JSONDecodeError as e:
-                raise ClarityParserError(
-                    f"Failed to parse JSON output: {e}\nOutput: {stdout_str[:500]}"
-                )
-            
-            return self._convert_to_result(data)
-            
-        except ClarityParserError:
-            # Re-raise ClarityParserError as-is
-            raise
-        except asyncio.TimeoutError:
-            raise ClarityParserError(f"Parser timed out after {self.timeout} seconds")
-        except Exception as e:
-            # Preserve full error details
-            error_msg = str(e) or repr(e)
-            error_type = type(e).__name__
-            raise ClarityParserError(f"Parser failed: [{error_type}] {error_msg}")
-    
+        return await asyncio.to_thread(self.parse, replay_path, minimal)
+
     def _convert_to_result(self, data: dict[str, Any]) -> ParseResult:
         """Convert raw JSON data to typed ParseResult."""
         
