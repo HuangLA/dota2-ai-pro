@@ -152,10 +152,44 @@ class ReplayDownloadService:
             ) as client:
                 async with client.stream("GET", replay_url) as response:
                     response.raise_for_status()
+                    content_length = response.headers.get("content-length")
+                    total_bytes = int(content_length) if content_length else 0
+                    downloaded_bytes = 0
+                    last_reported_pct = 10
+                    chunk_count = 0
+                    cancelled = False
                     with download_target.open("wb") as output_file:
                         async for chunk in response.aiter_bytes():
                             if chunk:
                                 output_file.write(chunk)
+                                downloaded_bytes += len(chunk)
+                                chunk_count += 1
+                                if total_bytes > 0:
+                                    raw_pct = int(downloaded_bytes / total_bytes * 49)
+                                    pct = max(10, min(49, raw_pct))
+                                    if pct >= last_reported_pct + 5:
+                                        last_reported_pct = pct
+                                        self.replay_download_storage.update_download_progress(task_id, pct)
+                                        current = self.replay_download_storage.get_task(task_id)
+                                        if current and current.get("error_code") == "CANCELLED":
+                                            cancelled = True
+                                            break
+                                elif chunk_count % 200 == 0:
+                                    current = self.replay_download_storage.get_task(task_id)
+                                    if current and current.get("error_code") == "CANCELLED":
+                                        cancelled = True
+                                        break
+
+            if cancelled:
+                try:
+                    download_target.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                current_task = self.replay_download_storage.get_task(task_id)
+                return current_task if current_task is not None else {}
+
+            # Download complete — transition to parsing phase
+            self.replay_download_storage.mark_parsing(task_id)
 
             try:
                 replay_path = self._decompress_replay_archive(download_target, match_id)
@@ -172,7 +206,6 @@ class ReplayDownloadService:
                         error_code="PARSE_FAILED",
                     )
             except Exception as exc:
-                # Capture full exception details for debugging
                 error_msg = str(exc) or repr(exc) or "Unknown parsing error occurred"
                 error_type = type(exc).__name__
                 self.logger.exception(
@@ -263,6 +296,38 @@ class ReplayDownloadService:
         return {
             "status": "ok",
             "message": f"Replay files deleted for match_id={match_id}.",
+            "task": updated,
+        }
+
+    def cancel_match_download(self, match_id: int) -> dict[str, Any]:
+        """Cancel the latest active download for a match and delete partial artifacts."""
+        active = None
+        for status in ("downloading", "parsing", "prepared", "pending"):
+            active = self._latest_task_for_match(match_id=match_id, status=status)
+            if active:
+                break
+
+        if active is None:
+            return {
+                "status": "error",
+                "message": f"No active download found for match_id={match_id}.",
+                "task": None,
+            }
+
+        task_id = str(active["task_id"])
+        updated = self.replay_download_storage.mark_cancelled(task_id)
+
+        # Best-effort cleanup — file may be locked on Windows if actively writing
+        for p in (self.replays_dir / f"{match_id}.dem.bz2", self.replays_dir / f"{match_id}.dem"):
+            try:
+                if p.exists() and p.is_file():
+                    p.unlink()
+            except OSError:
+                pass  # Locked file; execute_download will clean up on next chunk check
+
+        return {
+            "status": "ok",
+            "message": f"Download cancelled for match_id={match_id}.",
             "task": updated,
         }
 
