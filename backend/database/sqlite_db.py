@@ -245,7 +245,8 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
             task_id TEXT PRIMARY KEY,
             match_id INTEGER NOT NULL,
             status TEXT NOT NULL
-                CHECK(status IN ('pending', 'prepared', 'downloading', 'completed', 'failed')),
+                CHECK(status IN ('pending', 'prepared', 'downloading', 'parsing', 'completed', 'failed')),
+            progress INTEGER NOT NULL DEFAULT 0,
             attempt_count INTEGER NOT NULL DEFAULT 0,
             replay_url TEXT,
             download_path TEXT,
@@ -294,6 +295,7 @@ def _ensure_replay_download_task_columns(cursor: sqlite3.Cursor) -> None:
     cursor.execute("PRAGMA table_info(replay_download_tasks)")
     columns = {str(row["name"]) for row in cursor.fetchall()}
 
+    # Add missing columns first (safe ALTER TABLE ops)
     if "attempt_count" not in columns:
         cursor.execute(
             "ALTER TABLE replay_download_tasks ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0"
@@ -305,14 +307,25 @@ def _ensure_replay_download_task_columns(cursor: sqlite3.Cursor) -> None:
     if "error_code" not in columns:
         cursor.execute("ALTER TABLE replay_download_tasks ADD COLUMN error_code TEXT")
 
+    if "progress" not in columns:
+        cursor.execute(
+            "ALTER TABLE replay_download_tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0"
+        )
+
+    # Check if the status CHECK constraint includes the new statuses (parsing) AND progress column
     cursor.execute(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'replay_download_tasks'"
     )
     row = cursor.fetchone()
     table_sql = str(row["sql"]).lower() if row and row["sql"] else ""
-    supports_new_statuses = "downloading" in table_sql and "completed" in table_sql
+    needs_upgrade = (
+        # Must have 'parsing' in status CHECK
+        "'parsing'" not in table_sql
+        # Must have both download/completed statuses (old schema guard)
+        or "downloading" not in table_sql
+    )
 
-    if not supports_new_statuses:
+    if needs_upgrade:
         cursor.execute("ALTER TABLE replay_download_tasks RENAME TO replay_download_tasks_legacy")
         cursor.execute(
             """
@@ -320,7 +333,8 @@ def _ensure_replay_download_task_columns(cursor: sqlite3.Cursor) -> None:
                 task_id TEXT PRIMARY KEY,
                 match_id INTEGER NOT NULL,
                 status TEXT NOT NULL
-                    CHECK(status IN ('pending', 'prepared', 'downloading', 'completed', 'failed')),
+                    CHECK(status IN ('pending', 'prepared', 'downloading', 'parsing', 'completed', 'failed')),
+                progress INTEGER NOT NULL DEFAULT 0,
                 attempt_count INTEGER NOT NULL DEFAULT 0,
                 replay_url TEXT,
                 download_path TEXT,
@@ -334,33 +348,25 @@ def _ensure_replay_download_task_columns(cursor: sqlite3.Cursor) -> None:
         cursor.execute(
             """
             INSERT INTO replay_download_tasks (
-                task_id,
-                match_id,
-                status,
-                attempt_count,
-                replay_url,
-                download_path,
-                error_code,
-                error_message,
-                created_at,
-                updated_at
+                task_id, match_id, status, progress, attempt_count,
+                replay_url, download_path, error_code, error_message,
+                created_at, updated_at
             )
             SELECT
-                task_id,
-                match_id,
-                status,
+                task_id, match_id,
+                CASE
+                    WHEN status IN ('pending','prepared','downloading','parsing','completed','failed')
+                        THEN status
+                    ELSE 'failed'
+                END,
+                COALESCE(progress, 0),
                 COALESCE(attempt_count, 0),
-                replay_url,
-                download_path,
-                NULL,
-                error_message,
-                created_at,
-                updated_at
+                replay_url, download_path, NULL, error_message,
+                created_at, updated_at
             FROM replay_download_tasks_legacy
             """
         )
         cursor.execute("DROP TABLE replay_download_tasks_legacy")
-
 
 def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
     """Ensure opendota_matches supports source/name/icon fields in-place."""
