@@ -292,3 +292,12 @@ async def get_remote_match_status(match_id: int) -> RemoteMatchStatusResponse:
         replay_dem_exists=dem_path.exists(),
         replay_bz2_exists=bz2_path.exists(),
     )
+
+
+@router.delete("/matches/{match_id}/download")
+async def cancel_match_download(match_id: int) -> dict[str, Any]:
+    """Cancel active download task for a match and delete partial artifacts."""
+    result = replay_download_service.cancel_match_download(match_id=match_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result.get("message", "No active download found."))
+    return result
