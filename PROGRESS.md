@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4.5 收尾 + S-Next 稳定性冲刺 🚀 |
-| 最后更新 | 2026-03-02 |
+| 最后更新 | 2026-03-08 |
 | 更新者 | OpenCode |
 
 ---
@@ -48,21 +48,27 @@
 - 命令: `py -m pytest tests/test_playback_e2e.py tests/test_timeline_regression.py tests/test_playback_pause_contract.py tests/test_playback_hud_contract.py tests/test_replay_download_service.py tests/test_replay_download_storage.py -q`
 - 结果: `79 passed`
 
-### 最新完成任务（2026-03-02）
-**✅ OpenDota Live 战队/联赛图标显示修复**
-- **问题**: 职业比赛的战队图标和联赛图标大量缺失
-- **根因**: OpenDota API `/proMatches` 返回嵌套对象 (`radiant_team.team_id`)，原代码尝试将对象转为整数导致 NULL
-- **修复**:
-  - 修正嵌套对象提取逻辑 (`opendota_match_storage.py` lines 60-77)
-  - 实现多层回退策略：DB icon_url → Steam CDN → Dotabuff CDN
-  - 新增 `utils/steam_cdn.py` 工具模块（Steam CDN + Dotabuff CDN URL 构建）
-  - 添加 `/teams/{id}` 和 `/leagues/{id}` 单个资源查询 API
-  - 创建 `sync_teams_simple.py` 脚本同步缺失的战队/联赛参考数据
-- **成果**:
-  - 战队图标覆盖率: **93.5%** (261/279 teams with icon_url)
-  - 联赛图标覆盖率: **100%** (via Dotabuff CDN fallback)
-  - 前端布局优化: 调整 OpenDotaLivePage 表格列宽，图标尺寸统一为 24x24px
-- **技术债清理**: 删除 11+ 临时测试脚本，保持项目目录整洁
+### 最新完成任务（2026-03-08）
+**✅ OpenDota Live 实时下载进度条 + 取消下载功能**
+- **需求**:
+  - 下载进度条内联显示（替代分离 badge + progress bar 方案）
+  - 解析进度同理，内联于状态列
+  - 页面刷新后进度条不消失
+  - 鼠标悬停「下载中」状态时，显示取消按钮（✕），点击可取消下载并删除已下载文件
+  - 修复进度条胶囊挤压同行元素问题；全页面一屏显示（无横向滚动）
+- **后端实现**:
+  - `backend/database/sqlite_db.py`: `replay_download_tasks` 表新增 `progress` 整型列，status CHECK 增加 `'parsing'`，自动迁移
+  - `backend/storage/replay_download_storage.py`: 新增 `progress` 字段、`mark_parsing()`、`update_download_progress()`、`mark_cancelled()` 方法
+  - `backend/services/replay_download_service.py`: 字节级下载进度追踪（每 5% 写 DB）、取消检测（读 DB `error_code == 'CANCELLED'`）、取消后删除部分文件、`cancel_match_download()` 方法
+  - `backend/routers/remote.py`: 新增 `DELETE /api/v1/remote/matches/{match_id}/download` 端点
+- **前端实现**:
+  - `frontend/src/renderer/api/remoteService.ts`: `download_task` 新增 `progress` 字段、新增 `cancelMatchDownload()` 方法
+  - `frontend/src/renderer/pages/OpenDotaLivePage.tsx`:
+    - `fetchMatches` 中对活跃状态行自动 seed `liveStatus`（解决刷新后进度丢失）
+    - 下载状态列：固定 `w-[72px]` 圆形胶囊进度条，蓝色填充，内嵌 `{progress}%`，hover 显示 absolute 定位 ✕ 取消按钮
+    - 解析状态列：固定 `w-[56px]` 圆形胶囊（amber，固定 50%），内嵌「解析中」文字
+    - 全表格瘦身：`px-4 py-3` → `px-2 py-2`，图标列缩小，操作按钮 `text-xs`，状态 pill 固定宽（消除横向滚动）
+- **新增 API 端点**: `DELETE /api/v1/remote/matches/{match_id}/download` → 取消活跃下载、best-effort 删除文件
 
 ---
 
