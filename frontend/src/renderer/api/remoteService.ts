@@ -71,6 +71,7 @@ export interface RemoteMatchStatusResponse {
     task_id?: string;
     status?: string;
     attempt_count?: number;
+    progress?: number | null;
     error_code?: string | null;
     error_message?: string | null;
     updated_at?: number;
@@ -174,6 +175,17 @@ class RemoteService {
     }
 
     return response.json();
+  }
+
+  async cancelMatchDownload(matchId: number): Promise<{ status: string; message?: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/remote/matches/${matchId}/download`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json() as Promise<{ status: string; message?: string }>;
   }
 }
 
