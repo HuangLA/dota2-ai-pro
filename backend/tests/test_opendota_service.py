@@ -29,7 +29,7 @@ class _SuccessAsyncClient:
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         return None
 
-    async def get(self, path: str) -> _FakeResponse:
+    async def get(self, path: str, params: dict[str, object] | None = None) -> _FakeResponse:
         if path == "/publicMatches":
             return _FakeResponse(
                 [
@@ -66,6 +66,22 @@ class _SuccessAsyncClient:
                     "replay_salt": 987654321,
                 }
             )
+        if path == "/players/456/matches":
+            assert params == {"limit": 2, "offset": 10, "significant": 0, "leagueid": 15475}
+            return _FakeResponse(
+                [
+                    {"match_id": 201, "leagueid": 15475},
+                    {"match_id": 202, "leagueid": 15475},
+                ]
+            )
+        if path == "/leagues/15475/matches":
+            assert params == {"limit": 2, "offset": 5}
+            return _FakeResponse(
+                [
+                    {"match_id": 301, "leagueid": 15475},
+                    {"match_id": 302, "leagueid": 15475},
+                ]
+            )
         raise AssertionError(f"unexpected path: {path}")
 
 
@@ -79,7 +95,7 @@ class _TimeoutAsyncClient:
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         return None
 
-    async def get(self, path: str) -> _FakeResponse:
+    async def get(self, path: str, params: dict[str, object] | None = None) -> _FakeResponse:
         raise httpx.TimeoutException("timeout")
 
 
@@ -97,7 +113,7 @@ class _CaptureHeadersAsyncClient:
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         return None
 
-    async def get(self, path: str) -> _FakeResponse:
+    async def get(self, path: str, params: dict[str, object] | None = None) -> _FakeResponse:
         return _FakeResponse([])
 
 
@@ -111,7 +127,7 @@ class _ForbiddenAsyncClient:
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         return None
 
-    async def get(self, path: str) -> httpx.Response:
+    async def get(self, path: str, params: dict[str, object] | None = None) -> httpx.Response:
         request = httpx.Request("GET", f"https://api.opendota.com/api{path}")
         return httpx.Response(status_code=403, request=request)
 
@@ -175,6 +191,37 @@ async def test_fetch_match_details_success(monkeypatch: pytest.MonkeyPatch) -> N
     assert result["match_id"] == 123
     assert result["cluster"] == 123
     assert result["replay_salt"] == 987654321
+
+
+@pytest.mark.asyncio
+async def test_fetch_player_matches_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _SuccessAsyncClient)
+    service = OpenDotaService()
+
+    result = await service.fetch_player_matches(
+        456,
+        limit=2,
+        offset=10,
+        leagueid=15475,
+    )
+
+    assert result == [
+        {"match_id": 201, "leagueid": 15475},
+        {"match_id": 202, "leagueid": 15475},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_fetch_league_matches_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _SuccessAsyncClient)
+    service = OpenDotaService()
+
+    result = await service.fetch_league_matches(15475, limit=2, offset=5)
+
+    assert result == [
+        {"match_id": 301, "leagueid": 15475},
+        {"match_id": 302, "leagueid": 15475},
+    ]
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,6 @@ import asyncio
 import json
 import locale
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,6 +35,44 @@ def _decode_bytes(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def _coerce_int_list(value: object) -> list[int]:
+    """Coerce parser list-like values into a stable int list."""
+    if not isinstance(value, list):
+        return []
+
+    result: list[int] = []
+    for item in value:
+        if isinstance(item, bool):
+            result.append(int(item))
+        elif isinstance(item, (int, float)):
+            result.append(int(item))
+    return result
+
+
+def _coerce_string_list(value: object) -> Optional[list[Optional[str]]]:
+    """Coerce parser list-like values into a slot-preserving string list."""
+    if not isinstance(value, list):
+        return None
+
+    result: list[Optional[str]] = []
+    for item in value:
+        if isinstance(item, str) and item:
+            result.append(item)
+        elif isinstance(item, dict):
+            name = item.get("name")
+            if isinstance(name, str) and name:
+                result.append(name)
+            else:
+                result.append(None)
+        else:
+            result.append(None)
+
+    while result and result[-1] is None:
+        result.pop()
+
+    return result or None
+
+
 class ClarityParserError(Exception):
     """Exception raised when Clarity parser fails."""
     pass
@@ -53,9 +90,9 @@ class ClarityParser:
         result = await parser.parse_async("path/to/replay.dem")
     """
     
-    # Default paths (relative to project root)
-    DEFAULT_JAVA_PATH = Path(r"N:\dota2-ai-pro\parsers\jdk17\jdk-17.0.18+8\bin\java.exe")
-    DEFAULT_JAR_PATH = Path(r"N:\dota2-ai-pro\parsers\build\libs\clarity-parser-1.0.0-uber.jar")
+    # Default paths (platform-aware)
+    DEFAULT_JAVA_PATH = Path("/opt/homebrew/opt/openjdk@17/bin/java")
+    DEFAULT_JAR_PATH = Path(__file__).parent.parent.parent / "parsers" / "build" / "libs" / "clarity-parser-1.0.0-uber.jar"
     
     def __init__(
         self, 
@@ -230,6 +267,7 @@ class ClarityParser:
             clock_zero_source=raw_meta.get("clock_zero_source"),
             ticks_per_second=raw_meta.get("ticks_per_second"),
             time_mapping=raw_meta.get("time_mapping"),
+            inventory_slot_contract_version=raw_meta.get("inventory_slot_contract_version"),
             pause_intervals=raw_meta.get("pause_intervals", []),
             picks_bans=picks_bans,
             players=players
@@ -250,6 +288,7 @@ class ClarityParser:
                 mana=pos.get("mana"),
                 max_mana=pos.get("max_mana"),
                 level=pos.get("level"),
+                items=_coerce_string_list(pos.get("items")),
                 game_time=pos.get("game_time")
             ))
         
@@ -292,6 +331,23 @@ class ClarityParser:
                 dire_xp=e.get("dire_xp", 0),
                 gold_advantage=e.get("gold_advantage", 0),
                 xp_advantage=e.get("xp_advantage", 0),
+                radiant_gold_by_player=_coerce_int_list(
+                    e.get("radiant_gold_by_player", e.get("radiant_gold_by_slot"))
+                ),
+                dire_gold_by_player=_coerce_int_list(
+                    e.get("dire_gold_by_player", e.get("dire_gold_by_slot"))
+                ),
+                radiant_xp_by_player=_coerce_int_list(
+                    e.get("radiant_xp_by_player", e.get("radiant_xp_by_slot"))
+                ),
+                dire_xp_by_player=_coerce_int_list(
+                    e.get("dire_xp_by_player", e.get("dire_xp_by_slot"))
+                ),
+                radiant_net_worth=_coerce_int_list(e.get("radiant_net_worth")),
+                dire_net_worth=_coerce_int_list(e.get("dire_net_worth")),
+                radiant_net_worth_total=e.get("radiant_net_worth_total", 0),
+                dire_net_worth_total=e.get("dire_net_worth_total", 0),
+                net_worth_advantage=e.get("net_worth_advantage", 0),
             ))
 
         # Parse heroes mapping

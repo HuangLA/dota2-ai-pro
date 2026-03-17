@@ -37,6 +37,9 @@ public class SimpleDemoParser {
     
     // Sampling configuration
     private static final int POSITION_SAMPLE_INTERVAL = 30; // Sample every 30 ticks (~1 second)
+    private static final int TEAM_SLOT_COUNT = 5;
+    private static final int HERO_ITEM_SLOT_PROBE_COUNT = 25;
+    private static final int INVALID_ENTITY_REFERENCE = 16777215;
     
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -124,6 +127,7 @@ public class SimpleDemoParser {
         // Extract metadata from file info
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("time_contract_version", "v1");
+        metadata.put("inventory_slot_contract_version", "v2_preserve_empty_slots");
         metadata.put("ticks_per_second", 30);
         metadata.put("time_mapping", "replay_time = (m_fGameTime or tick/30); game_time = replay_time - clock_zero_time - max(total_paused_seconds - pregame_paused_seconds, 0); clock_zero_time priority: m_flGameStartTime - pregame_paused_seconds, then combatlog GAME_STATE=5, then (m_flPreGameStartTime + 90), then m_flGameStartTime");
         long fileInfoMatchId = 0L;
@@ -279,6 +283,9 @@ public class SimpleDemoParser {
         
         // Track known heroes by entity handle
         private Map<Integer, HeroState> trackedHeroes = new HashMap<>();
+
+        // Cache item slot field names per hero DT class once discovered.
+        private Map<String, List<String>> heroItemSlotProperties = new HashMap<>();
         
         // Track which hero+team combinations we've already seen (to filter illusions)
         // Key: "HeroName_Team" (e.g., "Spectre_3"), Value: first entity handle
@@ -421,6 +428,7 @@ public class SimpleDemoParser {
                     if (firstClockZeroTimeSeen || clockZeroTimeChanged) {
                         recalculateGameTimes(positionSamples);
                         recalculateGameTimes(wardEvents);
+                        recalculateGameTimes(economySamples);
                     }
                 }
 
@@ -621,6 +629,7 @@ public class SimpleDemoParser {
                             || Float.compare(previousClockZeroTime, clockZeroTime) != 0) {
                         recalculateGameTimes(positionSamples);
                         recalculateGameTimes(wardEvents);
+                        recalculateGameTimes(economySamples);
                     }
                 }
             } catch (Exception e) {
@@ -664,6 +673,11 @@ public class SimpleDemoParser {
                     if (mana != null) sample.put("mana", ((Number) mana).floatValue());
                     if (maxMana != null) sample.put("max_mana", ((Number) maxMana).floatValue());
                     if (level != null) sample.put("level", ((Number) level).intValue());
+
+                    List<String> items = extractHeroItems(hero);
+                    if (!items.isEmpty()) {
+                        sample.put("items", items);
+                    }
                     
                     positionSamples.add(sample);
                     snapshotTimingState(sample, gameRulesTimeSnapshot, totalPausedSecondsSnapshot, gamePausedSnapshot);
@@ -673,10 +687,21 @@ public class SimpleDemoParser {
                 }
             }
 
-            sampleEconomyData(tick, gameClock);
+            sampleEconomyData(
+                    tick,
+                    gameClock,
+                    gameRulesTimeSnapshot,
+                    totalPausedSecondsSnapshot,
+                    gamePausedSnapshot
+            );
         }
 
-        private void sampleEconomyData(int tick, float gameClock) {
+        private void sampleEconomyData(
+                int tick,
+                float gameClock,
+                Float gameRulesTimeSnapshot,
+                float totalPausedSecondsSnapshot,
+                boolean gamePausedSnapshot) {
             if (dataRadiantEntity == null || dataDireEntity == null) {
                 return;
             }
@@ -687,10 +712,14 @@ public class SimpleDemoParser {
             int direXp = 0;
             int radiantNetWorthTotal = 0;
             int direNetWorthTotal = 0;
-            List<Integer> radiantNetWorth = new ArrayList<>(5);
-            List<Integer> direNetWorth = new ArrayList<>(5);
+            List<Integer> radiantGoldBySlot = new ArrayList<>(TEAM_SLOT_COUNT);
+            List<Integer> direGoldBySlot = new ArrayList<>(TEAM_SLOT_COUNT);
+            List<Integer> radiantXpBySlot = new ArrayList<>(TEAM_SLOT_COUNT);
+            List<Integer> direXpBySlot = new ArrayList<>(TEAM_SLOT_COUNT);
+            List<Integer> radiantNetWorth = new ArrayList<>(TEAM_SLOT_COUNT);
+            List<Integer> direNetWorth = new ArrayList<>(TEAM_SLOT_COUNT);
 
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < TEAM_SLOT_COUNT; i++) {
                 String slot = String.format("%04d", i);
 
                 Object rGold = getTeamDataProperty(dataRadiantEntity, slot, "m_iTotalEarnedGold");
@@ -713,6 +742,10 @@ public class SimpleDemoParser {
                 direXp += dXpValue;
                 radiantNetWorthTotal += rNetWorthValue;
                 direNetWorthTotal += dNetWorthValue;
+                radiantGoldBySlot.add(rGoldValue);
+                direGoldBySlot.add(dGoldValue);
+                radiantXpBySlot.add(rXpValue);
+                direXpBySlot.add(dXpValue);
                 radiantNetWorth.add(rNetWorthValue);
                 direNetWorth.add(dNetWorthValue);
             }
@@ -729,6 +762,10 @@ public class SimpleDemoParser {
             sample.put("dire_gold", direGold);
             sample.put("radiant_xp", radiantXp);
             sample.put("dire_xp", direXp);
+            sample.put("radiant_gold_by_player", radiantGoldBySlot);
+            sample.put("dire_gold_by_player", direGoldBySlot);
+            sample.put("radiant_xp_by_player", radiantXpBySlot);
+            sample.put("dire_xp_by_player", direXpBySlot);
             sample.put("gold_advantage", radiantGold - direGold);
             sample.put("xp_advantage", radiantXp - direXp);
             sample.put("radiant_net_worth", radiantNetWorth);
@@ -737,6 +774,7 @@ public class SimpleDemoParser {
             sample.put("dire_net_worth_total", direNetWorthTotal);
             sample.put("net_worth_advantage", radiantNetWorthTotal - direNetWorthTotal);
             economySamples.add(sample);
+            snapshotTimingState(sample, gameRulesTimeSnapshot, totalPausedSecondsSnapshot, gamePausedSnapshot);
         }
 
         private Object getTeamDataProperty(Entity teamEntity, String slot, String statName) {
@@ -774,6 +812,194 @@ public class SimpleDemoParser {
                 return ((Number) value).intValue();
             }
             return 0;
+        }
+
+        private List<String> extractHeroItems(Entity hero) {
+            List<String> itemSlotProperties = getHeroItemSlotProperties(hero);
+            if (itemSlotProperties.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            List<String> items = new ArrayList<>();
+            for (String slotProperty : itemSlotProperties) {
+                int rawReference = toIntOrZero(getPropertySafe(hero, slotProperty));
+                if (rawReference <= 0 || rawReference == INVALID_ENTITY_REFERENCE) {
+                    items.add(null);
+                    continue;
+                }
+
+                Entity itemEntity = resolveEntityReference(rawReference);
+                if (itemEntity == null || itemEntity.getDtClass() == null) {
+                    items.add(null);
+                    continue;
+                }
+
+                String itemClass = itemEntity.getDtClass().getDtName();
+                String itemName = normalizeDotaEntityName(itemClass);
+                if (itemName != null && !itemName.isEmpty()) {
+                    items.add(itemName);
+                } else {
+                    items.add(null);
+                }
+            }
+
+            int lastPopulatedSlot = items.size() - 1;
+            while (lastPopulatedSlot >= 0 && items.get(lastPopulatedSlot) == null) {
+                lastPopulatedSlot--;
+            }
+            if (lastPopulatedSlot < 0) {
+                return Collections.emptyList();
+            }
+
+            return new ArrayList<>(items.subList(0, lastPopulatedSlot + 1));
+        }
+
+        private List<String> getHeroItemSlotProperties(Entity hero) {
+            if (hero == null || hero.getDtClass() == null) {
+                return Collections.emptyList();
+            }
+
+            String dtName = hero.getDtClass().getDtName();
+            if (heroItemSlotProperties.containsKey(dtName)) {
+                return heroItemSlotProperties.get(dtName);
+            }
+
+            List<String> discovered = discoverHeroItemSlotProperties(hero);
+            heroItemSlotProperties.put(dtName, discovered);
+            return discovered;
+        }
+
+        private List<String> discoverHeroItemSlotProperties(Entity hero) {
+            Map<Integer, String> propertyNamesBySlot = new LinkedHashMap<>();
+            String[] guessedPatterns = new String[] {
+                    "m_hItems.%04d",
+                    "m_hItems.%d",
+                    "m_hItems[%d]",
+                    "m_pInventory.m_hItems.%04d",
+                    "m_pInventory.m_hItems.%d",
+                    "m_pInventory.m_hItems[%d]",
+                    "m_Inventory.m_hItems.%04d",
+                    "m_Inventory.m_hItems.%d",
+                    "m_Inventory.m_hItems[%d]"
+            };
+
+            for (int i = 0; i < HERO_ITEM_SLOT_PROBE_COUNT; i++) {
+                for (String pattern : guessedPatterns) {
+                    String candidate = String.format(pattern, i);
+                    if (hero.hasProperty(candidate)) {
+                        propertyNamesBySlot.putIfAbsent(i, candidate);
+                    }
+                }
+            }
+
+            if (propertyNamesBySlot.isEmpty() && hero.getState() != null) {
+                for (FieldPath fieldPath : hero.getDtClass().collectFieldPaths(hero.getState())) {
+                    String propertyName = hero.getDtClass().getNameForFieldPath(fieldPath);
+                    if (isLikelyItemSlotProperty(propertyName)) {
+                        int slot = extractTrailingIndex(propertyName);
+                        propertyNamesBySlot.putIfAbsent(slot, propertyName);
+                    }
+                }
+            }
+
+            List<Integer> sortedSlots = new ArrayList<>(propertyNamesBySlot.keySet());
+            Collections.sort(sortedSlots);
+            List<String> sorted = new ArrayList<>(sortedSlots.size());
+            for (Integer slot : sortedSlots) {
+                sorted.add(propertyNamesBySlot.get(slot));
+            }
+            return sorted;
+        }
+
+        private boolean isLikelyItemSlotProperty(String propertyName) {
+            if (propertyName == null || !propertyName.contains("m_hItems")) {
+                return false;
+            }
+            int slot = extractTrailingIndex(propertyName);
+            return slot >= 0 && slot < HERO_ITEM_SLOT_PROBE_COUNT;
+        }
+
+        private int extractTrailingIndex(String propertyName) {
+            if (propertyName == null || propertyName.isEmpty()) {
+                return -1;
+            }
+
+            int end = propertyName.length() - 1;
+            while (end >= 0 && !Character.isDigit(propertyName.charAt(end))) {
+                if (propertyName.charAt(end) == ']') {
+                    end--;
+                    continue;
+                }
+                return -1;
+            }
+            if (end < 0) {
+                return -1;
+            }
+
+            int start = end;
+            while (start >= 0 && Character.isDigit(propertyName.charAt(start))) {
+                start--;
+            }
+
+            try {
+                return Integer.parseInt(propertyName.substring(start + 1, end + 1));
+            } catch (NumberFormatException ex) {
+                return -1;
+            }
+        }
+
+        private Entity resolveEntityReference(int rawReference) {
+            Entity resolved = entities.getByHandle(rawReference);
+            if (resolved != null) {
+                return resolved;
+            }
+
+            return entities.getByIndex(rawReference);
+        }
+
+        private String normalizeDotaEntityName(String dtName) {
+            if (dtName == null || dtName.isEmpty()) {
+                return null;
+            }
+
+            String normalized = dtName;
+            if (normalized.startsWith("CDOTA_Item_")) {
+                normalized = normalized.substring("CDOTA_Item_".length());
+            } else if (normalized.startsWith("CDOTA_Ability_")) {
+                normalized = normalized.substring("CDOTA_Ability_".length());
+            } else {
+                return dtName;
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < normalized.length(); i++) {
+                char current = normalized.charAt(i);
+                if (current == '-' || current == ' ') {
+                    if (builder.length() > 0 && builder.charAt(builder.length() - 1) != '_') {
+                        builder.append('_');
+                    }
+                    continue;
+                }
+                if (Character.isUpperCase(current) && builder.length() > 0) {
+                    char previous = normalized.charAt(i - 1);
+                    boolean nextIsLower = (i + 1) < normalized.length()
+                            && Character.isLowerCase(normalized.charAt(i + 1));
+                    if (Character.isLowerCase(previous) || Character.isDigit(previous) || nextIsLower) {
+                        if (builder.charAt(builder.length() - 1) != '_') {
+                            builder.append('_');
+                        }
+                    }
+                }
+                if (current == '_') {
+                    if (builder.length() > 0 && builder.charAt(builder.length() - 1) != '_') {
+                        builder.append(current);
+                    }
+                } else {
+                    builder.append(Character.toLowerCase(current));
+                }
+            }
+
+            return builder.toString();
         }
 
         private float[] getEntityPosition(Entity e) {

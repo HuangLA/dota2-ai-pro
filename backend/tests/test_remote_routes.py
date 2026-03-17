@@ -255,3 +255,192 @@ def test_remote_matches_backfill_failure_does_not_block_response(monkeypatch) ->
     assert payload["matches"][0]["league_name"] is None
     assert calls["upsert"] == 0
     assert calls["list"] == 2
+
+
+def test_remote_search_player_id_calls_opendota_and_returns_enriched_matches(monkeypatch) -> None:
+    captured_upserts: list[tuple[str, list[dict[str, object]]]] = []
+
+    async def _fake_fetch_player_matches(
+        account_id: int,
+        *,
+        limit: int,
+        offset: int,
+        leagueid: int | None = None,
+    ) -> list[dict[str, object]]:
+        assert account_id == 90001
+        assert limit == 20
+        assert offset == 0
+        assert leagueid == 15475
+        return [
+            {
+                "match_id": 501,
+                "start_time": 1700000000,
+                "duration": 2400,
+                "leagueid": 15475,
+            }
+        ]
+
+    def _fake_upsert_recent_matches(
+        matches: list[dict[str, object]],
+        *,
+        source: str = "pro",
+    ) -> tuple[int, int]:
+        captured_upserts.append((source, matches))
+        return 1, 0
+
+    def _fake_list_recent_matches(**kwargs: object) -> tuple[int, list[dict[str, object]]]:
+        assert kwargs["match_ids"] == [501]
+        return (
+            1,
+            [
+                {
+                    "match_id": 501,
+                    "start_time": 1700000000,
+                    "duration": 2400,
+                    "radiant_team_id": 1,
+                    "dire_team_id": 2,
+                    "leagueid": 15475,
+                    "radiant_team_name": "Team Liquid",
+                    "dire_team_name": "Team Falcons",
+                    "league_name": "DreamLeague",
+                    "source": "pro",
+                    "last_synced_at": 1700000200,
+                    "radiant_icon_url": None,
+                    "dire_icon_url": None,
+                    "radiant_logo_url": None,
+                    "dire_logo_url": None,
+                    "league_icon_url": None,
+                    "league_logo_url": None,
+                    "radiant_logo_sponsor_url": None,
+                    "dire_logo_sponsor_url": None,
+                    "league_image_url": None,
+                    "league_banner_url": None,
+                    "download_task_id": None,
+                    "download_status": None,
+                    "download_attempt_count": None,
+                    "download_error_code": None,
+                    "download_error_message": None,
+                    "download_updated_at": None,
+                    "local_parse_status": None,
+                    "local_replay_path": None,
+                }
+            ],
+        )
+
+    monkeypatch.setattr(remote.opendota_service, "fetch_player_matches", _fake_fetch_player_matches)
+    monkeypatch.setattr(remote.opendota_match_storage, "upsert_recent_matches", _fake_upsert_recent_matches)
+    monkeypatch.setattr(remote.opendota_match_storage, "list_recent_matches", _fake_list_recent_matches)
+
+    response = _client().get(
+        "/api/v1/remote/search",
+        params={"player_id": 90001, "leagueid": 15475},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["matches"][0]["match_id"] == 501
+    assert captured_upserts == [
+        (
+            "pro",
+            [
+                {
+                    "match_id": 501,
+                    "start_time": 1700000000,
+                    "duration": 2400,
+                    "leagueid": 15475,
+                }
+            ],
+        )
+    ]
+
+
+def test_remote_search_league_id_forces_league_and_persists_as_pro(monkeypatch) -> None:
+    captured_upserts: list[tuple[str, list[dict[str, object]]]] = []
+
+    async def _fake_fetch_league_matches(
+        league_id: int,
+        *,
+        limit: int,
+        offset: int,
+    ) -> list[dict[str, object]]:
+        assert league_id == 19269
+        assert limit == 20
+        assert offset == 0
+        return [
+            {
+                "match_id": 777,
+                "start_time": 1700000000,
+                "duration": 2500,
+            }
+        ]
+
+    def _fake_upsert_recent_matches(
+        matches: list[dict[str, object]],
+        *,
+        source: str = "pro",
+    ) -> tuple[int, int]:
+        captured_upserts.append((source, matches))
+        return 1, 0
+
+    def _fake_list_recent_matches(**kwargs: object) -> tuple[int, list[dict[str, object]]]:
+        assert kwargs["match_ids"] == [777]
+        return (
+            1,
+            [
+                {
+                    "match_id": 777,
+                    "start_time": 1700000000,
+                    "duration": 2500,
+                    "radiant_team_id": 10,
+                    "dire_team_id": 20,
+                    "leagueid": 19269,
+                    "radiant_team_name": "Team Spirit",
+                    "dire_team_name": "Xtreme Gaming",
+                    "league_name": "Elite League",
+                    "source": "pro",
+                    "last_synced_at": 1700000200,
+                    "radiant_icon_url": None,
+                    "dire_icon_url": None,
+                    "radiant_logo_url": None,
+                    "dire_logo_url": None,
+                    "league_icon_url": None,
+                    "league_logo_url": None,
+                    "radiant_logo_sponsor_url": None,
+                    "dire_logo_sponsor_url": None,
+                    "league_image_url": None,
+                    "league_banner_url": None,
+                    "download_task_id": None,
+                    "download_status": None,
+                    "download_attempt_count": None,
+                    "download_error_code": None,
+                    "download_error_message": None,
+                    "download_updated_at": None,
+                    "local_parse_status": None,
+                    "local_replay_path": None,
+                }
+            ],
+        )
+
+    monkeypatch.setattr(remote.opendota_service, "fetch_league_matches", _fake_fetch_league_matches)
+    monkeypatch.setattr(remote.opendota_match_storage, "upsert_recent_matches", _fake_upsert_recent_matches)
+    monkeypatch.setattr(remote.opendota_match_storage, "list_recent_matches", _fake_list_recent_matches)
+
+    response = _client().get("/api/v1/remote/search", params={"leagueid": 19269})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["matches"][0]["leagueid"] == 19269
+    assert captured_upserts == [
+        (
+            "pro",
+            [
+                {
+                    "match_id": 777,
+                    "start_time": 1700000000,
+                    "duration": 2500,
+                    "leagueid": 19269,
+                }
+            ],
+        )
+    ]

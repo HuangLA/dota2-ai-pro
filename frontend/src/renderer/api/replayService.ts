@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export interface UploadResponse {
   status: string;
@@ -39,7 +38,7 @@ export const replayService = {
     formData.append('file', file);
 
     const response = await axios.post<UploadResponse>(
-      `${API_BASE_URL}/api/v1/replays/upload`,
+      buildApiUrl('/api/v1/replays/upload'),
       formData,
       {
         headers: {
@@ -55,7 +54,7 @@ export const replayService = {
    */
   async getParseTasks(limit: number = 20, offset: number = 0): Promise<ParseTasksResponse> {
     const response = await axios.get<ParseTasksResponse>(
-      `${API_BASE_URL}/api/v1/replays/tasks`,
+      buildApiUrl('/api/v1/replays/tasks'),
       {
         params: {
           limit,
@@ -71,7 +70,20 @@ export const replayService = {
    */
   async getParseTask(taskId: string): Promise<ParseTask> {
     const response = await axios.get<ParseTask>(
-      `${API_BASE_URL}/api/v1/replays/tasks/${taskId}`
+      buildApiUrl(`/api/v1/replays/tasks/${taskId}`)
+    );
+    return response.data;
+  },
+
+  /**
+   * Create a new parse task for an existing replay file
+   */
+  async createParseTask(replayPath: string): Promise<ParseTask> {
+    const response = await axios.post<ParseTask>(
+      buildApiUrl('/api/v1/replays/parse'),
+      {
+        replay_path: replayPath,
+      }
     );
     return response.data;
   },

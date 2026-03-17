@@ -36,7 +36,7 @@
 </head>
 <body>
     <h1>Frontend-Backend API Test</h1>
-    <p>Testing communication with FastAPI backend on http://localhost:8000</p>
+    <p id="api-base-copy"></p>
     
     <div>
         <button onclick="testHealth()">Test Health Check</button>
@@ -47,8 +47,9 @@
     <div id="results"></div>
 
     <script>
-        const API_BASE = 'http://localhost:8000';
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
         const resultsDiv = document.getElementById('results');
+        document.getElementById('api-base-copy').textContent = `Testing communication with FastAPI backend on ${API_BASE}`;
 
         async function testHealth() {
             const start = performance.now();

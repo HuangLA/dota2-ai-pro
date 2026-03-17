@@ -152,7 +152,12 @@ class ReplayDownloadService:
             ) as client:
                 async with client.stream("GET", replay_url) as response:
                     response.raise_for_status()
-                    content_length = response.headers.get("content-length")
+                    response_headers = getattr(response, "headers", {})
+                    content_length = (
+                        response_headers.get("content-length")
+                        if hasattr(response_headers, "get")
+                        else None
+                    )
                     total_bytes = int(content_length) if content_length else 0
                     downloaded_bytes = 0
                     last_reported_pct = 10

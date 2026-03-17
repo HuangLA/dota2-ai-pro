@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export interface MatchDatabaseRecord {
   match_id: number;
@@ -92,7 +92,7 @@ class MatchDatabaseService {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/admin/match-database?${queryParams.toString()}`,
+      buildApiUrl(`/api/v1/admin/match-database?${queryParams.toString()}`),
       {
         method: 'GET',
         headers: {
@@ -113,7 +113,7 @@ class MatchDatabaseService {
     mode: MatchDatabaseActionMode
   ): Promise<MatchDatabaseActionResponse> {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/admin/match-database/${matchId}/download`,
+      buildApiUrl(`/api/v1/admin/match-database/${matchId}/download`),
       {
         method: 'POST',
         headers: {
@@ -132,7 +132,7 @@ class MatchDatabaseService {
 
   async getDownloadTaskDetails(taskId: string): Promise<ReplayDownloadTaskDetailsResponse> {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/admin/replays/download/tasks/${encodeURIComponent(taskId)}`,
+      buildApiUrl(`/api/v1/admin/replays/download/tasks/${encodeURIComponent(taskId)}`),
       {
         method: 'GET',
         headers: {
@@ -150,7 +150,7 @@ class MatchDatabaseService {
 
   async deleteReplay(matchId: number): Promise<MatchDatabaseActionResponse> {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/admin/match-database/${matchId}/delete-replay`,
+      buildApiUrl(`/api/v1/admin/match-database/${matchId}/delete-replay`),
       {
         method: 'POST',
         headers: {

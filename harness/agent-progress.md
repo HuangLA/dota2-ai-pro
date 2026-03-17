@@ -970,3 +970,96 @@ This file is the handoff log for long-running agent sessions.
   - Current chain treats reference sync as part of recent sync request lifecycle; if reference fetch latency becomes noticeable, a queued/background mode may be needed later.
 - Next suggested task:
   - Add optional `sync_reference_mode=sync|async` once download/sync orchestration enters higher-concurrency operations.
+
+- Date: 2026-03-16
+- Session ID: phase4-stabilization-visualization-closeout
+- Owner: OpenCode (Orchestrator)
+- Feature ID:
+  - PH4-1-OPENDOTA-SYNC
+  - PH4-2-MATCH-DATA-MODEL
+  - PH4-3-REPLAY-DOWNLOAD-SYSTEM
+  - PH4-4-MATCH-DATABASE-PAGE
+  - PH4-5-TEAM-PROFILE-PAGE
+  - PH4-7-GOLD-XP-ADVANTAGE
+  - PH3-LEGACY-HEATMAP-UI
+  - PH3-LEGACY-PATHS-UI
+- Status: `DONE`
+- Scope (this session only):
+  - Close stale backend replay-download/admin test contracts.
+  - Repair OpenDota team filter/name fallback regression.
+  - Make playback E2E tests follow actual bundled samples.
+  - Complete frontend heatmap/path visualization wiring in `RealMatchViewer`.
+  - Refresh progress/status docs to match implemented state.
+- Changes:
+  - Updated replay/admin tests and API spec for `http://replay...`, `progress`, and `parsing`.
+  - Fixed `backend/storage/opendota_match_storage.py` team id extraction and reference-name priority.
+  - Added `progress` to admin replay task response model and hardened replay download header handling.
+  - Switched `matches`/`visualization` routers to backend-root-relative `MATCHES_DIR` resolution.
+  - Wired `RealMatchViewer` heatmap to `/visualization/{match_id}/heatmap` with dense-grid conversion and range filters.
+  - Wired `RealMatchViewer` path analysis to `/visualization/{match_id}/paths` with hero/range/simplify/epsilon controls and minimap rendering.
+  - Updated playback E2E tests to discover actual repo samples and skip pause-only assertions when pause samples are absent.
+  - Marked completed parent features in `harness/feature_list.json`; kept `PH4-6-REALTIME-HUD-METRICS` open because backend still serves fallback `items/net_worth/gpm/xpm`.
+- Verification:
+  - `backend/.venv/bin/python -m pytest -q` (run in `backend/`) -> `163 passed, 10 skipped`
+  - `npx vitest run` (run in `frontend/`) -> `83 passed`
+  - `npm run build` (run in `frontend/`) -> passed
+- Risks / Follow-ups:
+  - HUD metrics parent feature is still only partially complete until parser/storage expose real per-hero items/net worth/GPM/XPM.
+  - Heatmap/path frontend currently lacks dedicated Vitest coverage beyond full regression/build validation.
+- Next suggested task:
+  - PH4-6 parser/storage extension for real-time hero inventory + economy snapshot fields.
+
+- Date: 2026-03-16
+- Session ID: ph4-6-hud-real-metrics-closeout
+- Owner: OpenCode (Orchestrator)
+- Feature ID:
+  - PH4-6-REALTIME-HUD-METRICS
+- Status: `DONE`
+- Scope (this session only):
+  - Complete the final real HUD metrics gap from parser through stored sample data and close the parent Phase 4 HUD feature.
+- Changes:
+  - Extended `parsers/src/main/java/SimpleDemoParser.java` to emit per-player `gold/xp/net_worth` arrays, snapshot hero inventory via `m_hItems.0000..0024`, and deduplicate slot aliases while ignoring invalid `16777215` references.
+  - Extended `backend/parsers/models.py`, `backend/parsers/clarity_parser.py`, and `backend/storage/parquet_storage.py` so replay parses preserve hero items plus per-player economy arrays in Parquet.
+  - Extended `backend/routers/playback.py` HUD snapshot building to map `metadata.players` onto team-local economy slots and return real `net_worth/gpm/xpm/items`.
+  - Updated `backend/tests/test_playback_hud_contract.py` with value-level assertions for real HUD metrics and re-parsed bundled sample replay `8729115809.dem` into `backend/data/matches/8729115809`.
+  - Updated `PROGRESS.md`, `docs/api_specification.md`, and `harness/feature_list.json` to mark PH4-6 complete.
+- Verification:
+  - `./.venv/bin/python -m pytest tests/test_playback_hud_contract.py -q` (run in `backend/`) -> `7 passed`
+  - `./.venv/bin/python -m pytest tests/test_playback_e2e.py -q` (run in `backend/`) -> `23 passed, 2 skipped`
+  - `./.venv/bin/python -m pytest -q` (run in `backend/`) -> `164 passed, 10 skipped`
+  - `npx vitest run` (run in `frontend/`) -> `83 passed`
+  - `npm run build` (run in `frontend/`) -> passed
+- Risks / Follow-ups:
+  - Legacy stored match folders parsed before this schema update will still need re-parse to populate real per-player HUD metrics; API now returns a controlled message in that case.
+  - Item names currently normalize from `CDOTA_Item_*` entity classes; if a future UI needs richer metadata (charges/neutral slot/backpack semantics), the parser can extend from the same source without contract breakage.
+- Next suggested task:
+  - Phase 5 work can start from the now-closed Phase 4 baseline; no open PH4 parent feature remains.
+
+- Date: 2026-03-18
+- Session ID: replay-workspace-ui-refactor-finalization
+- Owner: Codex (Orchestrator)
+- Feature ID:
+  - PH4-3-REPLAY-DOWNLOAD-SYSTEM
+  - PH4-6-REALTIME-HUD-METRICS
+  - PH3-LEGACY-HEATMAP-UI
+  - PH3-LEGACY-PATHS-UI
+- Status: `DONE`
+- Scope (this session only):
+  - Consolidate the replay workspace into a map-first desktop layout, close remote replay search gaps, and land the final item icon/tooltip/hotspot UX polish needed for a shippable branch snapshot.
+- Changes:
+  - Refactored `frontend/src/renderer/pages/RealMatchViewer.tsx` into a map-first desktop workspace with compact header, collapsible map workbench, default-collapsed hero HUD, draggable map overlays, and integrated heatmap/path controls.
+  - Added direct OpenDota remote replay search flow (`GET /api/v1/remote/search`) to `ReplayLibraryPage`, including direct ingest/open actions from the same screen.
+  - Added `backend/routers/assets.py` + `backend/services/item_asset_service.py` and wired frontend item rendering through cached icon proxy URLs with broader alias normalization.
+  - Added localized item tooltip helpers/data (`frontend/src/renderer/data/items.ts`, `itemTooltipData.generated.json`) and reworked replay HUD inventory layout around main/backpack/neutral slots.
+  - Tightened frontend shell/layout across OpenDota Live, Replay Library, Match Database, Team Profile, and replay workspace so desktop screens prioritize the analysis canvas instead of large page headers.
+  - Synced `PROGRESS.md` and `docs/api_specification.md` with the latest replay workspace/UI/API state.
+- Verification:
+  - `./.venv/bin/python -m pytest -q` (run in `backend/`) -> `176 passed, 8 skipped`
+  - `npx vitest run` (run in `frontend/`) -> `98 passed`
+  - `npm run build` (run in `frontend/`) -> passed
+  - Browser smoke/regression executed across OpenDota Live, Replay Library, Replay Workspace, Match Database, and Team Profile flows.
+- Risks / Follow-ups:
+  - Item tooltip Chinese text is now structurally complete for the current hot paths, but the corpus is still curated/normalized rather than sourced from a bundled official 7.40 client localization file.
+  - Older parsed matches may still require manual re-parse to expose the newest HUD inventory semantics and warnings will continue to surface until that is done.
+- Next suggested task:
+  - Cut a reviewable commit/PR from `feat/replay-workspace-ui-refactor`, then decide whether to keep iterating on desktop UX or start Phase 5 feature work on top of this branch.

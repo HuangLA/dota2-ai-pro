@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export type RemoteMatchSource = 'pro' | 'public';
 
@@ -15,6 +15,7 @@ export interface RemoteMatchRecord {
   leagueid?: number | null;
   league_name?: string | null;
   source?: RemoteMatchSource | null;
+  last_synced_at?: number | null;
   radiant_icon_url?: string | null;
   dire_icon_url?: string | null;
   league_icon_url?: string | null;
@@ -48,6 +49,7 @@ export interface RemoteMatchesParams {
   offset?: number;
   match_id?: number;
   leagueid?: number;
+  player_id?: number;
   sources?: RemoteMatchSource[];
 }
 
@@ -62,6 +64,12 @@ export interface RemoteIngestResponse {
   total?: number;
   succeeded?: number;
   failed?: number;
+  results?: Array<{
+    match_id: number;
+    status: string;
+    task_id?: string | null;
+    message?: string | null;
+  }>;
 }
 
 export interface RemoteMatchStatusResponse {
@@ -99,12 +107,42 @@ class RemoteService {
     if (params.leagueid !== undefined) {
       queryParams.append('leagueid', String(params.leagueid));
     }
+    if (params.player_id !== undefined) {
+      queryParams.append('player_id', String(params.player_id));
+    }
     if (params.sources !== undefined) {
       queryParams.append('include_pro', String(params.sources.includes('pro')));
       queryParams.append('include_public', String(params.sources.includes('public')));
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/remote/matches?${queryParams.toString()}`, {
+    const response = await fetch(buildApiUrl(`/api/v1/remote/matches?${queryParams.toString()}`), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async searchRemoteMatches(params: Pick<RemoteMatchesParams, 'limit' | 'player_id' | 'leagueid'>): Promise<RemoteMatchesResponse> {
+    const queryParams = new URLSearchParams();
+
+    if (params.limit !== undefined) {
+      queryParams.append('limit', String(params.limit));
+    }
+    if (params.player_id !== undefined) {
+      queryParams.append('player_id', String(params.player_id));
+    }
+    if (params.leagueid !== undefined) {
+      queryParams.append('leagueid', String(params.leagueid));
+    }
+
+    const response = await fetch(buildApiUrl(`/api/v1/remote/search?${queryParams.toString()}`), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -131,7 +169,7 @@ class RemoteService {
       sync_reference: payload?.sync_reference,
     };
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/remote/sync`, {
+    const response = await fetch(buildApiUrl('/api/v1/remote/sync'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -147,7 +185,7 @@ class RemoteService {
   }
 
   async ingestMatches(matchIds: number[]): Promise<RemoteIngestResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/remote/ingest`, {
+    const response = await fetch(buildApiUrl('/api/v1/remote/ingest'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -163,7 +201,7 @@ class RemoteService {
   }
 
   async getMatchStatus(matchId: number): Promise<RemoteMatchStatusResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/remote/matches/${matchId}/status`, {
+    const response = await fetch(buildApiUrl(`/api/v1/remote/matches/${matchId}/status`), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -178,7 +216,7 @@ class RemoteService {
   }
 
   async cancelMatchDownload(matchId: number): Promise<{ status: string; message?: string }> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/remote/matches/${matchId}/download`, {
+    const response = await fetch(buildApiUrl(`/api/v1/remote/matches/${matchId}/download`), {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
     });

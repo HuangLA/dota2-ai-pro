@@ -50,6 +50,7 @@ class PositionSample:
     mana: Optional[float] = None
     max_mana: Optional[float] = None
     level: Optional[int] = None
+    items: Optional[list[Optional[str]]] = None
     game_time: Optional[float] = None  # In-game clock seconds (creep spawn is 0)
     
     @property
@@ -89,7 +90,7 @@ class KillEvent:
 
 @dataclass
 class EconomySample:
-    """A single economy snapshot at a specific tick (team-level gold/xp)."""
+    """A single economy snapshot at a specific tick."""
     tick: int
     game_time: float  # In-game clock seconds (creep spawn is 0)
     radiant_gold: int
@@ -98,6 +99,15 @@ class EconomySample:
     dire_xp: int
     gold_advantage: int  # radiant_gold - dire_gold
     xp_advantage: int  # radiant_xp - dire_xp
+    radiant_gold_by_player: list[int] = field(default_factory=list)
+    dire_gold_by_player: list[int] = field(default_factory=list)
+    radiant_xp_by_player: list[int] = field(default_factory=list)
+    dire_xp_by_player: list[int] = field(default_factory=list)
+    radiant_net_worth: list[int] = field(default_factory=list)
+    dire_net_worth: list[int] = field(default_factory=list)
+    radiant_net_worth_total: int = 0
+    dire_net_worth_total: int = 0
+    net_worth_advantage: int = 0
 
 @dataclass
 class WardEvent:
@@ -133,6 +143,7 @@ class MatchMetadata:
     clock_zero_source: Optional[str] = None
     ticks_per_second: Optional[int] = None
     time_mapping: Optional[str] = None
+    inventory_slot_contract_version: Optional[str] = None
     pause_intervals: list[dict[str, float]] = field(default_factory=list)
     picks_bans: list[PickBan] = field(default_factory=list)
     players: list[PlayerInfo] = field(default_factory=list)

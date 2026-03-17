@@ -627,8 +627,10 @@ def test_admin_replay_prepare_success(monkeypatch) -> None:
         "task_id": "task-1",
         "match_id": 8674716612,
         "status": "pending",
+        "progress": 0,
         "attempt_count": 0,
         "replay_url": None,
+        "error_code": None,
         "download_path": None,
         "error_message": None,
         "created_at": 1700100000,
@@ -648,6 +650,7 @@ def test_admin_replay_prepare_success(monkeypatch) -> None:
         assert replay_url.endswith("8674716612_55500123.dem.bz2")
         updated = dict(task_state)
         updated["status"] = "prepared"
+        updated["progress"] = 5
         updated["replay_url"] = replay_url
         updated["updated_at"] = 1700100001
         return updated
@@ -666,10 +669,11 @@ def test_admin_replay_prepare_success(monkeypatch) -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["task"]["status"] == "prepared"
+    assert payload["task"]["progress"] == 5
     assert payload["task"]["error_code"] is None
     assert payload["task"]["error_message"] is None
     assert payload["task"]["replay_url"] == (
-        "https://replay236.valve.net/570/8674716612_55500123.dem.bz2"
+        "http://replay236.valve.net/570/8674716612_55500123.dem.bz2"
     )
 
 
@@ -684,8 +688,9 @@ def test_admin_match_database_download_action_prepare_success(monkeypatch) -> No
                 "task_id": "task-mdb-prepare-1",
                 "match_id": 8674716612,
                 "status": "prepared",
+                "progress": 5,
                 "attempt_count": 0,
-                "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+                "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
                 "download_path": None,
                 "error_code": None,
                 "error_message": None,
@@ -707,8 +712,9 @@ def test_admin_match_database_download_action_prepare_success(monkeypatch) -> No
             "task_id": "task-mdb-prepare-1",
             "match_id": 8674716612,
             "status": "prepared",
+            "progress": 5,
             "attempt_count": 0,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": None,
             "error_code": None,
             "error_message": None,
@@ -729,8 +735,9 @@ def test_admin_match_database_download_action_prepare_and_execute_success(monkey
                 "task_id": "task-mdb-exec-1",
                 "match_id": 8674716612,
                 "status": "completed",
+                "progress": 100,
                 "attempt_count": 1,
-                "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+                "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
                 "download_path": "backend/data/replays/8674716612.dem.bz2",
                 "error_code": None,
                 "error_message": None,
@@ -750,6 +757,7 @@ def test_admin_match_database_download_action_prepare_and_execute_success(monkey
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["task"]["status"] == "completed"
+    assert response.json()["task"]["progress"] == 100
     assert response.json()["task"]["attempt_count"] == 1
 
 
@@ -764,8 +772,9 @@ def test_admin_match_database_download_action_blocks_downloading(monkeypatch) ->
                 "task_id": "task-mdb-running-1",
                 "match_id": 8674716612,
                 "status": "downloading",
+                "progress": 10,
                 "attempt_count": 1,
-                "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+                "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
                 "download_path": None,
                 "error_code": None,
                 "error_message": None,
@@ -782,6 +791,7 @@ def test_admin_match_database_download_action_blocks_downloading(monkeypatch) ->
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert "already in progress" in response.json()["message"]
+    assert response.json()["task"]["progress"] == 10
     assert response.json()["task"]["status"] == "downloading"
 
 
@@ -800,8 +810,10 @@ def test_admin_replay_prepare_failure_marks_task_failed(monkeypatch) -> None:
         "task_id": "task-failed",
         "match_id": 8676017978,
         "status": "pending",
+        "progress": 0,
         "attempt_count": 0,
         "replay_url": None,
+        "error_code": None,
         "download_path": None,
         "error_message": None,
         "created_at": 1700100100,
@@ -822,6 +834,7 @@ def test_admin_replay_prepare_failure_marks_task_failed(monkeypatch) -> None:
         assert error_code == "UNKNOWN_ERROR"
         updated = dict(task_state)
         updated["status"] = "failed"
+        updated["progress"] = 0
         updated["error_code"] = error_code
         updated["error_message"] = error_message
         updated["updated_at"] = 1700100101
@@ -841,6 +854,7 @@ def test_admin_replay_prepare_failure_marks_task_failed(monkeypatch) -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["task"]["status"] == "failed"
+    assert payload["task"]["progress"] == 0
     assert payload["task"]["error_code"] == "UNKNOWN_ERROR"
     assert payload["task"]["replay_url"] is None
     assert "Missing required replay fields" in payload["task"]["error_message"]
@@ -865,8 +879,9 @@ def test_admin_replay_download_tasks_list_shape(monkeypatch) -> None:
                     "task_id": "task-2",
                     "match_id": 8123456789,
                     "status": "prepared",
+                    "progress": 5,
                     "attempt_count": 1,
-                    "replay_url": "https://replay236.valve.net/570/8123456789_1000.dem.bz2",
+                    "replay_url": "http://replay236.valve.net/570/8123456789_1000.dem.bz2",
                     "download_path": None,
                     "error_code": None,
                     "error_message": None,
@@ -895,8 +910,9 @@ def test_admin_replay_download_tasks_list_shape(monkeypatch) -> None:
                 "task_id": "task-2",
                 "match_id": 8123456789,
                 "status": "prepared",
+                "progress": 5,
                 "attempt_count": 1,
-                "replay_url": "https://replay236.valve.net/570/8123456789_1000.dem.bz2",
+                "replay_url": "http://replay236.valve.net/570/8123456789_1000.dem.bz2",
                 "download_path": None,
                 "error_code": None,
                 "error_message": None,
@@ -914,8 +930,9 @@ def test_admin_replay_download_task_detail_success(monkeypatch) -> None:
             "task_id": "task-detail-1",
             "match_id": 8674716612,
             "status": "completed",
+            "progress": 100,
             "attempt_count": 1,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": "backend/data/replays/8674716612.dem.bz2",
             "error_code": None,
             "error_message": None,
@@ -936,8 +953,9 @@ def test_admin_replay_download_task_detail_success(monkeypatch) -> None:
             "task_id": "task-detail-1",
             "match_id": 8674716612,
             "status": "completed",
+            "progress": 100,
             "attempt_count": 1,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": "backend/data/replays/8674716612.dem.bz2",
             "error_code": None,
             "error_message": None,
@@ -972,8 +990,9 @@ def test_admin_replay_download_by_match_success(monkeypatch) -> None:
             "task_id": "task-by-match-1",
             "match_id": 8674716612,
             "status": "completed",
+            "progress": 100,
             "attempt_count": 1,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": "backend/data/replays/8674716612.dem.bz2",
             "error_code": None,
             "error_message": None,
@@ -996,8 +1015,9 @@ def test_admin_replay_download_by_match_success(monkeypatch) -> None:
             "task_id": "task-by-match-1",
             "match_id": 8674716612,
             "status": "completed",
+            "progress": 100,
             "attempt_count": 1,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": "backend/data/replays/8674716612.dem.bz2",
             "error_code": None,
             "error_message": None,
@@ -1014,6 +1034,7 @@ def test_admin_replay_download_by_match_prepare_failed_task(monkeypatch) -> None
             "task_id": "task-by-match-failed",
             "match_id": 8676017978,
             "status": "failed",
+            "progress": 0,
             "attempt_count": 0,
             "replay_url": None,
             "download_path": None,
@@ -1038,6 +1059,7 @@ def test_admin_replay_download_by_match_prepare_failed_task(monkeypatch) -> None
             "task_id": "task-by-match-failed",
             "match_id": 8676017978,
             "status": "failed",
+            "progress": 0,
             "attempt_count": 0,
             "replay_url": None,
             "download_path": None,
@@ -1056,8 +1078,9 @@ def test_admin_replay_download_execute_success(monkeypatch) -> None:
             "task_id": "task-exec-1",
             "match_id": 8674716612,
             "status": "completed",
+            "progress": 100,
             "attempt_count": 1,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": "backend/data/replays/8674716612.dem.bz2",
             "error_code": None,
             "error_message": None,
@@ -1081,8 +1104,9 @@ def test_admin_replay_download_execute_success(monkeypatch) -> None:
             "task_id": "task-exec-1",
             "match_id": 8674716612,
             "status": "completed",
+            "progress": 100,
             "attempt_count": 1,
-            "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
             "download_path": "backend/data/replays/8674716612.dem.bz2",
             "error_code": None,
             "error_message": None,
@@ -1122,8 +1146,9 @@ def test_admin_replay_download_execute_download_failure(monkeypatch) -> None:
             "task_id": task_id,
             "match_id": 8676017978,
             "status": "failed",
+            "progress": 10,
             "attempt_count": 2,
-            "replay_url": "https://replay236.valve.net/570/8676017978_999.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8676017978_999.dem.bz2",
             "download_path": None,
             "error_code": "HTTP_ERROR",
             "error_message": "Replay download failed with status 404.",
@@ -1142,6 +1167,7 @@ def test_admin_replay_download_execute_download_failure(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["message"] == "Replay download failed."
+    assert response.json()["task"]["progress"] == 10
     assert response.json()["task"]["status"] == "failed"
     assert "404" in response.json()["task"]["error_message"]
 
@@ -1153,8 +1179,9 @@ def test_admin_replay_download_retry_success(monkeypatch) -> None:
             "task_id": "task-retry-1",
             "match_id": 8676017978,
             "status": "prepared",
+            "progress": 5,
             "attempt_count": 2,
-            "replay_url": "https://replay236.valve.net/570/8676017978_999.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8676017978_999.dem.bz2",
             "download_path": None,
             "error_code": None,
             "error_message": None,
@@ -1178,8 +1205,9 @@ def test_admin_replay_download_retry_success(monkeypatch) -> None:
             "task_id": "task-retry-1",
             "match_id": 8676017978,
             "status": "prepared",
+            "progress": 5,
             "attempt_count": 2,
-            "replay_url": "https://replay236.valve.net/570/8676017978_999.dem.bz2",
+            "replay_url": "http://replay236.valve.net/570/8676017978_999.dem.bz2",
             "download_path": None,
             "error_code": None,
             "error_message": None,
@@ -1205,6 +1233,7 @@ def test_admin_match_database_delete_replay_success(monkeypatch) -> None:
                 "task_id": "task-delete-1",
                 "match_id": 8674716612,
                 "status": "completed",
+                "progress": 100,
                 "attempt_count": 1,
                 "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
                 "download_path": None,

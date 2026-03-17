@@ -1,7 +1,5 @@
 import { MatchesResponse } from './backend';
-
-// Define the API base URL (mirroring backend.ts)
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export interface MatchSearchParams {
   limit?: number;
@@ -31,7 +29,7 @@ export class MatchService {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/matches?${queryParams.toString()}`,
+        buildApiUrl(`/api/v1/matches?${queryParams.toString()}`),
         {
           method: 'GET',
           headers: {
@@ -57,7 +55,7 @@ export class MatchService {
   async getMatchDetail(matchId: number): Promise<any> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/matches/${matchId}`,
+        buildApiUrl(`/api/v1/matches/${matchId}`),
         {
           method: 'GET',
           headers: {
@@ -83,7 +81,7 @@ export class MatchService {
   async deleteMatch(matchId: number): Promise<boolean> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/matches/${matchId}`,
+        buildApiUrl(`/api/v1/matches/${matchId}`),
         {
           method: 'DELETE',
           headers: {

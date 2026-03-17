@@ -23,9 +23,18 @@ def db() -> Iterator[None]:
 
 
 class _FakeStreamResponse:
-    def __init__(self, *, chunks: list[bytes] | None = None, status_code: int = 200) -> None:
+    def __init__(
+        self,
+        *,
+        chunks: list[bytes] | None = None,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        request_url: str = "http://replay236.valve.net/570/file.dem.bz2",
+    ) -> None:
         self._chunks = chunks or []
         self.status_code = status_code
+        self.headers = headers or {}
+        self._request_url = request_url
 
     async def __aenter__(self) -> "_FakeStreamResponse":
         return self
@@ -35,7 +44,7 @@ class _FakeStreamResponse:
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
-            request = httpx.Request("GET", "https://replay236.valve.net/570/file.dem.bz2")
+            request = httpx.Request("GET", self._request_url)
             response = httpx.Response(self.status_code, request=request)
             raise httpx.HTTPStatusError("error", request=request, response=response)
 
@@ -47,7 +56,18 @@ class _FakeStreamResponse:
 class _FakeAsyncClient:
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         compressed = bz2.compress(b"demo-bytes")
-        self._response = _FakeStreamResponse(chunks=[compressed], status_code=200)
+        split_one = max(1, len(compressed) // 3)
+        split_two = max(split_one + 1, (len(compressed) * 2) // 3)
+        chunks = [
+            compressed[:split_one],
+            compressed[split_one:split_two],
+            compressed[split_two:],
+        ]
+        self._response = _FakeStreamResponse(
+            chunks=[chunk for chunk in chunks if chunk],
+            status_code=200,
+            headers={"content-length": str(len(compressed))},
+        )
 
     async def __aenter__(self) -> "_FakeAsyncClient":
         return self
@@ -57,6 +77,7 @@ class _FakeAsyncClient:
 
     def stream(self, method: str, url: str) -> _FakeStreamResponse:
         assert method == "GET"
+        assert url.startswith("http://replay")
         assert url.endswith(".dem.bz2")
         return self._response
 
@@ -93,16 +114,28 @@ async def test_execute_download_success_marks_completed_and_writes_file(
     )
 
     task = storage.create_prepare_task(match_id=8674716612)
+    progress_updates: list[int] = []
+    original_update_progress = storage.update_download_progress
+
+    def _capture_progress(task_id: str, progress: int) -> None:
+        progress_updates.append(progress)
+        original_update_progress(task_id, progress)
+
+    monkeypatch.setattr(storage, "update_download_progress", _capture_progress)
     storage.mark_prepared(
         task_id=task["task_id"],
-        replay_url="https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+        replay_url="http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     )
 
     updated = await service.execute_download(task_id=task["task_id"])
 
     assert updated["status"] == "completed"
+    assert updated["progress"] == 100
     assert updated["attempt_count"] == 1
     assert updated["download_path"] is not None
+    assert progress_updates
+    assert progress_updates[-1] == 49
+    assert all(10 <= value <= 49 for value in progress_updates)
 
     downloaded_file = Path(str(updated["download_path"]))
     assert downloaded_file.exists()
@@ -114,7 +147,11 @@ async def test_execute_download_success_marks_completed_and_writes_file(
 
 class _FakeFailureAsyncClient(_FakeAsyncClient):
     def __init__(self, *_args: object, **_kwargs: object) -> None:
-        self._response = _FakeStreamResponse(chunks=[], status_code=404)
+        self._response = _FakeStreamResponse(
+            chunks=[],
+            status_code=404,
+            headers={"content-length": "0"},
+        )
 
 
 @pytest.mark.asyncio
@@ -135,12 +172,13 @@ async def test_execute_download_failure_marks_failed_with_error(
     task = storage.create_prepare_task(match_id=8676017978)
     storage.mark_prepared(
         task_id=task["task_id"],
-        replay_url="https://replay236.valve.net/570/8676017978_1000.dem.bz2",
+        replay_url="http://replay236.valve.net/570/8676017978_1000.dem.bz2",
     )
 
     updated = await service.execute_download(task_id=task["task_id"])
 
     assert updated["status"] == "failed"
+    assert updated["progress"] == 10
     assert updated["attempt_count"] == 1
     assert updated["download_path"] is None
     assert updated["error_code"] == "HTTP_ERROR"
@@ -163,6 +201,7 @@ async def test_execute_download_missing_url_sets_url_missing_error_code(tmp_path
     updated = await service.execute_download(task_id=task["task_id"])
 
     assert updated["status"] == "failed"
+    assert updated["progress"] == 5
     assert updated["error_code"] == "URL_MISSING"
     assert "Replay URL is missing" in str(updated["error_message"])
 
@@ -178,7 +217,7 @@ def test_retry_task_resets_failed_to_prepared() -> None:
     task = storage.create_prepare_task(match_id=8123456789)
     storage.mark_prepared(
         task_id=task["task_id"],
-        replay_url="https://replay236.valve.net/570/8123456789_1000.dem.bz2",
+        replay_url="http://replay236.valve.net/570/8123456789_1000.dem.bz2",
     )
     storage.mark_failed(
         task_id=task["task_id"],
@@ -189,6 +228,7 @@ def test_retry_task_resets_failed_to_prepared() -> None:
     retried = service.retry_task(task_id=task["task_id"])
 
     assert retried["status"] == "prepared"
+    assert retried["progress"] == 5
     assert retried["error_message"] is None
 
 
@@ -221,15 +261,18 @@ async def test_prepare_and_execute_runs_execute_when_prepared(monkeypatch: pytes
         "task_id": "task-combo-1",
         "match_id": 8674716612,
         "status": "prepared",
+        "progress": 5,
         "attempt_count": 0,
-        "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+        "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
         "download_path": None,
+        "error_code": None,
         "error_message": None,
         "created_at": 1700102000,
         "updated_at": 1700102001,
     }
     completed_task = dict(prepared_task)
     completed_task["status"] = "completed"
+    completed_task["progress"] = 100
     completed_task["attempt_count"] = 1
     completed_task["download_path"] = "backend/data/replays/8674716612.dem.bz2"
 
@@ -247,6 +290,7 @@ async def test_prepare_and_execute_runs_execute_when_prepared(monkeypatch: pytes
     result = await service.prepare_and_execute(match_id=8674716612)
 
     assert result["status"] == "completed"
+    assert result["progress"] == 100
     assert result["attempt_count"] == 1
 
 
@@ -265,9 +309,11 @@ async def test_prepare_and_execute_returns_prepare_failure_directly(
         "task_id": "task-combo-fail",
         "match_id": 8676017978,
         "status": "failed",
+        "progress": 0,
         "attempt_count": 0,
         "replay_url": None,
         "download_path": None,
+        "error_code": "UNKNOWN_ERROR",
         "error_message": "Missing required replay fields from OpenDota match details (cluster/replay_salt).",
         "created_at": 1700102100,
         "updated_at": 1700102101,
@@ -301,7 +347,7 @@ async def test_trigger_match_download_action_prepare_reuses_existing_prepared() 
     task = storage.create_prepare_task(match_id=8123456789)
     prepared = storage.mark_prepared(
         task_id=task["task_id"],
-        replay_url="https://replay236.valve.net/570/8123456789_1000.dem.bz2",
+        replay_url="http://replay236.valve.net/570/8123456789_1000.dem.bz2",
     )
 
     result = await service.trigger_match_download_action(match_id=8123456789, mode="prepare")
@@ -323,7 +369,7 @@ async def test_trigger_match_download_action_blocks_when_downloading_exists() ->
     task = storage.create_prepare_task(match_id=8123456790)
     storage.mark_prepared(
         task_id=task["task_id"],
-        replay_url="https://replay236.valve.net/570/8123456790_1001.dem.bz2",
+        replay_url="http://replay236.valve.net/570/8123456790_1001.dem.bz2",
     )
     downloading = storage.mark_downloading(task_id=task["task_id"])
 
@@ -352,12 +398,13 @@ async def test_execute_download_parse_failure_marks_failed_with_parse_error(
     task = storage.create_prepare_task(match_id=8674716613)
     storage.mark_prepared(
         task_id=task["task_id"],
-        replay_url="https://replay236.valve.net/570/8674716613_55500123.dem.bz2",
+        replay_url="http://replay236.valve.net/570/8674716613_55500123.dem.bz2",
     )
 
     updated = await service.execute_download(task_id=task["task_id"])
 
     assert updated["status"] == "failed"
+    assert updated["progress"] == 50
     assert updated["error_code"] == "PARSE_FAILED"
     assert "parser exploded" in str(updated["error_message"])
 
@@ -393,6 +440,7 @@ def test_delete_downloaded_replay_removes_dem_and_bz2(tmp_path: Path) -> None:
     assert not bz2_path.exists()
     assert not dem_path.exists()
     assert result["task"] is not None
+    assert result["task"]["progress"] == 100
     assert result["task"]["download_path"] is None
 
 

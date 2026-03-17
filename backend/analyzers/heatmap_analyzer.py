@@ -254,7 +254,10 @@ class HeatmapAnalyzer:
         self,
         match_id: int,
         grid_size: int = 64,
+        hero: Optional[str] = None,
         team: Optional[int] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
         map_bounds: Optional[dict] = None
     ) -> HeatmapResult:
         """
@@ -263,7 +266,10 @@ class HeatmapAnalyzer:
         Args:
             match_id: Match ID to analyze
             grid_size: Number of grid cells per axis
+            hero: Filter by killer hero (optional)
             team: Filter by killer team (2=Radiant, 3=Dire)
+            start_time: Filter by minimum event time in seconds (optional)
+            end_time: Filter by maximum event time in seconds (optional)
             map_bounds: Custom map bounds
             
         Returns:
@@ -278,9 +284,9 @@ class HeatmapAnalyzer:
             return HeatmapResult(
                 match_id=match_id,
                 heatmap_type="kill",
-                hero=None,
+                hero=hero,
                 team=team,
-                time_range=(0, 0),
+                time_range=(start_time or 0, end_time or 0),
                 grid_size=grid_size,
                 map_bounds=bounds,
                 cells=[],
@@ -296,9 +302,9 @@ class HeatmapAnalyzer:
             return HeatmapResult(
                 match_id=match_id,
                 heatmap_type="kill",
-                hero=None,
+                hero=hero,
                 team=team,
-                time_range=(0, 0),
+                time_range=(start_time or 0, end_time or 0),
                 grid_size=grid_size,
                 map_bounds=bounds,
                 cells=[],
@@ -314,9 +320,9 @@ class HeatmapAnalyzer:
             return HeatmapResult(
                 match_id=match_id,
                 heatmap_type="kill",
-                hero=None,
+                hero=hero,
                 team=team,
-                time_range=(0, 0),
+                time_range=(start_time or 0, end_time or 0),
                 grid_size=grid_size,
                 map_bounds=bounds,
                 cells=[],
@@ -325,6 +331,31 @@ class HeatmapAnalyzer:
                 generation_time_ms=(time.perf_counter() - start_gen) * 1000
             )
         
+        kills_df = self._filter_kill_events(
+            kills_df,
+            match_id=match_id,
+            perspective="kill",
+            hero=hero,
+            team=team,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        if kills_df.empty:
+            return HeatmapResult(
+                match_id=match_id,
+                heatmap_type="kill",
+                hero=hero,
+                team=team,
+                time_range=(start_time or 0, end_time or 0),
+                grid_size=grid_size,
+                map_bounds=bounds,
+                cells=[],
+                max_density=0,
+                total_samples=0,
+                generation_time_ms=(time.perf_counter() - start_gen) * 1000
+            )
+
         # Filter and aggregate
         map_width = bounds["max_x"] - bounds["min_x"]
         map_height = bounds["max_y"] - bounds["min_y"]
@@ -372,9 +403,9 @@ class HeatmapAnalyzer:
         return HeatmapResult(
             match_id=match_id,
             heatmap_type="kill",
-            hero=None,
+            hero=hero,
             team=team,
-            time_range=(0, 0),
+            time_range=(start_time or 0, end_time or 0),
             grid_size=grid_size,
             map_bounds=bounds,
             cells=cells,
@@ -389,6 +420,8 @@ class HeatmapAnalyzer:
         grid_size: int = 64,
         hero: Optional[str] = None,
         team: Optional[int] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
         map_bounds: Optional[dict] = None
     ) -> HeatmapResult:
         """
@@ -396,6 +429,180 @@ class HeatmapAnalyzer:
         
         Similar to kill heatmap but tracks where heroes died.
         """
-        # For now, use kill heatmap (same data, different perspective)
-        # In the future, we could add more detailed death tracking
-        return self.generate_kill_heatmap(match_id, grid_size, team, map_bounds)
+        start_gen = time.perf_counter()
+
+        bounds = map_bounds or self.DEFAULT_MAP_BOUNDS
+        parquet_path = self.storage.get_match_dir(match_id) / "kills.parquet"
+
+        if not parquet_path.exists():
+            return HeatmapResult(
+                match_id=match_id,
+                heatmap_type="death",
+                hero=hero,
+                team=team,
+                time_range=(start_time or 0, end_time or 0),
+                grid_size=grid_size,
+                map_bounds=bounds,
+                cells=[],
+                max_density=0,
+                total_samples=0,
+                generation_time_ms=0
+            )
+
+        kills_df = pd.read_parquet(parquet_path)
+        if kills_df.empty:
+            return HeatmapResult(
+                match_id=match_id,
+                heatmap_type="death",
+                hero=hero,
+                team=team,
+                time_range=(start_time or 0, end_time or 0),
+                grid_size=grid_size,
+                map_bounds=bounds,
+                cells=[],
+                max_density=0,
+                total_samples=0,
+                generation_time_ms=(time.perf_counter() - start_gen) * 1000
+            )
+
+        kills_df = kills_df.dropna(subset=["x", "y"])
+        if kills_df.empty:
+            return HeatmapResult(
+                match_id=match_id,
+                heatmap_type="death",
+                hero=hero,
+                team=team,
+                time_range=(start_time or 0, end_time or 0),
+                grid_size=grid_size,
+                map_bounds=bounds,
+                cells=[],
+                max_density=0,
+                total_samples=0,
+                generation_time_ms=(time.perf_counter() - start_gen) * 1000
+            )
+
+        kills_df = self._filter_kill_events(
+            kills_df,
+            match_id=match_id,
+            perspective="death",
+            hero=hero,
+            team=team,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        if kills_df.empty:
+            return HeatmapResult(
+                match_id=match_id,
+                heatmap_type="death",
+                hero=hero,
+                team=team,
+                time_range=(start_time or 0, end_time or 0),
+                grid_size=grid_size,
+                map_bounds=bounds,
+                cells=[],
+                max_density=0,
+                total_samples=0,
+                generation_time_ms=(time.perf_counter() - start_gen) * 1000
+            )
+
+        map_width = bounds["max_x"] - bounds["min_x"]
+        map_height = bounds["max_y"] - bounds["min_y"]
+        cell_width = map_width / grid_size
+        cell_height = map_height / grid_size
+
+        kills_df["grid_x"] = ((kills_df["x"] - bounds["min_x"]) / cell_width).astype(int)
+        kills_df["grid_y"] = ((kills_df["y"] - bounds["min_y"]) / cell_height).astype(int)
+        kills_df = kills_df[
+            (kills_df["grid_x"] >= 0) & (kills_df["grid_x"] < grid_size) &
+            (kills_df["grid_y"] >= 0) & (kills_df["grid_y"] < grid_size)
+        ]
+
+        grouped = kills_df.groupby(["grid_x", "grid_y"]).size().reset_index(name="density")
+
+        cells = []
+        max_density = 0
+        total_samples = 0
+
+        for _, row in grouped.iterrows():
+            grid_x = int(row["grid_x"])
+            grid_y = int(row["grid_y"])
+            density = int(row["density"])
+
+            world_x = bounds["min_x"] + (grid_x + 0.5) * cell_width
+            world_y = bounds["min_y"] + (grid_y + 0.5) * cell_height
+
+            cells.append(HeatmapCell(
+                grid_x=grid_x,
+                grid_y=grid_y,
+                x=world_x,
+                y=world_y,
+                density=density
+            ))
+
+            max_density = max(max_density, density)
+            total_samples += density
+
+        generation_time_ms = (time.perf_counter() - start_gen) * 1000
+
+        return HeatmapResult(
+            match_id=match_id,
+            heatmap_type="death",
+            hero=hero,
+            team=team,
+            time_range=(start_time or 0, end_time or 0),
+            grid_size=grid_size,
+            map_bounds=bounds,
+            cells=cells,
+            max_density=max_density,
+            total_samples=total_samples,
+            generation_time_ms=generation_time_ms
+        )
+
+    def _build_hero_team_lookup(self, match_id: int) -> dict[str, int]:
+        metadata = self.storage.get_metadata(match_id) or {}
+        players = metadata.get("players") if isinstance(metadata, dict) else None
+        if not isinstance(players, list):
+            return {}
+
+        lookup: dict[str, int] = {}
+        for player in players:
+            if not isinstance(player, dict):
+                continue
+            hero_name = player.get("hero_name")
+            game_team = player.get("game_team")
+            if isinstance(hero_name, str) and isinstance(game_team, int):
+                lookup[hero_name] = game_team
+        return lookup
+
+    def _filter_kill_events(
+        self,
+        kills_df: pd.DataFrame,
+        *,
+        match_id: int,
+        perspective: str,
+        hero: Optional[str] = None,
+        team: Optional[int] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+    ) -> pd.DataFrame:
+        filtered = kills_df
+
+        if start_time is not None:
+            filtered = filtered[filtered["time"] >= start_time]
+        if end_time is not None:
+            filtered = filtered[filtered["time"] <= end_time]
+
+        actor_column = "killer" if perspective == "kill" else "victim"
+        if hero:
+            filtered = filtered[filtered[actor_column] == hero]
+
+        if team is not None:
+            team_lookup = self._build_hero_team_lookup(match_id)
+            if team_lookup:
+                actor_teams = filtered[actor_column].map(team_lookup)
+                filtered = filtered[actor_teams == team]
+            else:
+                filtered = filtered.iloc[0:0]
+
+        return filtered

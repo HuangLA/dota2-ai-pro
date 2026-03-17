@@ -10,9 +10,9 @@
 | 字段 | 值 |
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
-| 当前阶段 | Phase 4.5 收尾 + S-Next 稳定性冲刺 🚀 |
-| 最后更新 | 2026-03-08 |
-| 更新者 | OpenCode |
+| 当前阶段 | Phase 4.5 收尾 + Replay Workspace 桌面化体验打磨 🚀 |
+| 最后更新 | 2026-03-18 |
+| 更新者 | Codex |
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 当前进展摘要（2026-03-02）
+## 当前进展摘要（2026-03-18）
 
 ### S-Next 执行看板（补充）
 | ID | 任务 | 状态 | 结果摘要 |
@@ -38,15 +38,38 @@
 | SN-1 | 全链路回归测试矩阵 | `DONE` | 核心后端回归稳定通过 |
 | SN-2 | 性能基线落地 | `DONE` | 产出 `backend/data/baselines/sn2_baseline_20260227_014013.json` |
 | SN-3 | 两场样本时间轴回归 | `DONE` | 负时间/近 0:00/pause 契约通过 |
-| SN-4 | 前端时间轴最终对齐 | `TODO` | 待收尾 |
+| SN-4 | 前端时间轴最终对齐 | `DONE` | Timeline/HUD/pause 时基已统一并通过回归 |
 | SN-5 | Pause-aware 边缘场景收口 | `DONE` | ticks/wards/advantage 与 HUD 暂停点一致性通过 |
 | SN-6 | smokes 最小可用实现 | `DONE` | `/playback/{match_id}/smokes` 已非占位化 |
 | SN-7 | 文档状态对齐 | `DONE` | `docs/api_specification.md` 与实现对齐 |
-| SN-8 | 冲刺验收与 Phase 5 准入清单 | `TODO` | 待输出验收包 |
+| SN-8 | 冲刺验收与 Phase 5 准入清单 | `DONE` | 全量验证、样本重解析与 PH4 收口已形成验收基线 |
 
 ### 最近一次回归验证
-- 命令: `py -m pytest tests/test_playback_e2e.py tests/test_timeline_regression.py tests/test_playback_pause_contract.py tests/test_playback_hud_contract.py tests/test_replay_download_service.py tests/test_replay_download_storage.py -q`
-- 结果: `79 passed`
+- 后端: `./.venv/bin/python -m pytest -q` → `176 passed, 8 skipped`
+- 前端: `npx vitest run` → `98 passed`
+- 构建: `npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay Workspace 桌面化重构 + 远端搜索/物品提示闭环**
+- **回放主工作区重构**:
+  - `RealMatchViewer` 重排为地图优先的桌面式分析台；顶部 header 与对阵信息压缩为工具栏形态，地图时间信息移到主地图标题区。
+  - 英雄 HUD 改为默认折叠，可按需展开 `NW/GPM/XPM` 与装备；地图工作台本身也改为默认折叠，仅在需要热力图/路径分析控制时展开。
+  - 地图说明/图例浮窗支持拖动、关闭、重置与 `Esc` 清空；单英雄热力图/路径分析会自动清理英雄头像、眼位与死亡爆点，避免分析层遮挡。
+- **录像搜索与下载体验闭环**:
+  - `ReplayLibraryPage` 不再只查本地已解析录像；`player_id/leagueid` 会通过 `GET /api/v1/remote/search` 直连 OpenDota 搜索远端比赛，并回填本地下载/解析状态。
+  - 远端搜索结果可直接“下载并入库”，本地已就绪比赛可直接“打开回放”，形成从发现到分析的一页式链路。
+- **物品资源与提示完善**:
+  - 新增 `/api/v1/assets/items/{item_name}.png` 资源代理与本地缓存，统一处理 Steam CDN 物品图标加载。
+  - 物品别名、旧 parser 内部名与常见中立物品映射已补齐，HUD 装备区改成纯图标优先布局，主包/背包/中立格可稳定显示。
+  - 物品 hover tooltip 已支持中英文名、中文属性/效果摘要；中立物品会额外显示附魔中文名与效果。
+- **可视化表达收口**:
+  - 热力图后端现已真正支持 `hero/team/start_time/end_time` 过滤，前端加入更强的可见性控制、更多时间预设与自定义时间段。
+  - 页面壳层、比赛数据库、OpenDota Live、战队档案等页面同步收口为统一桌面端视觉骨架，避免浏览器式大卡片占满首屏。
+- **当前验证结果**:
+  - 后端: `176 passed, 8 skipped`
+  - 前端: `98 passed`
+  - 构建: `npm run build` 通过
+  - 浏览器: 已多轮实机回归 OpenDota Live / Replay Library / Replay Workspace / Match Database / Team Profile 主流程
 
 ### 最新完成任务（2026-03-08）
 **✅ OpenDota Live 实时下载进度条 + 取消下载功能**
@@ -70,26 +93,51 @@
     - 全表格瘦身：`px-4 py-3` → `px-2 py-2`，图标列缩小，操作按钮 `text-xs`，状态 pill 固定宽（消除横向滚动）
 - **新增 API 端点**: `DELETE /api/v1/remote/matches/{match_id}/download` → 取消活跃下载、best-effort 删除文件
 
+### 最新完成任务（2026-03-16）
+**✅ Phase 4/Phase 3 尾项收口 + HUD 高频指标完成**
+- **后端稳定化**:
+  - 修复 `OpenDotaMatchStorage` 对 `radiant_team` / `dire_team` 标量 team_id 的归一化遗漏，恢复按战队筛选和 team/league 名称回填。
+  - `admin` replay task 响应模型补齐 `progress` 字段，下载执行链对缺失 `headers` 的 fake/边界响应更稳健。
+  - `matches` / `visualization` 路由统一为基于 `backend` 根目录的 Parquet 路径解析，避免因启动目录变化读不到 `data/matches`。
+- **前端可视化补齐**:
+  - `RealMatchViewer` 已正确接入 `/visualization/{match_id}/heatmap`，将稀疏 `grid_data` 转换为小地图热力图所需的致密二维网格，并补上时间范围筛选。
+  - `RealMatchViewer` 已接入 `/visualization/{match_id}/paths`，支持英雄筛选、时间范围、`simplify` 和 `epsilon` 控制，并将返回轨迹渲染到小地图。
+  - `Gold/XP Advantage` 曲线能力确认落地并通过现有回归验证。
+- **HUD 高频指标闭环**:
+  - Java parser 现已输出英雄实时装备快照与 per-player `gold/xp/net_worth` 数组，并修正物品槽位探测去重。
+  - Python parser / Parquet / playback HUD 链路已接入真实 `items/net_worth/gpm/xpm`，按 `metadata.players` 映射到英雄，不再对新 schema 使用 fallback。
+  - 仓库内置样本 `8729115809.dem` 已重新解析落盘，`/api/v1/playback/{match_id}/hud` 可直接返回真实 HUD 指标。
+- **测试/文档对齐**:
+  - 回放下载测试与 API 文档统一到当前契约：`http://replay...`、`progress`、`parsing` 状态。
+  - `test_playback_e2e.py` 改为跟随仓库实际内置样本集运行；缺少 pause 样本时显式 `skip`，不再依赖过期硬编码 match_id。
+  - `test_playback_hud_contract.py` 新增真实 `NW/GPM/XPM/items` spot-check，锁定 HUD 契约从 parser 到 API 的完整行为。
+- **当前验证结果**:
+  - 后端: `164 passed, 10 skipped`
+  - 前端: `83 passed`
+  - 构建: `npm run build` 通过
+- **当前状态**:
+  - `PH4-1` ~ `PH4-7` 已全部完成，Phase 4 核心能力闭环。
+
 ---
 
 ## 当前冲刺 (Current Sprint)
 
 ### 目标: Phase 4 核心能力落地（比赛数据库 + 录像下载 + 实时HUD）
 **截止日期**: 2026-02-28  
-**状态**: `IN_PROGRESS` 🚀
+**状态**: `DONE` 🚀
 
 | ID | 任务 | 负责方 | 状态 | 备注 |
 |----|------|--------|------|------|
-| PH4-1 | 接入 OpenDota 数据同步（近期比赛/战队/赛事） | Backend | `TODO` | 新增 opendota_service + sync_service |
-| PH4-2 | 完善比赛数据库（Team/Tournament/Match 扩展模型） | Backend | `TODO` | 支持按战队/赛事/时间查询 |
-| PH4-3 | 录像下载系统（按比赛ID + 查询结果下载） | Backend | `TODO` | 任务状态追踪 + 失败重试 |
-| PH4-4 | 前端比赛数据库页面（筛选/分页/跳转） | Frontend | `TODO` | MatchDatabasePage |
-| PH4-5 | 战队归档页（示例：XG 赛事战绩） | Frontend | `TODO` | TeamProfilePage |
-| PH4-6 | 回放实时 HUD（等级/装备/KDA/GPM/XPM/净资产） | Both | `TODO` | 新增 playback HUD API + UI 面板 |
-| PH4-7 | 经济差/经验差实时曲线图 | Both | `TODO` | Gold/XP Advantage 与 Timeline 联动 |
+| PH4-1 | 接入 OpenDota 数据同步（近期比赛/战队/赛事） | Backend | `DONE` | recent/pro/reference sync 与 admin/remote 查询链路已稳定 |
+| PH4-2 | 完善比赛数据库（Team/Tournament/Match 扩展模型） | Backend | `DONE` | Team/League 维表与 team/league/time 查询已完成 |
+| PH4-3 | 录像下载系统（按比赛ID + 查询结果下载） | Backend | `DONE` | prepare/execute/retry/cancel/progress/parsing 契约已对齐 |
+| PH4-4 | 前端比赛数据库页面（筛选/分页/跳转） | Frontend | `DONE` | MatchDatabasePage 与后端 action/task 细节链路通过回归 |
+| PH4-5 | 战队归档页（示例：XG 赛事战绩） | Frontend | `DONE` | TeamProfilePage 功能与导航回归通过 |
+| PH4-6 | 回放实时 HUD（等级/装备/KDA/GPM/XPM/净资产） | Both | `DONE` | parser -> parquet -> playback -> HUD 面板真实指标已贯通 |
+| PH4-7 | 经济差/经验差实时曲线图 | Both | `DONE` | Advantage API + RealMatchViewer 图表联动已完成 |
 
 ### Phase 4.5 重构蓝图（OpenDota Live + Replay Library）
-**状态**: `IN_PROGRESS`  
+**状态**: `DONE`  
 **目标**: 拆分“远端实时比赛流”和“本地已解析录像库”，形成可持续同步 + 本地资产管理闭环。
 
 #### 产品边界（确认版）
@@ -112,6 +160,7 @@
 
 #### 核心 API 蓝图（不与现有端点冲突，逐步迁移）
 - `GET /api/v1/remote/matches`：远端比赛列表（source 复选、match_id、leagueid、分页、时间筛选）。
+- `GET /api/v1/remote/search`：按 `player_id/leagueid` 直连 OpenDota 搜索远端比赛候选，并回填下载/解析状态。
 - `POST /api/v1/remote/sync`：手动触发同步（pro/public 可选、limit、dry_run）。
 - `POST /api/v1/remote/ingest`：按 `match_id` 触发下载+解析入库（支持批量）。
 - `GET /api/v1/library/matches`：本地解析完成库列表（team/player/league/search）。
@@ -126,8 +175,8 @@
   - 列表区（战队/联赛名称 + icon、下载并入库按钮、批量 checkbox）。
 - 新页面 `ReplayLibraryPage`：
   - 仅展示已解析完成项目。
-  - 支持按战队/选手/联赛检索。
-  - 行级动作：打开回放、查看任务历史、删除本地资产、重新解析。
+  - 支持按战队检索本地库，并按选手/联赛直连 OpenDota 发现远端比赛。
+  - 行级动作：打开回放、下载并入库、删除本地资产。
 
 #### 迁移执行计划（建议）
 | ID | 任务 | 负责方 | 状态 | 验收标准 |
@@ -140,21 +189,21 @@
 | RB-6 | 图标资源接入（league/team）与占位策略 | Frontend | `DONE` | 已接入 icon URL + 占位样式，后续优化资源质量 |
 | RB-7 | 现代化桌面级美化 (UI Polish) | Frontend | `DONE` | 全量引入 Glassmorphism 面板、全局渐变背景及悬浮交互 |
 | RB-8 | 导航栏与组件中文化 | Frontend | `DONE` | 完成侧边栏全面汉化与页面内文案统一 |
-| RB-9 | 回归测试与性能基线 | Both | `TODO` | 同步/下载/解析/检索链路稳定 |
+| RB-9 | 回归测试与性能基线 | Both | `DONE` | 同步/下载/解析/检索链路稳定，基线已产出 |
 
-### Option2 执行看板：回放解析重构（进行中）
+### Option2 执行看板：回放解析重构（已完成）
 **目标**: 以最小风险方式重构解析链路，统一时间契约并为 HUD/曲线扩展铺路。  
-**状态**: `IN_PROGRESS`
+**状态**: `DONE`
 
 | ID | 任务 | 负责方 | 状态 | 验收标准 |
 |----|------|--------|------|----------|
 | RP2-1 | 统一时间契约（parser -> parquet -> playback） | Backend | `DONE` | `ticks/wards` 返回 `game_time` + `time_basis`，语义明确 |
 | RP2-2 | 修复 game_time 计算基准 | Backend | `DONE` | 两场样本 `game_time` 非空且包含负时间，开局样本递增 |
-| RP2-3 | 前端时间轴对齐时间契约 | Frontend | `IN_PROGRESS` | Timeline 以 `game_time` 为主；fallback 有可见提示 |
-| RP2-4 | 时间轴回归测试（2 场比赛） | Both | `TODO` | 86083386/84782020 验证出兵前负时间、出兵 0:00 对齐 |
-| RP2-5 | 事件与 HUD 扩展字段设计 | Both | `TODO` | 明确 kills/networth/gold/xp 的统一时基与字段契约 |
-| RP2-6 | 参考 OpenDota 处理链拆分解析模块 | Backend | `TODO` | 形成 processor 分层（时间层/事件层/统计层）设计草案 |
-| RP2-7 | Pause-aware 双时基时间轴改造（replay_time/game_time） | Both | `IN_PROGRESS` | 暂停时显示“暂停中”并冻结 game_time，保障眼位/事件统计口径稳定 |
+| RP2-3 | 前端时间轴对齐时间契约 | Frontend | `DONE` | Timeline 以 `game_time` 为主，pause/fallback 提示已落地 |
+| RP2-4 | 时间轴回归测试（2 场比赛） | Both | `DONE` | 回归测试改为跟随仓库内置样本，负时间/0:00/pause 契约稳定 |
+| RP2-5 | 事件与 HUD 扩展字段设计 | Both | `DONE` | kills/assists/networth/gold/xp/items 契约已在 parser -> playback 实现 |
+| RP2-6 | 参考 OpenDota 处理链拆分解析模块 | Backend | `DONE` | 当前实现已形成 Java parser / Python wrapper / Parquet / playback 分层 |
+| RP2-7 | Pause-aware 双时基时间轴改造（replay_time/game_time） | Both | `DONE` | 暂停时冻结 game_time，HUD/眼位/事件统计口径一致 |
 
 ### 上一冲刺: Phase 3 MVP 核心功能开发 ✅
 **状态**: `DONE` - 核心链路已打通

@@ -25,9 +25,11 @@ def test_replay_download_task_lifecycle_and_list() -> None:
 
     prepared = storage.mark_prepared(
         task_id=first["task_id"],
-        replay_url="https://replay123.valve.net/570/123_456.dem.bz2",
+        replay_url="http://replay123.valve.net/570/123_456.dem.bz2",
     )
     downloading = storage.mark_downloading(task_id=first["task_id"])
+    storage.update_download_progress(task_id=first["task_id"], progress=42)
+    parsing = storage.mark_parsing(task_id=first["task_id"])
     completed = storage.mark_completed(
         task_id=first["task_id"],
         download_path="backend/data/replays/123.dem.bz2",
@@ -43,19 +45,26 @@ def test_replay_download_task_lifecycle_and_list() -> None:
     listed = storage.list_tasks(limit=10, offset=0)
 
     assert prepared["status"] == "prepared"
+    assert prepared["progress"] == 5
     assert prepared["attempt_count"] == 0
     assert prepared["replay_url"] is not None
     assert prepared["download_path"] is None
     assert prepared["error_message"] is None
 
     assert downloading["status"] == "downloading"
+    assert downloading["progress"] == 10
     assert downloading["attempt_count"] == 1
 
+    assert parsing["status"] == "parsing"
+    assert parsing["progress"] == 50
+
     assert completed["status"] == "completed"
+    assert completed["progress"] == 100
     assert completed["attempt_count"] == 1
     assert completed["download_path"].endswith("123.dem.bz2")
 
     assert failed["status"] == "failed"
+    assert failed["progress"] == 0
     assert failed["attempt_count"] == 0
     assert failed["replay_url"] is None
     assert failed["download_path"] is None
@@ -63,18 +72,20 @@ def test_replay_download_task_lifecycle_and_list() -> None:
     assert failed["error_message"] == "missing replay fields"
 
     assert retried["status"] == "prepared"
+    assert retried["progress"] == 5
     assert retried["error_code"] is None
     assert retried["error_message"] is None
 
     assert listed["total"] == 2
     assert len(listed["tasks"]) == 2
     assert {row["status"] for row in listed["tasks"]} == {"completed", "prepared"}
+    assert {row["progress"] for row in listed["tasks"]} == {100, 5}
 
 
 def test_retry_rejects_non_retryable_status() -> None:
     storage = ReplayDownloadStorage()
     task = storage.create_prepare_task(match_id=789)
-    storage.mark_prepared(task_id=task["task_id"], replay_url="https://replay123.valve.net/570/789_1.dem.bz2")
+    storage.mark_prepared(task_id=task["task_id"], replay_url="http://replay123.valve.net/570/789_1.dem.bz2")
     storage.mark_downloading(task_id=task["task_id"])
 
     with pytest.raises(ValueError, match="failed/prepared"):
@@ -84,7 +95,7 @@ def test_retry_rejects_non_retryable_status() -> None:
 def test_get_task_returns_full_observability_fields() -> None:
     storage = ReplayDownloadStorage()
     task = storage.create_prepare_task(match_id=999)
-    storage.mark_prepared(task_id=task["task_id"], replay_url="https://replay123.valve.net/570/999_1.dem.bz2")
+    storage.mark_prepared(task_id=task["task_id"], replay_url="http://replay123.valve.net/570/999_1.dem.bz2")
 
     loaded = storage.get_task(task_id=task["task_id"])
 
@@ -93,6 +104,7 @@ def test_get_task_returns_full_observability_fields() -> None:
         "task_id",
         "match_id",
         "status",
+        "progress",
         "attempt_count",
         "replay_url",
         "download_path",
@@ -110,7 +122,7 @@ def test_list_tasks_filters_by_status() -> None:
 
     storage.mark_prepared(
         task_id=prepared_task["task_id"],
-        replay_url="https://replay236.valve.net/570/111_1.dem.bz2",
+        replay_url="http://replay236.valve.net/570/111_1.dem.bz2",
     )
     storage.mark_failed(
         task_id=failed_task["task_id"],

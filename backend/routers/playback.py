@@ -28,6 +28,7 @@ def _resolve_backend_path(env_key: str, default_relative: str) -> str:
 # Initialize storage
 parquet_storage = ParquetStorage(_resolve_backend_path("MATCHES_DIR", "data/matches"))
 match_storage = MatchStorage()
+CURRENT_INVENTORY_SLOT_CONTRACT_VERSION = "v2_preserve_empty_slots"
 
 
 # =========== Helper Functions ===========
@@ -59,6 +60,26 @@ def normalize_hero_key(hero_name: object) -> str:
         normalized = normalized.replace("npc_dota_hero_", "", 1)
 
     return re.sub(r"[^a-z0-9]", "", normalized)
+
+
+def normalize_item_name(item_name: object) -> str:
+    """Normalize item identifiers from parser/entity sources."""
+    if not isinstance(item_name, str):
+        return ""
+
+    normalized = item_name.strip()
+    if not normalized:
+        return ""
+
+    if normalized.startswith("CDOTA_Item_"):
+        normalized = normalized.removeprefix("CDOTA_Item_")
+        normalized = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", normalized).lower()
+    elif normalized.startswith("item_"):
+        normalized = normalized.removeprefix("item_")
+    else:
+        normalized = normalized.lower()
+
+    return normalized.strip("_")
 
 
 def resolve_hud_snapshot_tick(
@@ -99,14 +120,205 @@ def resolve_hud_snapshot_tick(
     return selected_tick, selected_game_time
 
 
+def _coerce_list_value(value: object) -> list[object]:
+    """Coerce JSON/list parquet fields into a stable Python list."""
+    if value is None:
+        return []
+    if isinstance(value, float) and math.isnan(value):
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            return [stripped]
+        return parsed if isinstance(parsed, list) else []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return []
+
+
+def _coerce_int(value: object) -> Optional[int]:
+    """Safely coerce values to int."""
+    numeric_value = _coerce_float(value)
+    if numeric_value is None:
+        return None
+    return int(numeric_value)
+
+
+def _coerce_int_list(value: object) -> list[int]:
+    """Coerce mixed parquet/list values into integer lists."""
+    result: list[int] = []
+    for item in _coerce_list_value(value):
+        numeric_value = _coerce_int(item)
+        if numeric_value is not None:
+            result.append(numeric_value)
+    return result
+
+
+def _coerce_string_list(value: object) -> list[Optional[str]]:
+    """Coerce mixed parquet/list values into slot-preserving normalized string lists."""
+    result: list[Optional[str]] = []
+    for item in _coerce_list_value(value):
+        if item is None:
+            result.append(None)
+            continue
+
+        normalized = normalize_item_name(item)
+        if not normalized and isinstance(item, dict):
+            normalized = normalize_item_name(item.get("name"))
+        result.append(normalized or None)
+
+    while result and result[-1] is None:
+        result.pop()
+
+    return result
+
+
+def build_player_slot_lookup(metadata: Optional[dict]) -> dict[tuple[int, str], int]:
+    """Build team-local slot indices for heroes from match metadata."""
+    if not metadata:
+        return {}
+
+    players = metadata.get("players")
+    if not isinstance(players, list):
+        return {}
+
+    counters = {2: 0, 3: 0}
+    lookup: dict[tuple[int, str], int] = {}
+
+    for index, player in enumerate(players):
+        if not isinstance(player, dict):
+            continue
+
+        hero_key = normalize_hero_key(player.get("hero_name"))
+        if not hero_key:
+            continue
+
+        team_value = _coerce_int(player.get("game_team"))
+        if team_value not in (2, 3):
+            team_value = 2 if index < 5 else 3
+
+        slot_index = counters.get(team_value, 0)
+        if slot_index >= 5:
+            continue
+
+        lookup.setdefault((team_value, hero_key), slot_index)
+        counters[team_value] = slot_index + 1
+
+    return lookup
+
+
+def resolve_hud_economy_snapshot(
+    economy_df: pd.DataFrame,
+    target_tick: int,
+    target_game_time: float,
+) -> Optional[pd.Series]:
+    """Resolve the closest economy snapshot at or before the target time."""
+    if economy_df.empty:
+        return None
+
+    if "tick" in economy_df.columns and economy_df["tick"].notna().any():
+        tick_df = economy_df[economy_df["tick"].notna()].copy()
+        tick_df["tick"] = tick_df["tick"].astype(int)
+        tick_df = tick_df.sort_values("tick").drop_duplicates(subset=["tick"], keep="last")
+        candidate_df = tick_df[tick_df["tick"] <= target_tick]
+        if candidate_df.empty:
+            return tick_df.iloc[0]
+        return candidate_df.iloc[-1]
+
+    if "game_time" in economy_df.columns and economy_df["game_time"].notna().any():
+        game_time_df = economy_df[economy_df["game_time"].notna()].sort_values("game_time")
+        candidate_df = game_time_df[game_time_df["game_time"] <= target_game_time]
+        if candidate_df.empty:
+            return game_time_df.iloc[0]
+        return candidate_df.iloc[-1]
+
+    return economy_df.iloc[-1]
+
+
+def build_player_metrics_lookup(
+    economy_df: pd.DataFrame,
+    target_tick: int,
+    target_game_time: float,
+    metadata: Optional[dict],
+) -> tuple[dict[tuple[int, str], dict[str, int]], bool]:
+    """Build per-hero HUD metrics from per-player economy snapshots."""
+    snapshot_row = resolve_hud_economy_snapshot(economy_df, target_tick, target_game_time)
+    if snapshot_row is None:
+        return {}, False
+
+    slot_lookup = build_player_slot_lookup(metadata)
+    if not slot_lookup:
+        return {}, False
+
+    radiant_gold = _coerce_int_list(snapshot_row.get("radiant_gold_by_player"))
+    dire_gold = _coerce_int_list(snapshot_row.get("dire_gold_by_player"))
+    radiant_xp = _coerce_int_list(snapshot_row.get("radiant_xp_by_player"))
+    dire_xp = _coerce_int_list(snapshot_row.get("dire_xp_by_player"))
+    radiant_net_worth = _coerce_int_list(snapshot_row.get("radiant_net_worth"))
+    dire_net_worth = _coerce_int_list(snapshot_row.get("dire_net_worth"))
+
+    has_metrics = any(
+        len(values) > 0
+        for values in (
+            radiant_gold,
+            dire_gold,
+            radiant_xp,
+            dire_xp,
+            radiant_net_worth,
+            dire_net_worth,
+        )
+    )
+    if not has_metrics:
+        return {}, False
+
+    minutes_elapsed = max(target_game_time, 0.0) / 60.0
+
+    team_values = {
+        2: {
+            "gold": radiant_gold,
+            "xp": radiant_xp,
+            "net_worth": radiant_net_worth,
+        },
+        3: {
+            "gold": dire_gold,
+            "xp": dire_xp,
+            "net_worth": dire_net_worth,
+        },
+    }
+
+    lookup: dict[tuple[int, str], dict[str, int]] = {}
+    for hero_identity, slot_index in slot_lookup.items():
+        team_value = hero_identity[0]
+        values = team_values.get(team_value)
+        if values is None:
+            continue
+
+        gold_value = values["gold"][slot_index] if slot_index < len(values["gold"]) else 0
+        xp_value = values["xp"][slot_index] if slot_index < len(values["xp"]) else 0
+        net_worth_value = values["net_worth"][slot_index] if slot_index < len(values["net_worth"]) else 0
+
+        lookup[hero_identity] = {
+            "net_worth": net_worth_value,
+            "gpm": int(round(gold_value / minutes_elapsed)) if minutes_elapsed > 0 else 0,
+            "xpm": int(round(xp_value / minutes_elapsed)) if minutes_elapsed > 0 else 0,
+        }
+
+    return lookup, True
+
+
 def build_hud_heroes(
     positions_df: pd.DataFrame,
     kills_df: pd.DataFrame,
+    economy_df: pd.DataFrame,
     target_tick: int,
     target_game_time: float,
     game_start_time: float = 0.0,
     metadata: Optional[dict] = None,
-) -> list[dict]:
+) -> tuple[list[dict], bool]:
     """Build hero HUD rows for a single snapshot.
 
     Computes kills, deaths, and assists for each hero.
@@ -114,13 +326,19 @@ def build_hud_heroes(
     resolved to hero names via metadata.players.
     """
     if positions_df.empty:
-        return []
+        return [], False
 
     snapshot_df = positions_df[positions_df["tick"] <= target_tick]
     if snapshot_df.empty:
         snapshot_df = positions_df
 
     snapshot_df = snapshot_df.sort_values("tick").drop_duplicates(subset=["hero", "team"], keep="last")
+    player_metrics_lookup, has_realtime_metrics = build_player_metrics_lookup(
+        economy_df,
+        target_tick,
+        target_game_time,
+        metadata,
+    )
 
     # Build player index -> hero_key mapping from metadata
     _player_index_to_hero_key: dict[int, str] = {}
@@ -178,6 +396,8 @@ def build_hud_heroes(
 
         team_value = int(row["team"]) if pd.notna(row.get("team")) else 0
         level_value = int(row["level"]) if pd.notna(row.get("level")) else 0
+        items = _coerce_string_list(row.get("items"))
+        hero_metrics = player_metrics_lookup.get((team_value, hero_key), {})
 
         heroes.append(
             {
@@ -187,14 +407,14 @@ def build_hud_heroes(
                 "kills": kill_counts.get(hero_key, 0),
                 "deaths": death_counts.get(hero_key, 0),
                 "assists": assist_counts.get(hero_key, 0),
-                "net_worth": 0,
-                "gpm": 0,
-                "xpm": 0,
-                "items": [],
+                "net_worth": hero_metrics.get("net_worth", 0),
+                "gpm": hero_metrics.get("gpm", 0),
+                "xpm": hero_metrics.get("xpm", 0),
+                "items": items,
             }
         )
 
-    return heroes
+    return heroes, has_realtime_metrics
 
 
 def _coerce_float(value: object) -> Optional[float]:
@@ -833,18 +1053,44 @@ async def get_hud(
 
     target_tick, target_game_time = resolve_hud_snapshot_tick(positions_df, tick, game_time)
     kills_df = parquet_storage.get_kills(match_id)
+    economy_df = parquet_storage.get_economy(match_id)
     metadata = parquet_storage.get_metadata(match_id)
     game_start_time = float(metadata.get("game_start_time", 0.0)) if metadata else 0.0
-    heroes = build_hud_heroes(positions_df, kills_df, target_tick, target_game_time, game_start_time, metadata)
+    heroes, has_realtime_metrics = build_hud_heroes(
+        positions_df,
+        kills_df,
+        economy_df,
+        target_tick,
+        target_game_time,
+        game_start_time,
+        metadata,
+    )
 
-    return {
+    response = {
         "status": "ok",
         "match_id": match_id,
         "game_time": target_game_time,
         "tick": target_tick,
         "heroes": heroes,
-        "message": "items/net_worth/gpm/xpm currently use fallback values ([], 0).",
     }
+    warnings: list[str] = []
+    inventory_slot_contract_version = (
+        str(metadata.get("inventory_slot_contract_version"))
+        if metadata and metadata.get("inventory_slot_contract_version") is not None
+        else None
+    )
+    if inventory_slot_contract_version != CURRENT_INVENTORY_SLOT_CONTRACT_VERSION:
+        warnings.append(
+            "当前录像仍在使用旧版物品槽契约，背包和中立物品槽位可能不准确，请重新解析该 replay。"
+        )
+    if not has_realtime_metrics:
+        warnings.append(
+            "当前录像缺少逐人经济快照，重新解析后才能显示真实的净资产、GPM 和 XPM。"
+        )
+    if warnings:
+        response["warnings"] = warnings
+        response["message"] = warnings[0]
+    return response
 
 
 @router.get("/{match_id}/advantage")

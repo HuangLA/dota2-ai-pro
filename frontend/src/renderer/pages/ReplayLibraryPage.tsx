@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { libraryService, LibraryMatchRecord } from '../api/libraryService';
+import { RemoteMatchRecord, remoteService } from '../api/remoteService';
 import { formatDurationClock, formatUnixTimestampLocal } from './matchDatabaseFormatting';
 
 const PAGE_LIMIT = 20;
+const REMOTE_LIMIT = 20;
+
+function getLastPageOffset(total: number): number {
+  if (total <= 0) {
+    return 0;
+  }
+  return Math.floor((total - 1) / PAGE_LIMIT) * PAGE_LIMIT;
+}
 
 interface ReplayLibraryPageProps {
   onOpenReplay?: (matchId: number) => void;
@@ -46,6 +55,84 @@ function getLeagueText(value: string | null | undefined, leagueId: number | null
   return '未知联赛';
 }
 
+function resolvePipelineParseStatus(
+  downloadStatus: string | null | undefined,
+  parseStatus: string | null | undefined
+): string | null {
+  const normalizedParseStatus = (parseStatus || '').toLowerCase();
+  if (normalizedParseStatus) {
+    return normalizedParseStatus;
+  }
+
+  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
+  if (normalizedDownloadStatus === 'parsing') {
+    return 'parsing';
+  }
+  if (normalizedDownloadStatus === 'completed') {
+    return 'pending';
+  }
+
+  return null;
+}
+
+function getPipelineStatusBadge(
+  downloadStatus: string | null | undefined,
+  parseStatus: string | null | undefined
+): { label: string; className: string } {
+  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
+  const normalizedParseStatus = resolvePipelineParseStatus(downloadStatus, parseStatus);
+
+  if (normalizedDownloadStatus === 'failed' || normalizedParseStatus === 'failed') {
+    return { label: '流水线失败', className: 'border-red-500/60 bg-red-900/30 text-red-200' };
+  }
+  if (normalizedParseStatus === 'completed') {
+    return { label: '可回放', className: 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200' };
+  }
+  if (normalizedParseStatus === 'parsing') {
+    return { label: '解析中', className: 'border-amber-500/60 bg-amber-900/30 text-amber-200' };
+  }
+  if (normalizedDownloadStatus === 'downloading' || normalizedDownloadStatus === 'prepared') {
+    return { label: '下载中', className: 'border-cyan-500/60 bg-cyan-900/30 text-cyan-200' };
+  }
+  if (normalizedDownloadStatus === 'completed') {
+    return { label: '待解析', className: 'border-blue-500/60 bg-blue-900/30 text-blue-200' };
+  }
+  return { label: '未入库', className: 'border-slate-500/60 bg-slate-800/60 text-slate-300' };
+}
+
+function canIngestRemoteMatch(match: RemoteMatchRecord): boolean {
+  const normalizedDownloadStatus = (match.download_status || '').toLowerCase();
+  const normalizedParseStatus = (match.local_parse_status || '').toLowerCase();
+
+  if (normalizedParseStatus === 'completed') {
+    return false;
+  }
+  if (normalizedDownloadStatus === 'downloading' || normalizedDownloadStatus === 'prepared' || normalizedDownloadStatus === 'parsing') {
+    return false;
+  }
+  if (normalizedDownloadStatus === 'completed' && normalizedParseStatus !== 'failed') {
+    return false;
+  }
+
+  return true;
+}
+
+function getRemoteActionLabel(match: RemoteMatchRecord): string {
+  const normalizedParseStatus = (match.local_parse_status || '').toLowerCase();
+  const normalizedDownloadStatus = (match.download_status || '').toLowerCase();
+
+  if (normalizedParseStatus === 'completed') {
+    return '打开回放';
+  }
+  if (normalizedDownloadStatus === 'failed' || normalizedParseStatus === 'failed') {
+    return '重新入库';
+  }
+  if (!canIngestRemoteMatch(match)) {
+    return '处理中...';
+  }
+  return '下载并入库';
+}
+
 export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -54,8 +141,12 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
   const [matches, setMatches] = useState<LibraryMatchRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remoteMatches, setRemoteMatches] = useState<RemoteMatchRecord[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<number | null>(null);
+  const [ingestingMatchId, setIngestingMatchId] = useState<number | null>(null);
 
   const query = useMemo(
     () => ({
@@ -67,6 +158,17 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
     }),
     [appliedFilters.leagueId, appliedFilters.playerId, appliedFilters.teamId, offset]
   );
+
+  const remoteQuery = useMemo(
+    () => ({
+      player_id: toOptionalInt(appliedFilters.playerId),
+      leagueid: toOptionalInt(appliedFilters.leagueId),
+      limit: REMOTE_LIMIT,
+    }),
+    [appliedFilters.leagueId, appliedFilters.playerId]
+  );
+
+  const shouldSearchRemote = remoteQuery.player_id !== undefined || remoteQuery.leagueid !== undefined;
 
   const fetchMatches = useCallback(async () => {
     setLoading(true);
@@ -80,17 +182,57 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
       console.error('Failed to fetch replay library list:', fetchError);
       setMatches([]);
       setTotal(0);
-      setError('Replay Library 加载失败，请重试。');
+      setError('本地录像库加载失败，请重试。');
     } finally {
       setLoading(false);
     }
   }, [query]);
 
+  const fetchRemoteMatches = useCallback(async () => {
+    if (!shouldSearchRemote) {
+      setRemoteMatches([]);
+      setRemoteError(null);
+      setRemoteLoading(false);
+      return;
+    }
+
+    setRemoteLoading(true);
+    setRemoteError(null);
+
+    try {
+      const result = await remoteService.searchRemoteMatches(remoteQuery);
+      setRemoteMatches(result.matches ?? []);
+    } catch (fetchError) {
+      console.error('Failed to search remote replay candidates:', fetchError);
+      setRemoteMatches([]);
+      setRemoteError('OpenDota 搜索失败，请稍后重试。');
+    } finally {
+      setRemoteLoading(false);
+    }
+  }, [remoteQuery, shouldSearchRemote]);
+
   useEffect(() => {
     void fetchMatches();
   }, [fetchMatches]);
 
+  useEffect(() => {
+    void fetchRemoteMatches();
+  }, [fetchRemoteMatches]);
+
+  useEffect(() => {
+    if (total === 0 || offset < total) {
+      return;
+    }
+
+    setOffset(getLastPageOffset(total));
+  }, [offset, total]);
+
   const handleDelete = async (matchId: number) => {
+    const confirmed = window.confirm(`确认删除比赛 ${matchId} 的本地录像与解析产物吗？此操作不可撤销。`);
+    if (!confirmed) {
+      return;
+    }
+
     setDeletingMatchId(matchId);
     setFeedback(null);
 
@@ -100,7 +242,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
         type: result.status === 'ok' ? 'success' : 'error',
         message: result.message || `比赛 ${matchId} 删除请求已完成。`,
       });
-      await fetchMatches();
+      await Promise.all([fetchMatches(), fetchRemoteMatches()]);
     } catch (deleteError) {
       console.error('Failed to delete replay file from library:', deleteError);
       setFeedback({
@@ -112,16 +254,91 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
     }
   };
 
+  const handleRemoteIngest = async (match: RemoteMatchRecord) => {
+    const matchId = match.match_id;
+    if (!canIngestRemoteMatch(match)) {
+      return;
+    }
+
+    setIngestingMatchId(matchId);
+    setFeedback(null);
+
+    try {
+      const result = await remoteService.ingestMatches([matchId]);
+      const currentResult = result.results?.[0];
+      const hasFailed = currentResult?.status === 'failed' || (result.failed ?? 0) > 0;
+      setFeedback({
+        type: hasFailed ? 'error' : 'success',
+        message: currentResult?.message || (hasFailed ? `比赛 ${matchId} 入库失败。` : `比赛 ${matchId} 已加入下载与解析流水线。`),
+      });
+      await Promise.all([fetchMatches(), fetchRemoteMatches()]);
+    } catch (ingestError) {
+      console.error('Failed to ingest remote match:', ingestError);
+      setFeedback({
+        type: 'error',
+        message: `比赛 ${matchId} 入库失败。`,
+      });
+    } finally {
+      setIngestingMatchId(null);
+    }
+  };
+
+  const localReadyCount = matches.length;
+  const remoteReadyCount = remoteMatches.filter((match) => (match.local_parse_status || '').toLowerCase() === 'completed').length;
+  const remoteActionableCount = remoteMatches.filter(canIngestRemoteMatch).length;
+  const activeRemoteFilterCount = [appliedFilters.playerId, appliedFilters.leagueId].filter((value) => value.trim().length > 0).length;
+
   return (
-    <div className="p-6 text-white min-h-full bg-dota-bg">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950/40 p-5 shadow-xl">
-          <h1 className="text-3xl font-bold text-dota-gold">Replay Library</h1>
-          <p className="mt-1 text-sm text-emerald-100/80">仅展示已解析完成（completed）的本地录像。</p>
+    <div className="workspace-page bg-dota-bg">
+      <div className="workspace-stack">
+        <div className="workspace-header border-emerald-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(22,101,52,0.18),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]">
+          <div className="workspace-header-row">
+            <div>
+              <p className="workspace-eyebrow text-emerald-300/80">Replay Workspace</p>
+              <h1 className="workspace-title text-dota-gold">录像库与远端发现</h1>
+              <p className="workspace-description text-emerald-100/75">
+                本地库负责直接回放，`player_id` 和 `leagueid` 会额外直连 OpenDota 搜索可下载比赛。
+              </p>
+            </div>
+            <div className="workspace-kpi-grid xl:min-w-[420px]">
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">本地可回放</p>
+                <p className="workspace-kpi-value">{localReadyCount}</p>
+                <p className="workspace-kpi-hint">当前页已解析完成</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">远端命中</p>
+                <p className="workspace-kpi-value">{remoteMatches.length}</p>
+                <p className="workspace-kpi-hint">来自 OpenDota 直连搜索</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">可立即入库</p>
+                <p className="workspace-kpi-value">{remoteActionableCount}</p>
+                <p className="workspace-kpi-hint">未下载且可触发流水线</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="workspace-pill-row">
+            <span className="workspace-pill">
+              本地分页 {matches.length} / 总数 {total}
+            </span>
+            <span className="workspace-pill">
+              远端激活筛选 {activeRemoteFilterCount}
+            </span>
+            <span className="workspace-pill">
+              远端可回放 {remoteReadyCount}
+            </span>
+          </div>
         </div>
 
-        <div className="card p-5">
-          <h2 className="mb-4 text-lg font-semibold text-slate-100">筛选条件</h2>
+        <div className="workspace-panel">
+          <div className="workspace-panel-header">
+            <h2 className="workspace-panel-title">筛选与发现</h2>
+            <p className="workspace-panel-description">
+              `team_id` 只过滤本地已解析录像；`player_id`、`leagueid` 会同步检索 OpenDota 候选比赛。
+            </p>
+          </div>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -135,22 +352,22 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
               aria-label="team_id"
               value={filters.teamId}
               onChange={(event) => setFilters((current) => ({ ...current, teamId: event.target.value }))}
-              placeholder="team_id"
-              className="w-full rounded border border-slate-600 bg-dota-bg px-3 py-2 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+              placeholder="team_id（本地过滤）"
+              className="workspace-input focus:border-emerald-500"
             />
             <input
               aria-label="player_id"
               value={filters.playerId}
               onChange={(event) => setFilters((current) => ({ ...current, playerId: event.target.value }))}
-              placeholder="player_id"
-              className="w-full rounded border border-slate-600 bg-dota-bg px-3 py-2 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+              placeholder="player_id（OpenDota 搜索）"
+              className="workspace-input focus:border-emerald-500"
             />
             <input
               aria-label="leagueid"
               value={filters.leagueId}
               onChange={(event) => setFilters((current) => ({ ...current, leagueId: event.target.value }))}
-              placeholder="leagueid"
-              className="w-full rounded border border-slate-600 bg-dota-bg px-3 py-2 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+              placeholder="leagueid（OpenDota 搜索）"
+              className="workspace-input focus:border-emerald-500"
             />
             <button
               type="submit"
@@ -186,7 +403,111 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
 
         {error && <div className="rounded border border-red-600 bg-red-900/20 px-4 py-3 text-red-200">{error}</div>}
 
-        <div className="card p-0 overflow-hidden mt-6">
+        <div className="workspace-table-shell">
+          <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-100">远端发现结果</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                命中的比赛可以直接触发下载与解析；已经入库的比赛会直接显示为可回放。
+              </p>
+            </div>
+            <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100">
+              OpenDota 直连
+            </span>
+          </div>
+
+          {!shouldSearchRemote ? (
+            <div className="px-6 py-8 text-sm text-slate-400">
+              输入 `player_id` 或 `leagueid` 后，这里会直接展示 OpenDota 搜索到的比赛，而不是只过滤本地库。
+            </div>
+          ) : remoteError ? (
+            <div className="px-6 py-8 text-sm text-red-200">{remoteError}</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-[980px] w-full text-left">
+                <thead className="bg-gradient-to-r from-slate-900 to-slate-800 text-xs uppercase tracking-wide text-slate-300">
+                  <tr>
+                    <th className="px-4 py-3">match_id</th>
+                    <th className="px-4 py-3">时间</th>
+                    <th className="px-4 py-3">时长</th>
+                    <th className="px-4 py-3">队伍</th>
+                    <th className="px-4 py-3">联赛</th>
+                    <th className="px-4 py-3">流水线</th>
+                    <th className="px-4 py-3 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/80">
+                  {remoteLoading ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        正在从 OpenDota 搜索比赛...
+                      </td>
+                    </tr>
+                  ) : remoteMatches.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        当前筛选没有命中远端比赛。
+                      </td>
+                    </tr>
+                  ) : (
+                    remoteMatches.map((match) => {
+                      const pipelineStatus = getPipelineStatusBadge(match.download_status, match.local_parse_status);
+                      const actionLabel = getRemoteActionLabel(match);
+                      const isReplayReady = (match.local_parse_status || '').toLowerCase() === 'completed';
+                      const isBusy = ingestingMatchId === match.match_id || (!canIngestRemoteMatch(match) && !isReplayReady);
+
+                      return (
+                        <tr key={`remote-${match.match_id}`} className="hover:bg-slate-800/40">
+                          <td className="px-4 py-3 font-mono font-semibold text-dota-gold">{match.match_id}</td>
+                          <td className="px-4 py-3 text-slate-300">{formatUnixTimestampLocal(match.start_time)}</td>
+                          <td className="px-4 py-3 text-slate-300">{formatDurationClock(match.duration)}</td>
+                          <td className="px-4 py-3 text-slate-200">
+                            {getTeamText(match.radiant_team_name)} vs {getTeamText(match.dire_team_name)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-200">{getLeagueText(match.league_name, match.leagueid)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${pipelineStatus.className}`}>
+                              {pipelineStatus.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  if (isReplayReady) {
+                                    onOpenReplay?.(match.match_id);
+                                    return;
+                                  }
+                                  void handleRemoteIngest(match);
+                                }}
+                                disabled={isBusy || (isReplayReady && !onOpenReplay)}
+                                className="rounded border border-cyan-500/50 px-3 py-1.5 text-sm text-cyan-100 transition hover:border-cyan-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {ingestingMatchId === match.match_id ? '处理中...' : actionLabel}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="workspace-table-shell">
+          <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-100">本地录像库</h2>
+              <p className="mt-1 text-sm text-slate-400">仅展示已解析完成的本地录像，适合直接回放与复盘。</p>
+            </div>
+            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100">
+              直接回放
+            </span>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="min-w-[1120px] w-full text-left">
               <thead className="bg-gradient-to-r from-slate-900 to-slate-800 text-xs uppercase tracking-wide text-slate-300">

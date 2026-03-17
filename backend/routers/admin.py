@@ -182,6 +182,7 @@ class ReplayDownloadTaskRecord(BaseModel):
     task_id: str
     match_id: int
     status: str
+    progress: int
     attempt_count: int
     replay_url: str | None = None
     download_path: str | None = None

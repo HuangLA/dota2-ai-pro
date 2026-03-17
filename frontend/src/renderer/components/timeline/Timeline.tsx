@@ -36,6 +36,21 @@ export interface TimelineProps {
 /** 播放速度选项 */
 const SPEED_OPTIONS = [0.5, 1, 2, 4, 8];
 
+function shouldIgnoreHotkeys(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName;
+  return (
+    target.isContentEditable ||
+    tagName === 'INPUT' ||
+    tagName === 'TEXTAREA' ||
+    tagName === 'SELECT' ||
+    tagName === 'BUTTON'
+  );
+}
+
 /** 格式化时间为 MM:SS 格式 */
 function formatTime(seconds: number): string {
   const isNegative = seconds < 0;
@@ -217,8 +232,8 @@ export function Timeline({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (disabled) return;
       
-      // 避免在输入框中触发
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      // 避免在表单控件和可编辑区域中触发
+      if (shouldIgnoreHotkeys(e.target)) {
         return;
       }
       

@@ -3,7 +3,7 @@
  * Handles communication with Python FastAPI backend
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export interface HealthResponse {
   status: string;
@@ -17,6 +17,9 @@ export interface Match {
   duration?: number;
   radiant_win?: boolean;
   parsed_at?: string;
+  replay_path?: string | null;
+  parse_status?: string;
+  updated_at?: number;
 }
 
 export interface MatchesResponse {
@@ -113,7 +116,7 @@ export interface HudHeroMetric {
   net_worth: number;
   gpm: number;
   xpm: number;
-  items: string[];
+  items: Array<string | null>;
 }
 
 export interface PlaybackHudResponse {
@@ -122,6 +125,8 @@ export interface PlaybackHudResponse {
   game_time: number;
   tick: number;
   heroes: HudHeroMetric[];
+  message?: string;
+  warnings?: string[];
 }
 
 export interface MatchDetail {
@@ -130,8 +135,11 @@ export interface MatchDetail {
   dire_team: string;
   radiant_win: boolean;
   duration: number;
-  game_mode: string;
+  game_mode: string | number | null;
   parsed_at: string;
+  replay_path?: string | null;
+  parse_status?: string;
+  updated_at?: number;
 }
 
 export interface AdvantageData {
@@ -159,6 +167,87 @@ export interface AdvantageResponse {
   message?: string;
 }
 
+export interface HeatmapBounds {
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+}
+
+export interface HeatmapCell {
+  grid_x: number;
+  grid_y: number;
+  x: number;
+  y: number;
+  density: number;
+}
+
+export interface MatchHeatmapResponse {
+  data: {
+    match_id: number;
+    heatmap_type: string;
+    hero?: string | null;
+    team?: number | null;
+    time_range: {
+      start: number;
+      end: number;
+    };
+    grid_size: number;
+    map_bounds: HeatmapBounds;
+    grid_data: HeatmapCell[];
+    max_density: number;
+    total_samples: number;
+  };
+  meta: {
+    generation_time_ms: number;
+  };
+}
+
+export interface MovementPathPoint {
+  time: number;
+  x: number;
+  y: number;
+  hp: number;
+  level: number;
+}
+
+export interface MovementPathSeries {
+  hero: string;
+  team: number;
+  team_name: string;
+  points: MovementPathPoint[];
+  point_count: number;
+  stats: {
+    total_distance: number;
+    avg_speed: number;
+    time_alive: number;
+    time_dead: number;
+    death_count: number;
+  };
+}
+
+export interface MovementPathsResponse {
+  data: {
+    match_id: number;
+    time_range: {
+      start: number;
+      end: number;
+    };
+    paths: MovementPathSeries[];
+    hero_count: number;
+    simplification: {
+      enabled: boolean;
+      epsilon: number;
+      original_points: number;
+      simplified_points: number;
+      reduction_ratio: number;
+    };
+  };
+  meta: {
+    generation_time_ms: number;
+  };
+}
+
 export interface ApiTestResult {
   success: boolean;
   status?: number;
@@ -175,7 +264,7 @@ class BackendAPI {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/health`, {
+      const response = await fetch(buildApiUrl('/health'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +298,7 @@ class BackendAPI {
     
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/matches?limit=${limit}&offset=${offset}`,
+        buildApiUrl(`/api/v1/matches?limit=${limit}&offset=${offset}`),
         {
           method: 'GET',
           headers: {
@@ -258,7 +347,7 @@ class BackendAPI {
   async getMatchDetail(matchId: number): Promise<MatchDetail | null> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/matches/${matchId}`,
+        buildApiUrl(`/api/v1/matches/${matchId}`),
         {
           method: 'GET',
           headers: {
@@ -288,7 +377,7 @@ class BackendAPI {
   ): Promise<TicksResponse | null> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/playback/${matchId}/ticks?start_time=${startTime}&end_time=${endTime}`,
+        buildApiUrl(`/api/v1/playback/${matchId}/ticks?start_time=${startTime}&end_time=${endTime}`),
         {
           method: 'GET',
           headers: {
@@ -315,7 +404,7 @@ class BackendAPI {
   async getWards(matchId: number): Promise<WardsResponse | null> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/playback/${matchId}/wards`,
+        buildApiUrl(`/api/v1/playback/${matchId}/wards`),
         {
           method: 'GET',
           headers: {
@@ -355,7 +444,7 @@ class BackendAPI {
 
       const queryString = query.toString();
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/playback/${matchId}/hud${queryString ? `?${queryString}` : ''}`,
+        buildApiUrl(`/api/v1/playback/${matchId}/hud${queryString ? `?${queryString}` : ''}`),
         {
           method: 'GET',
           headers: {
@@ -389,7 +478,7 @@ class BackendAPI {
   ): Promise<AdvantageResponse | null> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/playback/${matchId}/advantage`,
+        buildApiUrl(`/api/v1/playback/${matchId}/advantage`),
         {
           method: 'GET',
           headers: {
@@ -414,13 +503,125 @@ class BackendAPI {
     }
   }
 
+  async getMatchHeatmap(
+    matchId: number,
+    params: {
+      heatmapType: 'movement' | 'kill' | 'death';
+      gridSize?: number;
+      hero?: string;
+      team?: number;
+      startTime?: number;
+      endTime?: number;
+      signal?: AbortSignal;
+    }
+  ): Promise<MatchHeatmapResponse | null> {
+    try {
+      const query = new URLSearchParams();
+      query.set('heatmap_type', params.heatmapType);
+      query.set('grid_size', String(params.gridSize ?? 64));
+
+      if (params.hero) {
+        query.set('hero', params.hero);
+      }
+      if (typeof params.team === 'number' && Number.isFinite(params.team)) {
+        query.set('team', String(params.team));
+      }
+      if (typeof params.startTime === 'number' && Number.isFinite(params.startTime)) {
+        query.set('start_time', String(Math.floor(params.startTime)));
+      }
+      if (typeof params.endTime === 'number' && Number.isFinite(params.endTime)) {
+        query.set('end_time', String(Math.floor(params.endTime)));
+      }
+
+      const response = await fetch(
+        buildApiUrl(`/api/v1/visualization/${matchId}/heatmap?${query.toString()}`),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: params.signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: MatchHeatmapResponse = await response.json();
+      return data;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return null;
+      }
+      console.error('Failed to fetch heatmap data:', error);
+      return null;
+    }
+  }
+
+  async getMovementPaths(
+    matchId: number,
+    params: {
+      hero?: string;
+      team?: number;
+      startTime?: number;
+      endTime?: number;
+      simplify?: boolean;
+      epsilon?: number;
+      signal?: AbortSignal;
+    }
+  ): Promise<MovementPathsResponse | null> {
+    try {
+      const query = new URLSearchParams();
+
+      if (params.hero) {
+        query.set('hero', params.hero);
+      }
+      if (typeof params.team === 'number' && Number.isFinite(params.team)) {
+        query.set('team', String(params.team));
+      }
+      if (typeof params.startTime === 'number' && Number.isFinite(params.startTime)) {
+        query.set('start_time', String(params.startTime));
+      }
+      if (typeof params.endTime === 'number' && Number.isFinite(params.endTime)) {
+        query.set('end_time', String(params.endTime));
+      }
+      query.set('simplify', String(params.simplify ?? true));
+      query.set('epsilon', String(params.epsilon ?? 100));
+
+      const response = await fetch(
+        buildApiUrl(`/api/v1/visualization/${matchId}/paths?${query.toString()}`),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: params.signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: MovementPathsResponse = await response.json();
+      return data;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return null;
+      }
+      console.error('Failed to fetch movement paths:', error);
+      return null;
+    }
+  }
+
   /**
    * Get list of available matches (typed version)
    */
   async getMatchList(limit = 20, offset = 0): Promise<Match[]> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/matches?limit=${limit}&offset=${offset}`,
+        buildApiUrl(`/api/v1/matches?limit=${limit}&offset=${offset}`),
         {
           method: 'GET',
           headers: {

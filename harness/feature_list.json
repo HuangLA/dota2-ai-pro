@@ -33,7 +33,7 @@
       "Verify records are inserted or updated without duplication.",
       "Re-run sync and confirm idempotent behavior on unchanged data."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH4-1-OPENDOTA-SYNC-SLICE-1",
@@ -93,7 +93,7 @@
       "Call list/search APIs with team/tournament/time filters.",
       "Verify returned records and pagination metadata are correct."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH4-2-MATCH-DATA-MODEL-SLICE-1",
@@ -129,7 +129,7 @@
       "Verify status transitions (pending/running/success/failed).",
       "Trigger retry flow and confirm final state is updated correctly."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH4-3-REPLAY-DOWNLOAD-SYSTEM-SLICE-1",
@@ -249,7 +249,7 @@
       "Verify pagination and sort behavior with backend responses.",
       "Navigate to replay viewer from a selected record."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH4-4-MATCH-DATABASE-PAGE-SLICE-FE-1",
@@ -358,7 +358,7 @@
       "Verify tournament grouping and per-match rows are complete.",
       "Confirm jump from team profile to match detail/replay works."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH4-5-TEAM-PROFILE-PAGE-SLICE-1",
@@ -584,7 +584,7 @@
       "Render HUD metrics in RealMatchViewer and validate updates while playing.",
       "Spot-check several timestamps against raw tick-derived values."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH4-6-REALTIME-HUD-METRICS-SLICE-1",
@@ -632,7 +632,7 @@
       "Render synchronized chart and validate cursor/link with timeline scrub.",
       "Verify data continuity around pauses and resume points."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH3-LEGACY-HEATMAP-UI",
@@ -644,7 +644,7 @@
       "Switch heatmap modes (movement/kill/death) and verify visual updates.",
       "Validate request parameters and result rendering against API output."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "PH3-LEGACY-PATHS-UI",
@@ -656,7 +656,7 @@
       "Toggle simplify/time-range options and verify path update behavior.",
       "Confirm performance remains smooth during playback interaction."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "HARNESS-FLOW-BOOTSTRAP",

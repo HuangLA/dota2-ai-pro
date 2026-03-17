@@ -57,18 +57,8 @@ class OpenDotaMatchStorage:
 
             start_time = self._as_int(raw.get("start_time")) or 0
             duration = self._as_int(raw.get("duration")) or 0
-            radiant_team_id = self._as_int(raw.get("radiant_team_id"))
-            if radiant_team_id is None:
-                # radiant_team 是嵌套对象，需要提取 team_id
-                radiant_team = raw.get("radiant_team")
-                if isinstance(radiant_team, dict):
-                    radiant_team_id = self._as_int(radiant_team.get("team_id"))
-            dire_team_id = self._as_int(raw.get("dire_team_id"))
-            if dire_team_id is None:
-                # dire_team 是嵌套对象，需要提取 team_id
-                dire_team = raw.get("dire_team")
-                if isinstance(dire_team, dict):
-                    dire_team_id = self._as_int(dire_team.get("team_id"))
+            radiant_team_id = self._extract_team_id(raw, "radiant")
+            dire_team_id = self._extract_team_id(raw, "dire")
             leagueid = self._as_int(raw.get("leagueid"))
             if leagueid is None:
                 # league 可能是嵌套对象
@@ -315,6 +305,7 @@ class OpenDotaMatchStorage:
         team_id: int | None = None,
         leagueid: int | None = None,
         match_id: int | None = None,
+        match_ids: list[int] | None = None,
         include_pro: bool = True,
         include_public: bool = True,
         start_time_from: int | None = None,
@@ -338,6 +329,14 @@ class OpenDotaMatchStorage:
         if match_id is not None:
             where_clauses.append("m.match_id = ?")
             query_params.append(match_id)
+
+        if match_ids is not None:
+            normalized_match_ids = [current_id for current_id in match_ids if current_id > 0]
+            if not normalized_match_ids:
+                return 0, []
+            placeholders = ",".join("?" for _ in normalized_match_ids)
+            where_clauses.append(f"m.match_id IN ({placeholders})")
+            query_params.extend(normalized_match_ids)
 
         if include_pro and not include_public:
             where_clauses.append("m.source = 'pro'")
@@ -399,9 +398,9 @@ class OpenDotaMatchStorage:
                 m.dire_team_id,
                 m.leagueid,
                 m.source,
-                COALESCE(m.radiant_team_name, rt.name) AS radiant_team_name,
-                COALESCE(m.dire_team_name, dt.name) AS dire_team_name,
-                COALESCE(m.league_name, l.name) AS league_name,
+                COALESCE(rt.name, m.radiant_team_name) AS radiant_team_name,
+                COALESCE(dt.name, m.dire_team_name) AS dire_team_name,
+                COALESCE(l.name, m.league_name) AS league_name,
                 COALESCE(m.radiant_icon_url, rt.icon_url) AS radiant_icon_url,
                 COALESCE(m.dire_icon_url, dt.icon_url) AS dire_icon_url,
                 COALESCE(m.radiant_logo_url, rt.logo_url) AS radiant_logo_url,
@@ -565,6 +564,22 @@ class OpenDotaMatchStorage:
             nested_value = cls._nested_text(payload, parent_key, child_key)
             if nested_value is not None:
                 return nested_value
+
+        return None
+
+    @classmethod
+    def _extract_team_id(cls, payload: dict[str, Any], side: str) -> int | None:
+        direct_value = cls._as_int(payload.get(f"{side}_team_id"))
+        if direct_value is not None:
+            return direct_value
+
+        nested_value = payload.get(f"{side}_team")
+        scalar_value = cls._as_int(nested_value)
+        if scalar_value is not None:
+            return scalar_value
+
+        if isinstance(nested_value, dict):
+            return cls._as_int(nested_value.get("team_id"))
 
         return None
 

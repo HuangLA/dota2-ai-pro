@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { ArrowLeft, LayoutDashboard } from 'lucide-react';
 import DesktopLayout from './components/DesktopLayout';
 import POCTestPage from './pages/POCTestPage';
 import MapTestPage from './pages/MapTestPage';
@@ -125,12 +126,21 @@ function App() {
         path="/match"
         element={
           <div className="w-full h-screen relative">
-            {/* Soft back button layer overlaying the top left for escaping fullscreen viewer mode */}
             <button
               onClick={handleBackFromReplayViewer}
-              className="absolute top-4 left-4 px-4 py-2 bg-dota-surface text-white rounded hover:bg-dota-primary z-[9999] shadow-lg border border-gray-700"
+              aria-label="← 返回"
+              className="absolute left-5 top-5 z-[9999] flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,41,59,0.72))] px-4 py-3 text-left text-white shadow-[0_20px_40px_rgba(2,6,23,0.4)] backdrop-blur-xl transition hover:border-cyan-400/40 hover:bg-[linear-gradient(135deg,rgba(8,47,73,0.88),rgba(15,23,42,0.92))]"
             >
-              ← 返回
+              <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 p-2 text-cyan-200">
+                <ArrowLeft className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  Workspace
+                </div>
+                <p className="mt-1 text-sm font-semibold text-white">返回工作台</p>
+              </div>
             </button>
             <RealMatchViewer
               initialMatchId={currentMatchId}

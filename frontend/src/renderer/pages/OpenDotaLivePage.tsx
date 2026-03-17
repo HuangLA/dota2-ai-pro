@@ -103,9 +103,69 @@ function getParseStatusBadge(status: string | null | undefined): { label: string
   }
 }
 
-function isTerminalDownloadStatus(status: string | null | undefined): boolean {
+function getPipelineStatusBadge(
+  downloadStatus: string | null | undefined,
+  parseStatus: string | null | undefined
+): { label: string; className: string } {
+  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
+  const normalizedParseStatus = resolvePipelineParseStatus(downloadStatus, parseStatus);
+
+  if (normalizedDownloadStatus === 'failed' || normalizedParseStatus === 'failed') {
+    return { label: '流水线失败', className: 'border-red-500/60 bg-red-900/30 text-red-200' };
+  }
+  if (normalizedParseStatus === 'completed') {
+    return { label: '可回放', className: 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200' };
+  }
+  if (normalizedParseStatus === 'parsing') {
+    return { label: '解析中', className: 'border-amber-500/60 bg-amber-900/30 text-amber-200' };
+  }
+  if (normalizedDownloadStatus === 'downloading' || normalizedDownloadStatus === 'prepared') {
+    return { label: '下载中', className: 'border-cyan-500/60 bg-cyan-900/30 text-cyan-200' };
+  }
+  if (normalizedDownloadStatus === 'completed') {
+    return { label: '待解析', className: 'border-blue-500/60 bg-blue-900/30 text-blue-200' };
+  }
+  return { label: '未开始', className: 'border-slate-500/60 bg-slate-800/60 text-slate-300' };
+}
+
+function resolvePipelineParseStatus(
+  downloadStatus: string | null | undefined,
+  parseStatus: string | null | undefined
+): string | null {
+  const normalizedParseStatus = (parseStatus || '').toLowerCase();
+  if (normalizedParseStatus) {
+    return normalizedParseStatus;
+  }
+
+  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
+  if (normalizedDownloadStatus === 'parsing') {
+    return 'parsing';
+  }
+  if (normalizedDownloadStatus === 'completed') {
+    return 'pending';
+  }
+
+  return null;
+}
+
+function isTerminalParseStatus(status: string | null | undefined): boolean {
   const normalized = (status || '').toLowerCase();
   return normalized === 'completed' || normalized === 'failed';
+}
+
+function isTerminalPipelineStatus(
+  downloadStatus: string | null | undefined,
+  parseStatus: string | null | undefined
+): boolean {
+  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
+  if (normalizedDownloadStatus === 'failed') {
+    return true;
+  }
+  if (normalizedDownloadStatus !== 'completed') {
+    return false;
+  }
+
+  return isTerminalParseStatus(resolvePipelineParseStatus(downloadStatus, parseStatus));
 }
 
 interface LiveMatchStatus {
@@ -116,13 +176,22 @@ interface LiveMatchStatus {
 
 function MatchIcon({ url, label }: { url?: string | null; label: string }) {
   const [broken, setBroken] = useState(false);
+  const fallbackText = label === 'Radiant' ? '天' : label === 'Dire' ? '夜' : '联';
+  const fallbackClassName =
+    label === 'Radiant'
+      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+      : label === 'Dire'
+        ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+        : 'border-amber-500/40 bg-amber-500/10 text-amber-200';
 
   if (!url || broken) {
     return (
       <div
         title={`${label} 图标缺失`}
-        className="h-7 w-7 shrink-0 rounded border border-dashed border-slate-500/40 bg-slate-800/50"
-      />
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border border-dashed text-xs font-semibold ${fallbackClassName}`}
+      >
+        {fallbackText}
+      </div>
     );
   }
 
@@ -131,6 +200,8 @@ function MatchIcon({ url, label }: { url?: string | null; label: string }) {
       src={url}
       alt={`${label} 图标`}
       className="max-h-7 max-w-[56px] shrink-0 rounded border border-slate-600/40 bg-slate-900/60 object-contain"
+      loading="lazy"
+      referrerPolicy="no-referrer"
       onError={() => setBroken(true)}
     />
   );
@@ -191,7 +262,10 @@ export function OpenDotaLivePage() {
           loading: false,
           error: null,
           detail,
-          autoPolling: isTerminalDownloadStatus(detail.download_task?.status)
+          autoPolling: isTerminalPipelineStatus(
+            detail.download_task?.status,
+            detail.local_parse_status
+          )
             ? false
             : current.autoPolling,
         };
@@ -235,9 +309,13 @@ export function OpenDotaLivePage() {
       for (const m of result.matches ?? []) {
         if (next.has(m.match_id)) continue;
         const rawStatus = (m.download_status ?? '').toLowerCase();
-        if (!rawStatus || rawStatus === 'completed' || rawStatus === 'failed') continue;
-        const progress = rawStatus === 'parsing' ? 50 : rawStatus === 'prepared' ? 5 : 10;
-        next.set(m.match_id, { downloadStatus: rawStatus, downloadProgress: progress, parseStatus: null });
+        if (!rawStatus || isTerminalPipelineStatus(rawStatus, m.local_parse_status)) continue;
+        const progress = rawStatus === 'parsing' ? 50 : rawStatus === 'completed' ? 100 : rawStatus === 'prepared' ? 5 : 10;
+        next.set(m.match_id, {
+          downloadStatus: rawStatus,
+          downloadProgress: progress,
+          parseStatus: m.local_parse_status ?? null,
+        });
       }
       return next;
     });
@@ -256,15 +334,34 @@ export function OpenDotaLivePage() {
   }, [fetchMatches]);
 
   useEffect(() => {
-    const currentIds = new Set(matches.map((match) => match.match_id));
-    setSelectedMatchIds((current) => current.filter((matchId) => currentIds.has(matchId)));
-  }, [matches]);
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const autoSyncSources = pickSources(appliedFilters);
+          if (autoSyncSources.length === 0) {
+            return;
+          }
+          await remoteService.syncRemoteMatches({ sources: autoSyncSources });
+          await fetchMatches();
+        } catch (autoSyncError) {
+          console.error('Failed to auto-sync remote matches:', autoSyncError);
+        }
+      })();
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, [appliedFilters, fetchMatches]);
 
   useEffect(() => {
     if (!statusPanel || !statusPanel.autoPolling) {
       return;
     }
-    if (isTerminalDownloadStatus(statusPanel.detail?.download_task?.status)) {
+    if (
+      isTerminalPipelineStatus(
+        statusPanel.detail?.download_task?.status,
+        statusPanel.detail?.local_parse_status
+      )
+    ) {
       return;
     }
 
@@ -277,10 +374,10 @@ export function OpenDotaLivePage() {
 
   // Per-row live status polling (same pattern as statusPanel auto-polling above)
   useEffect(() => {
-    // Find active (non-terminal) entries that still need polling
+    // Find active entries that still need polling across download + parse stages
     const activeIds: number[] = [];
     liveStatus.forEach((entry, matchId) => {
-      if (entry.downloadStatus !== 'completed' && entry.downloadStatus !== 'failed') {
+      if (!isTerminalPipelineStatus(entry.downloadStatus, entry.parseStatus)) {
         activeIds.push(matchId);
       }
     });
@@ -301,10 +398,8 @@ export function OpenDotaLivePage() {
           const parseStatus = resp.local_parse_status ?? null;
           updates.set(matchId, { downloadStatus: dlStatus, downloadProgress: dlProgress, parseStatus });
           changed = true;
-        } catch {
-          // On error, mark failed so we stop polling this entry
-          updates.set(matchId, { downloadStatus: 'failed', downloadProgress: 0, parseStatus: null });
-          changed = true;
+        } catch (statusError) {
+          console.error(`Failed to poll status for match ${matchId}:`, statusError);
         }
       }
 
@@ -318,19 +413,28 @@ export function OpenDotaLivePage() {
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (pickSources(filters).length === 0) {
+      setFeedback({ type: 'error', message: '请至少选择一个来源（职业或路人）。' });
+      return;
+    }
     setOffset(0);
     setAppliedFilters(filters);
     setFeedback(null);
   };
 
   const handleManualSync = async () => {
+    const syncSources = pickSources(appliedFilters);
+    if (syncSources.length === 0) {
+      setFeedback({ type: 'error', message: '当前没有启用的来源，无法同步。' });
+      return;
+    }
+
     setSyncing(true);
     setFeedback(null);
 
     try {
-      const syncSources = pickSources(filters);
       const result = await remoteService.syncRemoteMatches({
-        sources: syncSources.length > 0 ? syncSources : undefined,
+        sources: syncSources,
       });
       setFeedback({
         type: 'success',
@@ -373,6 +477,7 @@ export function OpenDotaLivePage() {
         type: 'success',
         message: result.message || `已触发 ${matchIds.length} 场比赛的入库任务。`,
       });
+      setSelectedMatchIds((current) => current.filter((id) => !matchIds.includes(id)));
       await fetchMatches();
     } catch (ingestError) {
       console.error('Failed to ingest remote matches:', ingestError);
@@ -416,92 +521,195 @@ export function OpenDotaLivePage() {
   const currentPageMatchIds = matches
     .map((match) => match.match_id)
     .filter((matchId) => Number.isFinite(matchId) && matchId > 0);
+  const selectedCurrentPageCount = currentPageMatchIds.filter((matchId) =>
+    selectedMatchIds.includes(matchId)
+  ).length;
   const isAllCurrentPageSelected =
-    currentPageMatchIds.length > 0 && selectedMatchIds.length === currentPageMatchIds.length;
+    currentPageMatchIds.length > 0 && selectedCurrentPageCount === currentPageMatchIds.length;
   const isSomeCurrentPageSelected =
-    selectedMatchIds.length > 0 && selectedMatchIds.length < currentPageMatchIds.length;
+    selectedCurrentPageCount > 0 && selectedCurrentPageCount < currentPageMatchIds.length;
+  const selectedSources = pickSources(appliedFilters);
+  const activeFilterCount = [appliedFilters.matchId, appliedFilters.leagueId].filter(
+    (value) => value.trim().length > 0
+  ).length + selectedSources.length;
+  const activePipelineCount = matches.filter((match) => {
+    const live = liveStatus.get(match.match_id);
+    return !isTerminalPipelineStatus(
+      live?.downloadStatus ?? match.download_status,
+      live?.parseStatus ?? match.local_parse_status
+    );
+  }).length;
+  const replayReadyCount = matches.filter((match) => {
+    const live = liveStatus.get(match.match_id);
+    return resolvePipelineParseStatus(
+      live?.downloadStatus ?? match.download_status,
+      live?.parseStatus ?? match.local_parse_status
+    ) === 'completed';
+  }).length;
 
   return (
-    <div className="p-6 text-white min-h-full bg-dota-bg">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-950/50 p-5 shadow-xl">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="workspace-page bg-dota-bg">
+      <div className="workspace-stack">
+        <div className="workspace-header border-cyan-500/20">
+          <div className="workspace-header-row">
             <div>
-              <h1 className="text-3xl font-bold text-dota-gold">OpenDota Live</h1>
-              <p className="mt-1 text-sm text-cyan-100/80">自动同步（每1分钟）</p>
+              <p className="workspace-eyebrow text-cyan-300/80">OpenDota Live Intake</p>
+              <h1 className="workspace-title text-dota-gold">OpenDota 实时比赛</h1>
+              <p className="workspace-description text-cyan-100/75">
+                自动同步远端比赛列表，并把下载、解析和可回放状态放到同一条流水线里。
+              </p>
             </div>
+            <div className="workspace-kpi-grid xl:min-w-[420px]">
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">流水线进行中</p>
+                <p className="workspace-kpi-value">{activePipelineCount}</p>
+                <p className="workspace-kpi-hint">下载或解析未结束</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">可回放</p>
+                <p className="workspace-kpi-value">{replayReadyCount}</p>
+                <p className="workspace-kpi-hint">当前页已解析完成</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">已勾选</p>
+                <p className="workspace-kpi-value">{selectedMatchIds.length}</p>
+                <p className="workspace-kpi-hint">准备批量入库</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="workspace-pill-row">
+            <span className="workspace-pill">
+              自动同步 每 1 分钟
+            </span>
+            <span className="workspace-pill">
+              激活筛选 {activeFilterCount}
+            </span>
+            <span className="workspace-pill">
+              来源 {selectedSources.length > 0 ? selectedSources.map(getSourceLabel).join(' + ') : '未选择'}
+            </span>
+            <span className="workspace-pill">
+              当前页 {matches.length} / 总数 {total}
+            </span>
             <button
               onClick={() => {
                 void handleManualSync();
               }}
               disabled={syncing}
-              className="rounded-lg border border-cyan-500/60 bg-cyan-700/70 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full border border-cyan-500/50 bg-cyan-600/15 px-3 py-1.5 text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {syncing ? '刷新中...' : '手动刷新'}
+              {syncing ? '同步中...' : '立即同步远端列表'}
             </button>
           </div>
         </div>
 
-        <div className="card p-5">
-          <h2 className="mb-4 text-lg font-semibold text-slate-100">筛选条件</h2>
-          <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-            <label className="flex h-[42px] items-center gap-2 rounded border border-slate-600 bg-dota-bg px-3">
-              <input
-                aria-label="职业"
-                type="checkbox"
-                checked={filters.includePro}
-                onChange={(event) =>
-                  setFilters((current) => ({ ...current, includePro: event.target.checked }))
-                }
-                className="h-4 w-4 accent-cyan-500"
-              />
-              <span className="text-sm text-slate-200">职业</span>
-            </label>
-            <label className="flex h-[42px] items-center gap-2 rounded border border-slate-600 bg-dota-bg px-3">
-              <input
-                aria-label="路人"
-                type="checkbox"
-                checked={filters.includePublic}
-                onChange={(event) =>
-                  setFilters((current) => ({ ...current, includePublic: event.target.checked }))
-                }
-                className="h-4 w-4 accent-cyan-500"
-              />
-              <span className="text-sm text-slate-200">路人</span>
-            </label>
-            <input
-              aria-label="match_id"
-              value={filters.matchId}
-              onChange={(event) => setFilters((current) => ({ ...current, matchId: event.target.value }))}
-              placeholder="match_id"
-              className="w-full rounded border border-slate-600 bg-dota-bg px-3 py-2 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
-            />
-            <input
-              aria-label="leagueid"
-              value={filters.leagueId}
-              onChange={(event) => setFilters((current) => ({ ...current, leagueId: event.target.value }))}
-              placeholder="leagueid"
-              className="w-full rounded border border-slate-600 bg-dota-bg px-3 py-2 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded border border-cyan-500/60 bg-cyan-700 px-4 py-2 font-medium text-white transition hover:bg-cyan-600"
-            >
-              查询
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFilters(DEFAULT_FILTERS);
-                setAppliedFilters(DEFAULT_FILTERS);
-                setOffset(0);
-                setFeedback(null);
-              }}
-              className="rounded border border-slate-500/60 bg-slate-700 px-4 py-2 font-medium text-white transition hover:bg-slate-600"
-            >
-              清空
-            </button>
-          </form>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.24fr)_340px]">
+          <div className="workspace-panel">
+            <div className="workspace-panel-header">
+              <h2 className="workspace-panel-title">筛选实时比赛</h2>
+              <p className="workspace-panel-description">
+                比赛 ID 适合精确定位，联赛 ID 适合做赛事级别筛选。
+              </p>
+            </div>
+            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+              <label className="workspace-checkpanel">
+                <input
+                  aria-label="职业"
+                  type="checkbox"
+                  checked={filters.includePro}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, includePro: event.target.checked }))
+                  }
+                  className="h-4 w-4 accent-cyan-500"
+                />
+                <span className="text-sm text-slate-200">职业</span>
+              </label>
+              <label className="workspace-checkpanel">
+                <input
+                  aria-label="路人"
+                  type="checkbox"
+                  checked={filters.includePublic}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, includePublic: event.target.checked }))
+                  }
+                  className="h-4 w-4 accent-cyan-500"
+                />
+                <span className="text-sm text-slate-200">路人</span>
+              </label>
+              <div className="xl:col-span-2">
+                <label className="mb-1.5 block text-sm text-slate-400">比赛 ID</label>
+                <input
+                  aria-label="match_id"
+                  value={filters.matchId}
+                  onChange={(event) => setFilters((current) => ({ ...current, matchId: event.target.value }))}
+                  placeholder="例如 8674716612"
+                  className="workspace-input"
+                />
+              </div>
+              <div className="xl:col-span-2">
+                <label className="mb-1.5 block text-sm text-slate-400">联赛 ID</label>
+                <input
+                  aria-label="leagueid"
+                  value={filters.leagueId}
+                  onChange={(event) => setFilters((current) => ({ ...current, leagueId: event.target.value }))}
+                  placeholder="例如 15475"
+                  className="workspace-input"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 xl:col-span-6">
+                <button
+                  type="submit"
+                  className="rounded border border-cyan-500/60 bg-cyan-700 px-4 py-2 font-medium text-white transition hover:bg-cyan-600"
+                >
+                  查询
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setAppliedFilters(DEFAULT_FILTERS);
+                    setOffset(0);
+                    setFeedback(null);
+                  }}
+                  className="rounded border border-slate-500/60 bg-slate-700 px-4 py-2 font-medium text-white transition hover:bg-slate-600"
+                >
+                  清空
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="workspace-panel">
+            <div className="workspace-panel-header">
+              <h2 className="workspace-panel-title">批量入库</h2>
+              <p className="workspace-panel-description">
+              勾选比赛后，会顺序执行下载和解析；可随时查看单场状态详情。
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">当前选择</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{selectedMatchIds.length}</p>
+              <p className="mt-1 text-sm text-slate-400">
+                {selectedMatchIds.length === 0 ? '请先勾选要下载的比赛。' : '准备下载并入库选中比赛。'}
+              </p>
+              <button
+                onClick={() => {
+                  void handleIngest(selectedMatchIds);
+                }}
+                disabled={selectedMatchIds.length === 0 || batchLoading || actionMatchId !== null}
+                className="mt-4 w-full rounded border border-emerald-500/60 bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {batchLoading ? '批量入库中...' : '批量下载并入库'}
+              </button>
+              <button
+                onClick={() => setSelectedMatchIds([])}
+                disabled={selectedMatchIds.length === 0}
+                className="mt-2 w-full rounded border border-slate-600 px-4 py-2 text-sm text-white transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                清空勾选
+              </button>
+            </div>
+          </div>
         </div>
 
         {feedback && (
@@ -517,21 +725,19 @@ export function OpenDotaLivePage() {
 
         {error && <div className="rounded border border-red-600 bg-red-900/20 px-4 py-3 text-red-200">{error}</div>}
 
-        <div className="card p-0 overflow-hidden">
+        <div className="workspace-table-shell">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-5 py-4">
-            <div className="text-sm text-slate-300">
-              当前页可选 <span className="font-semibold text-white">{currentPageMatchIds.length}</span> 场，
-              已勾选 <span className="font-semibold text-white">{selectedMatchIds.length}</span> 场
+            <div>
+              <p className="text-sm font-semibold text-slate-100">实时比赛列表</p>
+              <p className="mt-1 text-sm text-slate-300">
+                当前页可选 <span className="font-semibold text-white">{currentPageMatchIds.length}</span> 场，
+                已勾选 <span className="font-semibold text-white">{selectedMatchIds.length}</span> 场，
+                当前页命中 <span className="font-semibold text-white">{selectedCurrentPageCount}</span> 场。
+              </p>
             </div>
-            <button
-              onClick={() => {
-                void handleIngest(selectedMatchIds);
-              }}
-              disabled={selectedMatchIds.length === 0 || batchLoading || actionMatchId !== null}
-              className="rounded border border-emerald-500/60 bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {batchLoading ? '批量入库中...' : '批量下载并入库'}
-            </button>
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+              查看“状态详情”可追踪单场下载与解析链路
+            </span>
           </div>
 
           <div className="overflow-x-auto">
@@ -594,6 +800,15 @@ export function OpenDotaLivePage() {
                     const leagueName = getLeagueLabel(match.league_name, match.leagueid);
                     const ingesting = actionMatchId === match.match_id;
                     const live = liveStatus.get(match.match_id);
+                    const liveParseStatus = live
+                      ? resolvePipelineParseStatus(live.downloadStatus, live.parseStatus)
+                      : null;
+                    const effectiveDownloadStatus = live?.downloadStatus ?? match.download_status;
+                    const effectiveParseStatus = live?.parseStatus ?? match.local_parse_status;
+                    const pipelineBadge = getPipelineStatusBadge(
+                      effectiveDownloadStatus,
+                      effectiveParseStatus
+                    );
 
                     return (
                       <tr key={match.match_id} className="hover:bg-slate-800/40">
@@ -660,16 +875,20 @@ export function OpenDotaLivePage() {
                         <td className="px-2 py-2 text-slate-200 whitespace-nowrap">{getSourceLabel(match.source)}</td>
                         <td className="px-2 py-2 whitespace-nowrap">
                           {live?.downloadStatus === 'downloading' ? (
-                            <div className="group relative h-5 w-[72px] rounded-full bg-slate-700">
-                              <div className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500" style={{ width: `${live.downloadProgress}%` }} />
-                              <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
-                                {live.downloadProgress}%
-                              </span>
+                            <div className="space-y-1">
+                              <div className="relative h-5 w-[108px] rounded-full bg-slate-700">
+                                <div className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500" style={{ width: `${live.downloadProgress}%` }} />
+                                <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
+                                  下载 {live.downloadProgress}%
+                                </span>
+                              </div>
                               <button
                                 onClick={(e) => { e.stopPropagation(); void handleCancel(match.match_id); }}
                                 title="取消下载"
-                                className="absolute inset-y-0 right-0 z-20 flex w-[18px] items-center justify-center rounded-r-full bg-red-600/90 hover:bg-red-500 text-[9px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                              >✕</button>
+                                className="rounded border border-red-500/60 px-2 py-0.5 text-[10px] text-red-200 transition hover:border-red-400 hover:text-red-100"
+                              >
+                                取消下载
+                              </button>
                             </div>
                           ) : live ? (
                             <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${
@@ -686,7 +905,11 @@ export function OpenDotaLivePage() {
                           )}
                         </td>
                         <td className="px-2 py-2 whitespace-nowrap">
-                          {live?.downloadStatus === 'parsing' ? (
+                          <div className="space-y-1">
+                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${pipelineBadge.className}`}>
+                              {pipelineBadge.label}
+                            </span>
+                            {liveParseStatus === 'parsing' ? (
                             <div className="relative h-5 w-[56px] rounded-full bg-slate-700">
                               <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
                               <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
@@ -694,21 +917,18 @@ export function OpenDotaLivePage() {
                               </span>
                             </div>
                           ) : live ? (
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${
-                              live.downloadStatus === 'completed'
-                                ? 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200'
-                                : 'border-slate-500/60 bg-slate-800/60 text-slate-300'
-                            }`}>
-                              {live.downloadStatus === 'completed' ? '解析成功' : '--'}
+                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getParseStatusBadge(liveParseStatus).className}`}>
+                              {getParseStatusBadge(liveParseStatus).label}
                             </span>
                           ) : (
                             <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getParseStatusBadge(match.local_parse_status).className}`}>
                               {getParseStatusBadge(match.local_parse_status).label}
                             </span>
-                          )}
+                            )}
+                          </div>
                         </td>
                         <td className="px-2 py-2 text-right whitespace-nowrap">
-                          <div className="flex flex-nowrap items-center justify-end gap-1">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
                             <button
                               onClick={() => {
                                 void handleIngest([match.match_id]);
@@ -820,12 +1040,44 @@ export function OpenDotaLivePage() {
                 )}
                 {statusPanel.detail && (
                   <>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">download.status</div>
-                      <div className="text-white">{statusPanel.detail.download_task?.status ?? '--'}</div>
+                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                          getPipelineStatusBadge(
+                            statusPanel.detail.download_task?.status,
+                            statusPanel.detail.local_parse_status
+                          ).className
+                        }`}>
+                          {
+                            getPipelineStatusBadge(
+                              statusPanel.detail.download_task?.status,
+                              statusPanel.detail.local_parse_status
+                            ).label
+                          }
+                        </span>
+                        {typeof statusPanel.detail.download_task?.progress === 'number' && (
+                          <span className="text-xs text-slate-400">
+                            下载进度 {statusPanel.detail.download_task.progress}%
+                          </span>
+                        )}
+                      </div>
+                      {typeof statusPanel.detail.download_task?.progress === 'number' && (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-700">
+                          <div
+                            className="h-full rounded-full bg-cyan-500 transition-[width] duration-300"
+                            style={{ width: `${statusPanel.detail.download_task.progress}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">download.error</div>
+                      <div className="text-slate-400">下载阶段</div>
+                      <div className="text-white">
+                        {getDownloadStatusBadge(statusPanel.detail.download_task?.status).label}
+                      </div>
+                    </div>
+                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
+                      <div className="text-slate-400">下载错误</div>
                       <div className="text-white break-words">
                         {statusPanel.detail.download_task?.error_code ?? '--'}
                         {statusPanel.detail.download_task?.error_message
@@ -834,18 +1086,20 @@ export function OpenDotaLivePage() {
                       </div>
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">parse.status</div>
-                      <div className="text-white">{statusPanel.detail.local_parse_status ?? '--'}</div>
-                    </div>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">files</div>
+                      <div className="text-slate-400">解析阶段</div>
                       <div className="text-white">
-                        dem: {statusPanel.detail.replay_dem_exists ? 'yes' : 'no'} | dem.bz2:{' '}
-                        {statusPanel.detail.replay_bz2_exists ? 'yes' : 'no'}
+                        {getParseStatusBadge(statusPanel.detail.local_parse_status).label}
                       </div>
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">replay_path</div>
+                      <div className="text-slate-400">文件状态</div>
+                      <div className="text-white">
+                        DEM {statusPanel.detail.replay_dem_exists ? '已生成' : '缺失'} | 压缩包{' '}
+                        {statusPanel.detail.replay_bz2_exists ? '已保留' : '缺失'}
+                      </div>
+                    </div>
+                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
+                      <div className="text-slate-400">本地录像路径</div>
                       <div className="font-mono text-white break-all">
                         {statusPanel.detail.local_replay_path ?? '--'}
                       </div>

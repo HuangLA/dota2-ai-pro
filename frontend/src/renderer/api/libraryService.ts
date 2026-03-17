@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export interface LibraryMatchRecord {
   match_id: number;
@@ -53,7 +53,7 @@ class LibraryService {
       queryParams.append('offset', String(params.offset));
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/library/matches?${queryParams.toString()}`, {
+    const response = await fetch(buildApiUrl(`/api/v1/library/matches?${queryParams.toString()}`), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +68,7 @@ class LibraryService {
   }
 
   async deleteLibraryMatch(matchId: number): Promise<LibraryMatchActionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/library/${matchId}/delete`, {
+    const response = await fetch(buildApiUrl(`/api/v1/library/${matchId}/delete`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,7 +1,7 @@
 # API 规范文档 - True Sight
 
-> 版本: v1.2 (implementation-aligned)
-> 最后更新: 2026-02-26
+> 版本: v1.3 (implementation-aligned)
+> 最后更新: 2026-03-18
 > 基础 URL: `http://127.0.0.1:8000`
 
 本文件以当前代码实现为准（`backend/routers/*.py`），并明确区分：
@@ -93,11 +93,30 @@
 | GET | `/api/v1/admin/opendota/leagues` | DONE | OpenDota 赛事维表分页查询（`limit/offset`） |
 | POST | `/api/v1/admin/replays/download/prepare` | DONE | 录像下载任务准备：按 `match_id` 拉取 OpenDota `cluster/replay_salt` 并生成 replay URL（仅准备，不含大文件下载） |
 | GET | `/api/v1/admin/replays/download/tasks` | DONE | 查询下载任务分页列表（支持 `status/match_id/limit/offset` 过滤） |
-| GET | `/api/v1/admin/replays/download/tasks/{task_id}` | DONE | 查询单个下载任务详情（按 `task_id` 观测状态/尝试次数/错误信息） |
+| GET | `/api/v1/admin/replays/download/tasks/{task_id}` | DONE | 查询单个下载任务详情（按 `task_id` 观测状态/进度/尝试次数/错误信息/下载路径） |
 | POST | `/api/v1/admin/replays/download/by-match` | DONE | 一键触发 `prepare + execute`（仅当 prepare 成功且为 `prepared` 时执行下载） |
 | POST | `/api/v1/admin/match-database/{match_id}/download` | DONE | 比赛数据库页动作接口：按 `mode=prepare/prepare_and_execute` 触发单场下载准备或准备并执行 |
-| POST | `/api/v1/admin/replays/download/execute` | DONE | 按 `task_id` 执行最小下载（流式写入 `backend/data/replays/{match_id}.dem.bz2`），状态流转 `prepared -> downloading -> completed/failed` |
+| POST | `/api/v1/admin/replays/download/execute` | DONE | 按 `task_id` 执行最小下载（流式写入 `backend/data/replays/{match_id}.dem.bz2`），状态流转 `prepared -> downloading -> parsing -> completed/failed` |
 | POST | `/api/v1/admin/replays/download/retry` | DONE | 按 `task_id` 将 `failed/prepared` 重置为 `prepared`（清空错误） |
+
+### 1.7 Remote Replay Discovery (`/api/v1/remote`, `/api/v1/library`)
+
+| Method | Endpoint | 状态 | 说明 |
+|---|---|---|---|
+| GET | `/api/v1/remote/matches` | DONE | 已同步到本地镜像的远端比赛列表，支持 `include_pro/include_public/match_id/leagueid/limit/offset` |
+| GET | `/api/v1/remote/search` | DONE | 直连 OpenDota 搜索比赛候选，支持 `player_id/leagueid/limit`，并聚合本地下载/解析状态 |
+| POST | `/api/v1/remote/sync` | DONE | 手动同步远端比赛镜像（pro/public 可选） |
+| POST | `/api/v1/remote/ingest` | DONE | 按 `match_ids` 批量触发下载 + 解析入库 |
+| GET | `/api/v1/remote/matches/{match_id}/status` | DONE | 查询单场下载任务、解析状态与本地文件存在性 |
+| DELETE | `/api/v1/remote/matches/{match_id}/download` | DONE | 取消单场活跃下载 |
+| GET | `/api/v1/library/matches` | DONE | 本地已解析录像列表，支持 `team_id/player_id/leagueid/limit/offset` |
+| POST | `/api/v1/library/{match_id}/delete` | DONE | 删除单场本地录像与解析产物 |
+
+### 1.8 Assets (`/api/v1/assets`)
+
+| Method | Endpoint | 状态 | 说明 |
+|---|---|---|---|
+| GET | `/api/v1/assets/items/{item_name}.png` | DONE | 物品图标代理与本地缓存；会先归一化 parser/frontend 物品别名，再尝试多组 Steam CDN 地址并缓存在 `backend/data/cache/item_icons` |
 
 ## 2. 时间契约（重要）
 
@@ -152,7 +171,8 @@ FormData:
 响应要点：
 - 顶层固定字段：`status/match_id/game_time/tick/heroes`。
 - `heroes[]` 固定包含：`hero/team/level/kills/deaths/assists/net_worth/gpm/xpm/items`。
-- 当前最小切片中 `items/net_worth/gpm/xpm` 采用稳定 fallback（`[]`/`0`），后续切片将接入真实解析值。
+- `net_worth/gpm/xpm` 来自 parser 输出的 per-player economy 快照；`items` 来自英雄位置采样时的 inventory 快照。
+- 对于旧 schema 的历史 match 数据，响应可能额外包含 `warnings[]` / `message` 提示重新解析，以补齐真实 HUD 指标。
 - `kills/deaths` 由 `kills.parquet` 在目标时间点之前累计得到；`assists` 由 `assist_players` 映射累计（缺失时回退为 `0`）。
 
 ### 3.3.1 查询 Smokes
@@ -395,7 +415,11 @@ FormData:
     "task_id": "7c0b7605-f5e6-4ee8-b0f3-c57d86b5b8ce",
     "match_id": 8674716612,
     "status": "prepared",
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "progress": 5,
+    "attempt_count": 0,
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "download_path": null,
+    "error_code": null,
     "error_message": null,
     "created_at": 1700100000,
     "updated_at": 1700100001
@@ -412,7 +436,11 @@ FormData:
     "task_id": "1e8d2a3c-4f5a-4f47-bbb4-5b5c3c77f108",
     "match_id": 8676017978,
     "status": "failed",
+    "progress": 0,
+    "attempt_count": 0,
     "replay_url": null,
+    "download_path": null,
+    "error_code": "UNKNOWN_ERROR",
     "error_message": "Missing required replay fields from OpenDota match details (cluster/replay_salt).",
     "created_at": 1700100100,
     "updated_at": 1700100101
@@ -421,7 +449,8 @@ FormData:
 ```
 
 说明：
-- 当前任务模型状态：`pending` / `prepared` / `downloading` / `completed` / `failed`。
+- 当前任务模型状态：`pending` / `prepared` / `downloading` / `parsing` / `completed` / `failed`。
+- 底层任务记录维护整数型 `progress`：`pending=0`、`prepared=5`、`downloading=10..49`、`parsing=50`、`completed=100`；下载阶段仅在可获得 `content-length` 时按字节进度推进，失败时保留当前进度值。
 - `attempt_count` 表示下载执行尝试次数；执行接口会在进入 `downloading` 时自动 +1。
 - `download_path` 在成功后写入本地文件路径。
 - `error_code` 为可机读错误分类；当前包含：`INVALID_STATE` / `URL_MISSING` / `DOWNLOAD_TIMEOUT` / `HTTP_ERROR` / `NETWORK_ERROR` / `FILE_WRITE_ERROR` / `UNKNOWN_ERROR`。
@@ -443,8 +472,9 @@ FormData:
       "task_id": "7c0b7605-f5e6-4ee8-b0f3-c57d86b5b8ce",
       "match_id": 8674716612,
       "status": "prepared",
+      "progress": 5,
       "attempt_count": 0,
-      "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+      "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
       "download_path": null,
       "error_code": null,
       "error_message": null,
@@ -456,7 +486,7 @@ FormData:
 ```
 
 参数说明：
-- `status`（可选）：任务状态过滤，仅允许 `pending/prepared/downloading/completed/failed`，非法值返回 `422`。
+- `status`（可选）：任务状态过滤，仅允许 `pending/prepared/downloading/completed/failed`，非法值返回 `422`。任务在下载完成到解析完成之间会短暂进入 `parsing`，该状态当前可在详情/无过滤列表中观察到，但不能直接作为过滤参数传入。
 - `match_id`（可选）：按比赛 ID 精确过滤。
 
 ### 3.12 查询单个 replay 下载任务（管理端）
@@ -473,8 +503,9 @@ FormData:
     "task_id": "7c0b7605-f5e6-4ee8-b0f3-c57d86b5b8ce",
     "match_id": 8674716612,
     "status": "completed",
+    "progress": 100,
     "attempt_count": 1,
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     "download_path": "backend/data/replays/8674716612.dem.bz2",
     "error_code": null,
     "error_message": null,
@@ -506,6 +537,45 @@ FormData:
 }
 ```
 
+### 3.14 回放库远端搜索
+
+`GET /api/v1/remote/search?player_id=90001&leagueid=15475&limit=20`
+
+说明：
+- 当传入 `player_id` 时，后端直接请求 OpenDota `/players/{account_id}/matches`。
+- 当仅传入 `leagueid` 时，后端直接请求 OpenDota `/leagues/{league_id}/matches`。
+- 命中的 `match_id` 会 best-effort 回填到本地镜像层，以便返回统一的 `download_status/local_parse_status/local_replay_path`。
+- 若 `player_id` 和 `leagueid` 都缺失，返回 `422`。
+
+响应示例：
+
+```json
+{
+  "status": "ok",
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "matches": [
+    {
+      "match_id": 8123456789,
+      "start_time": 1700054321,
+      "duration": 2450,
+      "radiant_team_id": 15,
+      "dire_team_id": 2163,
+      "leagueid": 15475,
+      "radiant_team_name": "Team Liquid",
+      "dire_team_name": "Team Falcons",
+      "league_name": "DreamLeague Season 26",
+      "source": "pro",
+      "last_synced_at": 1700055000,
+      "download_status": null,
+      "local_parse_status": null,
+      "local_replay_path": null
+    }
+  ]
+}
+```
+
 响应示例（prepare 成功并完成下载）：
 
 ```json
@@ -515,8 +585,9 @@ FormData:
     "task_id": "ab28cf20-25d1-4daf-a97a-5cb06e276f25",
     "match_id": 8674716612,
     "status": "completed",
+    "progress": 100,
     "attempt_count": 1,
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     "download_path": "backend/data/replays/8674716612.dem.bz2",
     "error_code": null,
     "error_message": null,
@@ -535,6 +606,7 @@ FormData:
     "task_id": "a772ce7f-d7d8-4fe6-856e-2a1ad6e9067f",
     "match_id": 8676017978,
     "status": "failed",
+    "progress": 0,
     "attempt_count": 0,
     "replay_url": null,
     "download_path": null,
@@ -568,8 +640,9 @@ FormData:
     "task_id": "7c0b7605-f5e6-4ee8-b0f3-c57d86b5b8ce",
     "match_id": 8674716612,
     "status": "completed",
+    "progress": 100,
     "attempt_count": 1,
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     "download_path": "backend/data/replays/8674716612.dem.bz2",
     "error_code": null,
     "error_message": null,
@@ -588,6 +661,11 @@ FormData:
   "task": null
 }
 ```
+
+执行细节：
+- 下载开始后任务先进入 `downloading`，完成归档写入后进入 `parsing`，解析成功才会返回 `completed`。
+- 若上游响应包含 `content-length`，服务会在下载阶段按字节量滚动更新内部 `progress`（10..49）；无该头时仅维持阶段性进度。
+- 解析失败会返回 `failed`，并写入 `error_code=PARSE_FAILED` 与受控错误消息。
 
 ### 3.15 重试 replay 下载任务（管理端）
 
@@ -611,8 +689,9 @@ FormData:
     "task_id": "7c0b7605-f5e6-4ee8-b0f3-c57d86b5b8ce",
     "match_id": 8674716612,
     "status": "prepared",
+    "progress": 5,
     "attempt_count": 1,
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     "download_path": null,
     "error_code": null,
     "error_message": null,
@@ -652,8 +731,9 @@ FormData:
     "task_id": "task-mdb-prepare-1",
     "match_id": 8674716612,
     "status": "prepared",
+    "progress": 5,
     "attempt_count": 0,
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     "download_path": null,
     "error_code": null,
     "error_message": null,
@@ -673,8 +753,9 @@ FormData:
     "task_id": "task-mdb-running-1",
     "match_id": 8674716612,
     "status": "downloading",
+    "progress": 10,
     "attempt_count": 1,
-    "replay_url": "https://replay236.valve.net/570/8674716612_55500123.dem.bz2",
+    "replay_url": "http://replay236.valve.net/570/8674716612_55500123.dem.bz2",
     "download_path": null,
     "error_code": null,
     "error_message": null,
@@ -694,10 +775,10 @@ FormData:
 
 - 比赛管理页多文件上传已上线，但 API 仍保持单文件接口设计
 - Match Database 页面已对接 `GET /api/v1/admin/match-database` 与 `POST /api/v1/admin/match-database/{match_id}/download`（`prepare` / `prepare_and_execute`）并支持筛选、分页、动作刷新
-- Match Database 列表 `download_status` 已对齐前端状态徽章策略：`pending/prepared/downloading/completed/failed` 分别使用差异化文案与颜色；空值或未知值统一显示为 `Unknown`
+- Match Database 列表 `download_status` 已对齐前端状态徽章策略：`pending/prepared/downloading/parsing/completed/failed` 分别使用差异化文案与颜色；空值或未知值统一显示为 `Unknown`
 - Match Database 时间可读性策略：`start_time` 与 Task Details `updated_at` 以本地时间 `YYYY-MM-DD HH:mm:ss` 显示，并通过 `title` 保留原始 Unix 秒值；`duration` 统一显示为 `mm:ss` 或 `hh:mm:ss`
-- Match Database 列表对存在 `download_task_id` 的行新增 `Task Details` 面板，按需调用 `GET /api/v1/admin/replays/download/tasks/{task_id}` 展示 `task_id/status/attempt_count/error_code/error_message/download_path/updated_at`
-- Task Details 面板支持手动刷新；当任务状态为 `pending/prepared/downloading` 时前端每 4 秒轻量轮询，进入 `completed/failed` 后自动停止
+- Match Database 列表对存在 `download_task_id` 的行新增 `Task Details` 面板，按需调用 `GET /api/v1/admin/replays/download/tasks/{task_id}` 展示 `task_id/status/progress/attempt_count/error_code/error_message/download_path/updated_at`
+- Task Details 面板支持手动刷新；当任务状态为 `pending/prepared/downloading/parsing` 时前端每 4 秒轻量轮询，进入 `completed/failed` 后自动停止
 - Match Database 列表新增 `Open Replay` 跳转：进入 Replay Viewer 时携带 `match_id/download_status/download_task_id` 上下文，并在回放页显示轻量来源提示
 - 从 Replay Viewer 返回 Match Database 时，前端会在会话内恢复上一轮筛选条件与分页（包含至少一个筛选项与 `offset`）
 - Match Database 操作区新增当前页批量动作：`Batch Prepare (Current Page)` 与 `Batch Prepare + Execute (Current Page)`；基于当前页可操作 `match_id` 逐条串行调用单场动作接口，执行中启用页面级并发保护（禁用行级 `Prepare/Prepare+Execute/Open Replay/Task Details`，阻止重复批量触发），完成后展示汇总（`Total/Success/Failed/withTaskId` + 最多 3 条失败摘要），并自动打开“最后一个有 `task_id` 的批量结果”任务详情且显示 `Opened from batch result.` 轻提示
@@ -733,8 +814,8 @@ FormData:
 - Team Profile `Action History` 新增页面级批量动作 `Replay Visible History`：按当前 `History Filter` 可见记录的时间顺序（旧 -> 新）串行执行重放，执行中禁用并防重复触发，完成后反馈 `replayed/succeeded/failed` 汇总；当无可见记录时按钮禁用
 - Team Profile `Action History` 记录结构扩展最小执行状态字段：`lastRunStatus`（`succeeded`/`failed`）、`lastRunAt`、`lastRunMessage`，用于标记最近一次重放结果
 - Team Profile `Action History` 新增失败项 `Retry`：仅当记录最近执行为失败时展示 `Retry` 按钮，点击后复用同一重放逻辑并更新该记录的最近状态与时间
-- Playback 新增 `GET /api/v1/playback/{match_id}/hud`：支持 `game_time`/`tick` 二选一查询单时间点 10 英雄核心指标，当前后端最小可用契约已稳定返回 `hero/team/level/kills/deaths/assists/net_worth/gpm/xpm/items`（其中 `items/net_worth/gpm/xpm` 为 fallback）
-- RealMatchViewer 已新增最小 `HUD Metrics` 面板并接入上述接口，表格列至少包含 `Hero/Team/Lvl/K/D/A/NW/GPM/XPM`，`items` 以 count 方式展示以兼容 fallback
+- Playback 新增 `GET /api/v1/playback/{match_id}/hud`：支持 `game_time`/`tick` 二选一查询单时间点 10 英雄核心指标，稳定返回 `hero/team/level/kills/deaths/assists/net_worth/gpm/xpm/items`，其中 `items/net_worth/gpm/xpm` 已接入 parser/storage 真实值
+- RealMatchViewer 已新增最小 `HUD Metrics` 面板并接入上述接口，表格列至少包含 `Hero/Team/Lvl/K/D/A/NW/GPM/XPM`，`items` 以 count 方式展示
 - HUD 请求与回放时间联动：播放/拖动按当前 source time 映射 `game_time` 触发 `GET /playback/{match_id}/hud?game_time=...`，前端采用 500ms 轻量节流并在新请求到来时中止旧请求以避免堆积
 - HUD 面板具备可见状态反馈：`Loading`、`No HUD metrics at current time`、以及非阻断错误态（`HUD metrics request failed. Playback continues normally.`），失败不影响地图渲染与时间轴交互
 - HUD 血条数据来源于 `ticks.heroes[].hp/max_hp`

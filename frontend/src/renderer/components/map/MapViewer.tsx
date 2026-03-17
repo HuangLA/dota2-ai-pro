@@ -4,7 +4,13 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import DotaMapRenderer, { HeatmapBounds, HeroPosition, KillMarkerData, Ward } from './DotaMapRenderer';
+import DotaMapRenderer, {
+  HeatmapBounds,
+  HeroPosition,
+  KillMarkerData,
+  PathOverlay,
+  Ward,
+} from './DotaMapRenderer';
 
 export interface MapViewerProps {
   width?: number;
@@ -28,6 +34,8 @@ export interface MapViewerProps {
   heatmapGrid?: number[][] | null;
   /** 热力图坐标边界 */
   heatmapBounds?: HeatmapBounds | null;
+  /** 后端路径分析生成的静态轨迹 */
+  pathOverlays?: PathOverlay[] | null;
 }
 
 export function MapViewer({
@@ -44,6 +52,7 @@ export function MapViewer({
   showCalibrationMarkers = false,
   heatmapGrid = null,
   heatmapBounds = null,
+  pathOverlays = null,
 }: MapViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DotaMapRenderer | null>(null);
@@ -119,16 +128,26 @@ export function MapViewer({
     
     console.log('[MapViewer] Updating heroes:', heroPositions.length);
     rendererRef.current.renderHeroes(heroPositions);
-    if (showPaths) {
-      rendererRef.current.updatePathTraces(heroPositions);
-    }
-  }, [isInitialized, heroPositions, showPaths]);
+  }, [isInitialized, heroPositions]);
 
   // Toggle path traces visibility
   useEffect(() => {
     if (!isInitialized || !rendererRef.current) return;
     rendererRef.current.togglePathTraces(showPaths);
   }, [isInitialized, showPaths]);
+
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+
+    if (showPaths && pathOverlays && pathOverlays.length > 0) {
+      rendererRef.current.renderPathOverlays(pathOverlays);
+      return;
+    }
+
+    rendererRef.current.clearPathOverlays();
+  }, [isInitialized, pathOverlays, showPaths]);
 
   // Update wards
   useEffect(() => {
@@ -179,7 +198,7 @@ export function MapViewer({
       />
       {!isInitialized && (
         <div className="absolute inset-0 flex items-center justify-center bg-dota-bg/80">
-          <p className="text-gray-400">Loading map...</p>
+          <p className="text-gray-400">加载地图中...</p>
         </div>
       )}
     </div>

@@ -4,6 +4,8 @@ Visualization data endpoints.
 Provides APIs for generating heatmaps and movement path visualizations.
 """
 
+import os
+from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
@@ -14,8 +16,19 @@ from analyzers.path_analyzer import PathAnalyzer
 
 router = APIRouter()
 
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_backend_path(env_key: str, default_relative: str) -> str:
+    configured = os.getenv(env_key, default_relative)
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        candidate = BACKEND_ROOT / candidate
+    return str(candidate)
+
+
 # Initialize storage and analyzers
-storage = ParquetStorage("data/matches")
+storage = ParquetStorage(_resolve_backend_path("MATCHES_DIR", "data/matches"))
 heatmap_analyzer = HeatmapAnalyzer(storage)
 path_analyzer = PathAnalyzer(storage)
 
@@ -87,14 +100,19 @@ async def get_single_match_heatmap(
         result = heatmap_analyzer.generate_kill_heatmap(
             match_id=match_id,
             grid_size=grid_size,
-            team=team
+            hero=hero,
+            team=team,
+            start_time=start_time if start_time > 0 else None,
+            end_time=end_time,
         )
     elif heatmap_type == "death":
         result = heatmap_analyzer.generate_death_heatmap(
             match_id=match_id,
             grid_size=grid_size,
             hero=hero,
-            team=team
+            team=team,
+            start_time=start_time if start_time > 0 else None,
+            end_time=end_time,
         )
     else:
         raise HTTPException(

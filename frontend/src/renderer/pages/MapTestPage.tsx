@@ -38,17 +38,25 @@ export function MapTestPage() {
   const [showWards, setShowWards] = useState(true);
 
   return (
-    <div className="min-h-full bg-dota-bg p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-dota-gold mb-2">
-          Dota 2 地图渲染测试
-        </h1>
-        <p className="text-gray-400 mb-6">
-          测试基于 PixiJS 的地图渲染，包含英雄位置和眼位信息
-        </p>
+    <div className="workspace-page bg-dota-bg">
+      <div className="workspace-stack max-w-[1280px]">
+        <div className="workspace-header">
+          <div className="workspace-header-row">
+            <div>
+              <p className="workspace-eyebrow text-cyan-300/80">Map Renderer</p>
+              <h1 className="workspace-title text-dota-gold">Dota 2 地图渲染测试</h1>
+              <p className="workspace-description">单独校验小地图渲染、英雄点位和眼位图层，让地图相关调试页也更像独立桌面工具。</p>
+            </div>
+            <div className="workspace-pill-row xl:mt-0">
+              <span className="workspace-pill">PixiJS v8</span>
+              <span className="workspace-pill">坐标映射</span>
+              <span className="workspace-pill">图层校准</span>
+            </div>
+          </div>
+        </div>
 
         {/* Controls */}
-        <div className="card mb-6 p-4">
+        <div className="workspace-panel">
           <h2 className="text-lg font-medium mb-3">显示控制</h2>
           <div className="flex gap-4">
             <label className="flex items-center gap-2">
@@ -76,7 +84,7 @@ export function MapTestPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Map Canvas */}
           <div className="lg:col-span-2">
-            <div className="card p-4">
+            <div className="workspace-panel">
               <h2 className="text-lg font-medium mb-3">地图视图</h2>
               <MapViewer
                 width={800}
@@ -90,7 +98,7 @@ export function MapTestPage() {
           {/* Info Panel */}
           <div className="space-y-4">
             {/* Hero List */}
-            <div className="card p-4">
+            <div className="workspace-panel">
               <h3 className="text-lg font-medium mb-3">英雄列表</h3>
               <div className="space-y-2">
                 <div>
@@ -119,7 +127,7 @@ export function MapTestPage() {
             </div>
 
             {/* Ward Legend */}
-            <div className="card p-4">
+            <div className="workspace-panel">
               <h3 className="text-lg font-medium mb-3">眼位图例</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
@@ -142,7 +150,7 @@ export function MapTestPage() {
             </div>
 
             {/* Map Info */}
-            <div className="card p-4">
+            <div className="workspace-panel">
               <h3 className="text-lg font-medium mb-3">地图信息</h3>
               <div className="text-sm text-gray-400 space-y-1">
                 <p>尺寸: 800x800 像素</p>

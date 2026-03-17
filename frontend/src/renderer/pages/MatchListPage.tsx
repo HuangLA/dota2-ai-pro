@@ -15,7 +15,7 @@ interface MatchData {
   game_mode?: number;
   patch_version?: string;
   league_id?: number;
-  replay_path?: string;
+  replay_path?: string | null;
   parse_status?: string;
   created_at?: number;
   updated_at?: number;
@@ -164,18 +164,40 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
   };
 
   return (
-    <div className="p-6 text-white min-h-full bg-dota-bg">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-dota-gold">比赛管理</h1>
-          <p className="text-gray-400 mt-1">上传录像、搜索比赛、管理你的游戏数据</p>
+    <div className="workspace-page bg-dota-bg">
+      <div className="workspace-stack">
+        <div className="workspace-header">
+          <div className="workspace-header-row">
+            <div>
+              <p className="workspace-eyebrow text-cyan-300/80">Legacy Match List</p>
+              <h1 className="workspace-title text-dota-gold">比赛管理</h1>
+              <p className="workspace-description">上传录像、搜索比赛、管理你的游戏数据。这是保留的旧版入口，但现在也使用同一套桌面工作区视觉。</p>
+            </div>
+            <div className="workspace-kpi-grid xl:min-w-[420px]">
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">当前结果</p>
+                <p className="workspace-kpi-value">{matches.length}</p>
+                <p className="workspace-kpi-hint">当前页比赛数</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">偏移</p>
+                <p className="workspace-kpi-value">{offset}</p>
+                <p className="workspace-kpi-hint">分页位置</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">总数</p>
+                <p className="workspace-kpi-value">{total}</p>
+                <p className="workspace-kpi-hint">命中总比赛</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Replay Uploader */}
         <ReplayUploader onTaskCompleted={fetchMatches} />
 
         {/* Search Bar */}
-        <div className="card mb-6 p-6">
+        <div className="workspace-panel">
           <h2 className="text-lg font-semibold text-gray-200 mb-4">搜索筛选</h2>
           <form onSubmit={handleSearch} className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[150px]">
@@ -185,7 +207,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                 value={matchIdInput}
                 onChange={(e) => setMatchIdInput(e.target.value)}
                 placeholder="e.g., 8478202"
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-dota-primary focus:ring-1 focus:ring-dota-primary transition-colors"
+                className="workspace-input focus:border-dota-primary"
               />
             </div>
 
@@ -196,7 +218,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                 value={accountIdInput}
                 onChange={(e) => setAccountIdInput(e.target.value)}
                 placeholder="e.g., 87278757"
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-dota-primary focus:ring-1 focus:ring-dota-primary transition-colors"
+                className="workspace-input focus:border-dota-primary"
               />
             </div>
 
@@ -205,7 +227,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
               <select
                 value={selectedHeroId || ''}
                 onChange={(e) => setSelectedHeroId(e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-dota-primary focus:ring-1 focus:ring-dota-primary transition-colors"
+                className="workspace-select focus:border-dota-primary"
               >
                 <option value="">全部英雄</option>
                 {heroes.map(hero => (
@@ -248,13 +270,13 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
+          <div className="rounded-2xl border border-red-500 bg-red-900/50 px-4 py-3 text-red-200">
             {error}
           </div>
         )}
 
         {/* Data Table */}
-        <div className="card overflow-hidden p-0">
+        <div className="workspace-table-shell">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 text-sm uppercase">

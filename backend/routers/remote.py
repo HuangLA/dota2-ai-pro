@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -139,6 +140,104 @@ async def _backfill_missing_league_names(*, match_ids: list[int]) -> None:
             continue
 
 
+def _find_match_ids_with_missing_metadata(records: list[dict[str, Any]]) -> list[int]:
+    match_ids: list[int] = []
+    for record in records:
+        if not (
+            _is_missing_name(record.get("radiant_team_name"))
+            or _is_missing_name(record.get("dire_team_name"))
+            or _is_missing_name(record.get("league_name"))
+        ):
+            continue
+
+        raw_match_id = record.get("match_id")
+        if isinstance(raw_match_id, int):
+            match_ids.append(raw_match_id)
+
+    return match_ids
+
+
+def _normalize_search_matches(
+    raw_matches: list[dict[str, Any]],
+    *,
+    forced_leagueid: int | None = None,
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    seen_match_ids: set[int] = set()
+
+    for raw in raw_matches:
+        match_id = raw.get("match_id")
+        if not isinstance(match_id, int) or match_id <= 0 or match_id in seen_match_ids:
+            continue
+
+        payload = dict(raw)
+        if forced_leagueid is not None and not payload.get("leagueid"):
+            payload["leagueid"] = forced_leagueid
+        normalized.append(payload)
+        seen_match_ids.add(match_id)
+
+    return normalized
+
+
+def _upsert_search_matches(matches: list[dict[str, Any]]) -> None:
+    pro_matches: list[dict[str, Any]] = []
+    public_matches: list[dict[str, Any]] = []
+
+    for match in matches:
+        leagueid = match.get("leagueid")
+        if isinstance(leagueid, int) and leagueid > 0:
+            pro_matches.append(match)
+        else:
+            public_matches.append(match)
+
+    if pro_matches:
+        opendota_match_storage.upsert_recent_matches(pro_matches, source="pro")
+    if public_matches:
+        opendota_match_storage.upsert_recent_matches(public_matches, source="public")
+
+
+async def _backfill_missing_match_metadata(*, match_ids: list[int]) -> None:
+    if not match_ids:
+        return
+
+    detail_tasks = [opendota_service.fetch_match_details(match_id) for match_id in match_ids]
+    detail_results = await asyncio.gather(*detail_tasks, return_exceptions=True)
+    for detail in detail_results:
+        if isinstance(detail, dict):
+            opendota_match_storage.upsert_match_detail(detail)
+
+
+async def _load_enriched_matches(match_ids: list[int]) -> list[dict[str, Any]]:
+    if not match_ids:
+        return []
+
+    _, rows = opendota_match_storage.list_recent_matches(
+        limit=len(match_ids),
+        offset=0,
+        match_ids=match_ids,
+        include_pro=True,
+        include_public=True,
+    )
+
+    missing_match_ids = _find_match_ids_with_missing_metadata(rows)
+    if missing_match_ids:
+        await _backfill_missing_match_metadata(match_ids=missing_match_ids)
+        _, rows = opendota_match_storage.list_recent_matches(
+            limit=len(match_ids),
+            offset=0,
+            match_ids=match_ids,
+            include_pro=True,
+            include_public=True,
+        )
+
+    rows_by_match_id = {
+        int(row["match_id"]): row
+        for row in rows
+        if isinstance(row.get("match_id"), int)
+    }
+    return [rows_by_match_id[match_id] for match_id in match_ids if match_id in rows_by_match_id]
+
+
 @router.get("/matches", response_model=RemoteMatchListResponse)
 async def list_remote_matches(
     limit: int = Query(50, ge=1, le=200),
@@ -181,6 +280,61 @@ async def list_remote_matches(
         total=total,
         limit=limit,
         offset=offset,
+        matches=[RemoteMatchRecord(**row) for row in rows],
+    )
+
+
+@router.get("/search", response_model=RemoteMatchListResponse)
+async def search_remote_matches(
+    limit: int = Query(20, ge=1, le=50),
+    player_id: int | None = Query(None, ge=1),
+    leagueid: int | None = Query(None, ge=1),
+) -> RemoteMatchListResponse:
+    """Search OpenDota directly for replay candidates by player or league ID."""
+    if player_id is None and leagueid is None:
+        raise HTTPException(status_code=422, detail="player_id or leagueid is required.")
+
+    try:
+        if player_id is not None:
+            raw_matches = await opendota_service.fetch_player_matches(
+                player_id,
+                limit=limit,
+                offset=0,
+                leagueid=leagueid,
+            )
+            normalized_matches = _normalize_search_matches(raw_matches)
+        else:
+            assert leagueid is not None
+            raw_matches = await opendota_service.fetch_league_matches(
+                leagueid,
+                limit=limit,
+                offset=0,
+            )
+            normalized_matches = _normalize_search_matches(
+                raw_matches,
+                forced_leagueid=leagueid,
+            )
+    except OpenDotaServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not normalized_matches:
+        return RemoteMatchListResponse(
+            status="ok",
+            total=0,
+            limit=limit,
+            offset=0,
+            matches=[],
+        )
+
+    _upsert_search_matches(normalized_matches)
+    match_ids = [int(match["match_id"]) for match in normalized_matches if isinstance(match.get("match_id"), int)]
+    rows = await _load_enriched_matches(match_ids)
+
+    return RemoteMatchListResponse(
+        status="ok",
+        total=len(rows),
+        limit=limit,
+        offset=0,
         matches=[RemoteMatchRecord(**row) for row in rows],
     )
 

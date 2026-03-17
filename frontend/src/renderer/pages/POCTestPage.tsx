@@ -5,10 +5,12 @@
 import { useState } from 'react';
 import PixiJSStressTest from '../components/poc/PixiJSStressTest';
 import backendAPI, { ApiTestResult } from '../api/backend';
+import { getApiBaseUrl } from '../api/apiBase';
 
 type TestTab = 'pixijs' | 'api' | 'summary';
 
 export function POCTestPage() {
+  const apiBaseUrl = getApiBaseUrl();
   const [activeTab, setActiveTab] = useState<TestTab>('pixijs');
   const [healthResult, setHealthResult] = useState<ApiTestResult | null>(null);
   const [matchesResult, setMatchesResult] = useState<ApiTestResult | null>(null);
@@ -31,17 +33,25 @@ export function POCTestPage() {
   };
 
   return (
-    <div className="min-h-full bg-dota-bg p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-dota-gold mb-2">
-          技术验证 POC
-        </h1>
-        <p className="text-gray-400 mb-6">
-          全面开发前验证核心技术
-        </p>
+    <div className="workspace-page bg-dota-bg">
+      <div className="workspace-stack max-w-[1280px]">
+        <div className="workspace-header">
+          <div className="workspace-header-row">
+            <div>
+              <p className="workspace-eyebrow text-cyan-300/80">POC Lab</p>
+              <h1 className="workspace-title text-dota-gold">技术验证 POC</h1>
+              <p className="workspace-description">用于验证渲染、接口和中间实验能力。它不是正式业务页面，但也保持和主工作台一致的桌面端信息层次。</p>
+            </div>
+            <div className="workspace-pill-row xl:mt-0">
+              <span className="workspace-pill">PixiJS</span>
+              <span className="workspace-pill">API</span>
+              <span className="workspace-pill">Summary</span>
+            </div>
+          </div>
+        </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-700">
+        <div className="flex gap-2 border-b border-gray-700">
           <button
             onClick={() => setActiveTab('pixijs')}
             className={`px-4 py-2 -mb-px ${activeTab === 'pixijs'
@@ -75,7 +85,7 @@ export function POCTestPage() {
         {activeTab === 'pixijs' && <PixiJSStressTest />}
 
         {activeTab === 'api' && (
-          <div className="card p-6">
+          <div className="workspace-panel">
             <h2 className="text-xl font-bold text-dota-gold mb-4">
               后端 API 测试
             </h2>
@@ -90,7 +100,7 @@ export function POCTestPage() {
                   <div>
                     <h3 className="font-medium mb-1">健康检查</h3>
                     <code className="text-sm text-gray-400">
-                      GET http://localhost:8000/health
+                      GET {apiBaseUrl}/health
                     </code>
                   </div>
                   <button
@@ -137,7 +147,7 @@ export function POCTestPage() {
                   <div>
                     <h3 className="font-medium mb-1">比赛列表</h3>
                     <code className="text-sm text-gray-400">
-                      GET http://localhost:8000/api/v1/matches
+                      GET {apiBaseUrl}/api/v1/matches
                     </code>
                   </div>
                   <button
@@ -197,7 +207,7 @@ export function POCTestPage() {
         )}
 
         {activeTab === 'summary' && (
-          <div className="card p-6">
+          <div className="workspace-panel">
             <h2 className="text-xl font-bold text-dota-gold mb-4">
               POC 总结
             </h2>

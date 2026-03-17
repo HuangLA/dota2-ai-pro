@@ -123,6 +123,14 @@ function getLeagueLabel(name: string | null | undefined, leagueId: number | null
   return '未知联赛';
 }
 
+function isReplayReady(downloadStatus: string | null | undefined): boolean {
+  return normalizeDownloadStatus(downloadStatus) === 'completed';
+}
+
+function getReplayAvailabilityHint(downloadStatus: string | null | undefined): string {
+  return isReplayReady(downloadStatus) ? '可直接打开本地回放。' : '录像尚未准备好，请先下载。';
+}
+
 export function MatchDatabasePage({
   onOpenReplay,
   initialViewState,
@@ -205,15 +213,26 @@ export function MatchDatabasePage({
   );
 
   const selectedMatchCount = selectedMatchIds.length;
+  const selectedCurrentPageCount = allCurrentPageMatchIds.filter((matchId) =>
+    selectedMatchIds.includes(matchId)
+  ).length;
   const isAllCurrentPageSelected =
-    allCurrentPageMatchIds.length > 0 && selectedMatchCount === allCurrentPageMatchIds.length;
+    allCurrentPageMatchIds.length > 0 && selectedCurrentPageCount === allCurrentPageMatchIds.length;
   const isSomeCurrentPageSelected =
-    selectedMatchCount > 0 && selectedMatchCount < allCurrentPageMatchIds.length;
+    selectedCurrentPageCount > 0 && selectedCurrentPageCount < allCurrentPageMatchIds.length;
   const batchActionsDisabled =
     loading ||
     activeActionMatchId !== null ||
-    allCurrentPageMatchIds.length === 0 ||
     selectedMatchCount === 0;
+  const readyReplayCount = actionableMatches.filter((match) => isReplayReady(match.download_status)).length;
+  const activeFilterCount = [
+    filters.teamId,
+    filters.leagueId,
+    filters.startTimeFrom,
+    filters.startTimeTo,
+  ].filter((value) => value.trim().length > 0).length +
+    (filters.hasDownload !== 'all' ? 1 : 0) +
+    (filters.professionalOnly ? 1 : 0);
 
   const failedItemsText = useMemo(() => {
     if (lastBatchFailures.length === 0) {
@@ -226,11 +245,6 @@ export function MatchDatabasePage({
   useEffect(() => {
     fetchMatches();
   }, [fetchMatches]);
-
-  useEffect(() => {
-    const currentPageIds = new Set(allCurrentPageMatchIds);
-    setSelectedMatchIds((current) => current.filter((matchId) => currentPageIds.has(matchId)));
-  }, [allCurrentPageMatchIds]);
 
   useEffect(() => {
     if (!onViewStateChange) {
@@ -436,13 +450,12 @@ export function MatchDatabasePage({
     let successCount = 0;
     let withTaskIdCount = 0;
     let lastTaskIdFromBatch: string | null = null;
-    const selectedIdSet = new Set(selectedMatchIds);
-    const selectedMatches = actionableMatches.filter((match) => selectedIdSet.has(match.match_id));
+    const selectedMatches = [...selectedMatchIds];
 
-    for (const match of selectedMatches) {
+    for (const matchId of selectedMatches) {
       try {
         const result = await matchDatabaseService.triggerDownloadAction(
-          match.match_id,
+          matchId,
           'prepare_and_execute'
         );
         if (result.task?.task_id) {
@@ -458,13 +471,13 @@ export function MatchDatabasePage({
         }
 
         failures.push({
-          matchId: match.match_id,
+          matchId,
           message: result.message || '请求失败。',
         });
       } catch (batchError) {
         console.error('Failed to trigger batch match database action:', batchError);
         failures.push({
-          matchId: match.match_id,
+          matchId,
           message: '请求失败。',
         });
       }
@@ -490,6 +503,7 @@ export function MatchDatabasePage({
 
     try {
       await fetchMatches();
+      setSelectedMatchIds([]);
       if (lastTaskIdFromBatch) {
         await handleOpenTaskDetails(lastTaskIdFromBatch, { autoOpened: true });
       }
@@ -501,6 +515,11 @@ export function MatchDatabasePage({
 
   const handleDeleteReplay = async (matchId: number) => {
     if (activeBatchMode || batchActionInFlightRef.current) {
+      return;
+    }
+
+    const confirmed = window.confirm(`确定删除比赛 ${matchId} 的本地录像文件吗？`);
+    if (!confirmed) {
       return;
     }
 
@@ -555,6 +574,14 @@ export function MatchDatabasePage({
   }, []);
 
   const handleOpenReplay = (match: MatchDatabaseRecord) => {
+    if (!isReplayReady(match.download_status)) {
+      setFeedback({
+        type: 'error',
+        message: `比赛 ${match.match_id} 的录像尚未准备好，请先下载完成后再打开。`,
+      });
+      return;
+    }
+
     onOpenReplay?.({
       source: 'match_database',
       matchId: match.match_id,
@@ -631,184 +658,295 @@ export function MatchDatabasePage({
   }, [fetchTaskDetails, taskDetails?.status, taskDetailsTaskId]);
 
   return (
-    <div className="p-6 text-white min-h-full bg-dota-bg relative">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-dota-gold">比赛数据库</h1>
-          <p className="text-gray-400 mt-1">
-            默认仅显示职业联赛。可关闭“仅职业联赛”查看全部比赛（含路人局）。
-          </p>
+    <div className="workspace-page relative bg-dota-bg">
+      <div className="workspace-stack">
+        <div className="workspace-header border-dota-primary/20 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.16),_transparent_34%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]">
+          <div className="workspace-header-row">
+            <div>
+              <p className="workspace-eyebrow text-cyan-300/80">Match Database</p>
+              <h1 className="workspace-title text-dota-gold">比赛数据库</h1>
+              <p className="workspace-description">
+                先筛出目标比赛，再决定下载、查看任务或直接进入回放。默认仅展示职业联赛。
+              </p>
+            </div>
+            <div className="workspace-kpi-grid xl:min-w-[420px]">
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">当前页</p>
+                <p className="workspace-kpi-value">{actionableMatches.length}</p>
+                <p className="workspace-kpi-hint">可操作比赛</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">已勾选</p>
+                <p className="workspace-kpi-value">{selectedMatchCount}</p>
+                <p className="workspace-kpi-hint">等待批量处理</p>
+              </div>
+              <div className="workspace-kpi">
+                <p className="workspace-kpi-label">可回放</p>
+                <p className="workspace-kpi-value">{readyReplayCount}</p>
+                <p className="workspace-kpi-hint">当前页已下载完成</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="workspace-pill-row">
+            <span className="workspace-pill">
+              激活筛选 {activeFilterCount}
+            </span>
+            <span className="workspace-pill">
+              总记录 {total}
+            </span>
+            <span className="workspace-pill">
+              当前偏移 {offset}
+            </span>
+            {filters.professionalOnly && (
+              <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-200">
+                仅职业联赛
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="card mb-6 p-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">筛选条件</h2>
-          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">战队 ID</label>
-              <input
-                aria-label="战队 ID"
-                value={filters.teamId}
-                onChange={(event) => setFilters((prev) => ({ ...prev, teamId: event.target.value }))}
-                placeholder="例如 15"
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-dota-primary"
-              />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.95fr)]">
+          <div className="workspace-panel">
+            <div className="workspace-panel-header">
+              <h2 className="workspace-panel-title">查找比赛</h2>
+              <p className="workspace-panel-description">
+                适合先用战队、联赛和时间范围缩小集合，再做下载或进入回放。
+              </p>
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">联赛 ID</label>
-              <input
-                aria-label="联赛 ID"
-                value={filters.leagueId}
-                onChange={(event) => setFilters((prev) => ({ ...prev, leagueId: event.target.value }))}
-                placeholder="例如 15475"
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-dota-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">开始时间（起）</label>
-              <input
-                aria-label="开始时间（起）"
-                type="datetime-local"
-                value={filters.startTimeFrom}
-                onChange={(event) =>
-                  setFilters((prev) => ({ ...prev, startTimeFrom: event.target.value }))
-                }
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-dota-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">开始时间（止）</label>
-              <input
-                aria-label="开始时间（止）"
-                type="datetime-local"
-                value={filters.startTimeTo}
-                onChange={(event) =>
-                  setFilters((prev) => ({ ...prev, startTimeTo: event.target.value }))
-                }
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-dota-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">是否已有下载任务</label>
-              <select
-                aria-label="是否已有下载任务"
-                value={filters.hasDownload}
-                onChange={(event) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    hasDownload: event.target.value as HasDownloadFilter,
-                  }))
-                }
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-dota-primary"
-              >
-                <option value="all">全部</option>
-                <option value="true">是</option>
-                <option value="false">否</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">仅职业联赛</label>
-              <label className="h-[42px] w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white flex items-center gap-2 cursor-pointer">
+
+            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
                 <input
-                  aria-label="仅职业联赛"
-                  type="checkbox"
-                  checked={filters.professionalOnly}
+                  aria-label="战队 ID"
+                  value={filters.teamId}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, teamId: event.target.value }))}
+                  placeholder="例如 15"
+                  className="workspace-input focus:border-dota-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">联赛 ID</label>
+                <input
+                  aria-label="联赛 ID"
+                  value={filters.leagueId}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, leagueId: event.target.value }))}
+                  placeholder="例如 15475"
+                  className="workspace-input focus:border-dota-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">开始时间（起）</label>
+                <input
+                  aria-label="开始时间（起）"
+                  type="datetime-local"
+                  value={filters.startTimeFrom}
+                  onChange={(event) =>
+                    setFilters((prev) => ({ ...prev, startTimeFrom: event.target.value }))
+                  }
+                  className="workspace-input focus:border-dota-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">开始时间（止）</label>
+                <input
+                  aria-label="开始时间（止）"
+                  type="datetime-local"
+                  value={filters.startTimeTo}
+                  onChange={(event) =>
+                    setFilters((prev) => ({ ...prev, startTimeTo: event.target.value }))
+                  }
+                  className="workspace-input focus:border-dota-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">是否已有下载任务</label>
+                <select
+                  aria-label="是否已有下载任务"
+                  value={filters.hasDownload}
                   onChange={(event) =>
                     setFilters((prev) => ({
                       ...prev,
-                      professionalOnly: event.target.checked,
+                      hasDownload: event.target.value as HasDownloadFilter,
                     }))
                   }
-                  className="h-4 w-4 accent-dota-primary"
-                />
-                <span className="text-sm text-gray-200">仅显示职业联赛</span>
-              </label>
-            </div>
-            <div className="flex gap-2 xl:col-span-6">
-              <button
-                type="submit"
-                className="bg-dota-primary hover:bg-blue-600 text-white px-5 py-2 rounded transition-colors font-medium"
-              >
-                查询
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeBatchMode || batchActionInFlightRef.current) {
-                    setFeedback({
-                      type: 'error',
-                      message: '批量任务进行中。当前页将在完成后自动刷新。',
-                    });
-                    return;
-                  }
-                  void fetchMatches();
-                }}
-                className="bg-cyan-700 hover:bg-cyan-600 text-white px-5 py-2 rounded transition-colors"
-              >
-                刷新当前页
-              </button>
-              <button
-                type="button"
-                onClick={handleClear}
-                className="bg-gray-600 hover:bg-gray-500 text-white px-5 py-2 rounded transition-colors"
-              >
-                清空
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleBatchAction();
-                }}
-                disabled={batchActionsDisabled || activeBatchMode !== null}
-                className="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {activeBatchMode === 'prepare_and_execute' ? '正在批量下载（勾选项）...' : '批量下载（勾选项）'}
-              </button>
-              <span className="text-sm text-gray-300">
-                {allCurrentPageMatchIds.length === 0
-                  ? '当前页无可选比赛。'
-                  : selectedMatchCount === 0
+                  className="workspace-select focus:border-dota-primary"
+                >
+                  <option value="all">全部</option>
+                  <option value="true">是</option>
+                  <option value="false">否</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">仅职业联赛</label>
+                <label className="workspace-checkpanel h-[46px] w-full cursor-pointer text-white">
+                  <input
+                    aria-label="仅职业联赛"
+                    type="checkbox"
+                    checked={filters.professionalOnly}
+                    onChange={(event) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        professionalOnly: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 accent-dota-primary"
+                  />
+                  <span className="text-sm text-gray-200">仅显示职业联赛</span>
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2 xl:col-span-6">
+                <button
+                  type="submit"
+                  className="rounded bg-dota-primary px-5 py-2 font-medium text-white transition-colors hover:bg-blue-600"
+                >
+                  查询
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeBatchMode || batchActionInFlightRef.current) {
+                      setFeedback({
+                        type: 'error',
+                        message: '批量任务进行中。当前页将在完成后自动刷新。',
+                      });
+                      return;
+                    }
+                    void fetchMatches();
+                  }}
+                  className="rounded bg-cyan-700 px-5 py-2 text-white transition-colors hover:bg-cyan-600"
+                >
+                  刷新当前页
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="rounded bg-gray-600 px-5 py-2 text-white transition-colors hover:bg-gray-500"
+                >
+                  清空
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="space-y-4">
+            <div className="workspace-panel">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-100">批量处理</h2>
+                  <p className="mt-1 text-sm text-gray-400">
+                    先勾选比赛，再执行批量下载。回放入口只会对已准备好的录像开放。
+                  </p>
+                </div>
+                <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+                  已勾选 {selectedMatchCount}
+                </span>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleBatchAction();
+                  }}
+                  disabled={batchActionsDisabled || activeBatchMode !== null}
+                  className="rounded bg-emerald-700 px-5 py-2 text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {activeBatchMode === 'prepare_and_execute' ? '正在批量下载（勾选项）...' : '批量下载（勾选项）'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMatchIds([])}
+                  disabled={selectedMatchCount === 0}
+                  className="rounded border border-slate-600 px-4 py-2 text-white transition-colors hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  清空勾选
+                </button>
+                <span className="self-center text-sm text-gray-300">
+                  {selectedMatchCount === 0
                     ? '请先勾选要批量下载的比赛。'
-                    : `已勾选 ${selectedMatchCount} 场比赛`}
-              </span>
+                    : selectedCurrentPageCount === selectedMatchCount
+                      ? `本次将处理 ${selectedMatchCount} 场比赛。`
+                      : `本次将处理 ${selectedMatchCount} 场比赛，其中当前页 ${selectedCurrentPageCount} 场。`}
+                </span>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-[1.2fr_auto_1fr_auto] gap-2 xl:col-span-6">
-              <input
-                aria-label="预设名称"
-                value={presetName}
-                onChange={(event) => setPresetName(event.target.value)}
-                placeholder="预设名称"
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-dota-primary"
-              />
-              <button
-                type="button"
-                onClick={handleSavePreset}
-                className="bg-indigo-700 hover:bg-indigo-600 text-white px-4 py-2 rounded transition-colors"
-              >
-                保存预设
-              </button>
-              <select
-                aria-label="预设"
-                value={selectedPresetName}
-                onChange={(event) => setSelectedPresetName(event.target.value)}
-                className="w-full bg-dota-bg border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-dota-primary"
-              >
-                <option value="">选择预设</option>
-                {filterPresets.map((preset) => (
-                  <option key={preset.name} value={preset.name}>
-                    {preset.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleApplyPreset}
-                disabled={!selectedPresetName}
-                className="bg-sky-700 hover:bg-sky-600 text-white px-4 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                应用
-              </button>
+
+            <div className="workspace-panel">
+              <h2 className="text-lg font-semibold text-gray-100">筛选预设</h2>
+              <p className="mt-1 text-sm text-gray-400">把常用查询条件保存下来，避免重复输入。</p>
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-[1.2fr_auto]">
+                <input
+                  aria-label="预设名称"
+                  value={presetName}
+                  onChange={(event) => setPresetName(event.target.value)}
+                  placeholder="预设名称"
+                  className="workspace-input focus:border-dota-primary"
+                />
+                <button
+                  type="button"
+                  onClick={handleSavePreset}
+                  className="rounded bg-indigo-700 px-4 py-2 text-white transition-colors hover:bg-indigo-600"
+                >
+                  保存预设
+                </button>
+                <select
+                  aria-label="预设"
+                  value={selectedPresetName}
+                  onChange={(event) => setSelectedPresetName(event.target.value)}
+                  className="workspace-select focus:border-dota-primary"
+                >
+                  <option value="">选择预设</option>
+                  {filterPresets.map((preset) => (
+                    <option key={preset.name} value={preset.name}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleApplyPreset}
+                  disabled={!selectedPresetName}
+                  className="rounded bg-sky-700 px-4 py-2 text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  应用
+                </button>
+              </div>
             </div>
-          </form>
+
+            <div className="workspace-panel">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-100">失败项处理</h2>
+                  <p className="mt-1 text-sm text-gray-400">批量下载失败后，可直接复制或导出失败明细。</p>
+                </div>
+                <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+                  {lastBatchFailures.length} 条
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleCopyFailedItems();
+                  }}
+                  disabled={lastBatchFailures.length === 0}
+                  className="rounded bg-orange-700 px-4 py-2 text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  复制失败项
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportFailedItems}
+                  disabled={lastBatchFailures.length === 0}
+                  className="rounded bg-orange-800 px-4 py-2 text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  导出失败项（.txt）
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {feedback && (
@@ -822,37 +960,11 @@ export function MatchDatabasePage({
           </div>
         )}
 
-        <div className="card mb-4 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                void handleCopyFailedItems();
-              }}
-              disabled={lastBatchFailures.length === 0}
-              className="bg-orange-700 hover:bg-orange-600 text-white px-4 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              复制失败项
-            </button>
-            <button
-              type="button"
-              onClick={handleExportFailedItems}
-              disabled={lastBatchFailures.length === 0}
-              className="bg-orange-800 hover:bg-orange-700 text-white px-4 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              导出失败项（.txt）
-            </button>
-            <span className="text-xs text-gray-400">
-              本次勾选批量失败项：<span className="text-gray-200">{lastBatchFailures.length}</span>
-            </span>
-          </div>
-        </div>
-
         {error && (
           <div className="mb-4 px-4 py-3 rounded border bg-red-900/30 border-red-600 text-red-200">{error}</div>
         )}
 
-        <div className="card overflow-hidden p-0">
+        <div className="workspace-table-shell">
           <div className="overflow-x-auto">
             <table className="w-full text-left table-auto">
               <thead className="bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 text-sm uppercase">
@@ -898,14 +1010,19 @@ export function MatchDatabasePage({
                     </td>
                   </tr>
                 ) : (
-                  matches.map((match) => (
-                    <tr
-                      key={match.match_id}
-                      className={`transition-colors ${highlightedMatchId === match.match_id
-                        ? 'bg-emerald-900/30 ring-1 ring-emerald-500/40'
-                        : 'hover:bg-white/5'
-                        }`}
-                    >
+                  matches.map((match) => {
+                    const normalizedDownloadStatus = normalizeDownloadStatus(match.download_status);
+                    const canDownloadReplay =
+                      normalizedDownloadStatus === 'unknown' || normalizedDownloadStatus === 'failed';
+
+                    return (
+                      <tr
+                        key={match.match_id}
+                        className={`transition-colors ${highlightedMatchId === match.match_id
+                          ? 'bg-emerald-900/30 ring-1 ring-emerald-500/40'
+                          : 'hover:bg-white/5'
+                          }`}
+                      >
                       <td className="px-4 py-3">
                         <input
                           aria-label={`选择比赛 ${match.match_id}`}
@@ -945,11 +1062,12 @@ export function MatchDatabasePage({
                       </td>
                       <td className="px-4 py-3 text-gray-300 whitespace-nowrap">{match.download_attempt_count ?? 0}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           <button
                             onClick={() => handleOpenReplay(match)}
-                            disabled={activeBatchMode !== null}
-                            className="text-amber-300 hover:text-amber-200 border border-amber-700/50 hover:border-amber-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={activeBatchMode !== null || !isReplayReady(match.download_status)}
+                            title={getReplayAvailabilityHint(match.download_status)}
+                            className="rounded border border-amber-700/50 px-3 py-1.5 text-sm text-amber-300 hover:border-amber-500/50 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             打开回放
                           </button>
@@ -971,13 +1089,19 @@ export function MatchDatabasePage({
                           <button
                             onClick={() => handleAction(match.match_id)}
                             disabled={
+                              !canDownloadReplay ||
                               activeActionMatchId === match.match_id ||
                               activeBatchMode !== null ||
                               batchActionInFlightRef.current
                             }
-                            className="text-green-300 hover:text-green-200 border border-green-700/50 hover:border-green-500/50 rounded px-3 py-1.5 text-sm disabled:opacity-50"
+                            title={canDownloadReplay ? '触发下载任务' : '当前状态下无需重复触发下载'}
+                            className="rounded border border-green-700/50 px-3 py-1.5 text-sm text-green-300 hover:border-green-500/50 hover:text-green-200 disabled:opacity-50"
                           >
-                            下载录像
+                            {normalizedDownloadStatus === 'completed'
+                              ? '已下载'
+                              : normalizedDownloadStatus === 'downloading' || normalizedDownloadStatus === 'prepared'
+                                ? '下载进行中'
+                                : '下载录像'}
                           </button>
                           <button
                             onClick={() => {
@@ -995,8 +1119,9 @@ export function MatchDatabasePage({
                           </button>
                         </div>
                       </td>
-                    </tr>
-                  ))
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1070,31 +1195,33 @@ export function MatchDatabasePage({
                       </div>
                     )}
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">task_id</div>
+                      <div className="text-gray-400">任务 ID</div>
                       <div className="text-white font-mono break-all">{taskDetails.task_id}</div>
                     </div>
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">status</div>
-                      <div className="text-white">{taskDetails.status ?? '--'}</div>
+                      <div className="text-gray-400">任务状态</div>
+                      <div className="text-white">
+                        {getDownloadStatusMeta(taskDetails.status).label}
+                      </div>
                     </div>
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">attempt_count</div>
+                      <div className="text-gray-400">尝试次数</div>
                       <div className="text-white">{taskDetails.attempt_count ?? 0}</div>
                     </div>
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">error_code</div>
+                      <div className="text-gray-400">错误代码</div>
                       <div className="text-white">{taskDetails.error_code ?? '--'}</div>
                     </div>
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">error_message</div>
+                      <div className="text-gray-400">错误信息</div>
                       <div className="text-white break-words">{taskDetails.error_message ?? '--'}</div>
                     </div>
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">download_path</div>
+                      <div className="text-gray-400">下载文件路径</div>
                       <div className="text-white break-all">{taskDetails.download_path ?? '--'}</div>
                     </div>
                     <div className="bg-gray-800/70 border border-gray-700 rounded px-3 py-2">
-                      <div className="text-gray-400">updated_at</div>
+                      <div className="text-gray-400">最近更新时间</div>
                       <div className="text-white" title={taskDetails.updated_at ? String(taskDetails.updated_at) : '--'}>
                         {taskDetails.updated_at ? formatUnixTimestampLocal(taskDetails.updated_at) : '--'}
                       </div>

@@ -6,10 +6,10 @@ This module handles storing and retrieving high-frequency replay data
 
 Storage structure:
     backend/data/matches/{match_id}/
-        ├── positions.parquet     # Hero position samples
+        ├── positions.parquet     # Hero position samples + optional HUD items
         ├── kills.parquet         # Kill events
         ├── wards.parquet         # Ward placement/destruction
-        ├── economy.parquet       # Team-level gold/xp snapshots
+        ├── economy.parquet       # Team/per-player gold/xp/net worth snapshots
         └── meta.json             # Match metadata
 """
 
@@ -114,7 +114,7 @@ class ParquetStorage:
             # Create empty file with schema
             df = pd.DataFrame(columns=[
                 "tick", "hero", "handle", "team", "x", "y",
-                "hp", "max_hp", "mana", "max_mana", "level", "game_time"
+                "hp", "max_hp", "mana", "max_mana", "level", "items", "game_time"
             ])
         else:
             data = []
@@ -131,6 +131,7 @@ class ParquetStorage:
                     "mana": pos.mana,
                     "max_mana": pos.max_mana,
                     "level": pos.level,
+                    "items": json.dumps(pos.items) if pos.items is not None else None,
                     "game_time": getattr(pos, "game_time", None)
                 })
             df = pd.DataFrame(data)
@@ -202,7 +203,12 @@ class ParquetStorage:
         if not economy:
             df = pd.DataFrame(columns=[
                 "tick", "game_time", "radiant_gold", "dire_gold",
-                "radiant_xp", "dire_xp", "gold_advantage", "xp_advantage"
+                "radiant_xp", "dire_xp", "gold_advantage", "xp_advantage",
+                "radiant_gold_by_player", "dire_gold_by_player",
+                "radiant_xp_by_player", "dire_xp_by_player",
+                "radiant_net_worth", "dire_net_worth",
+                "radiant_net_worth_total", "dire_net_worth_total",
+                "net_worth_advantage",
             ])
         else:
             data = []
@@ -216,6 +222,15 @@ class ParquetStorage:
                     "dire_xp": e.dire_xp,
                     "gold_advantage": e.gold_advantage,
                     "xp_advantage": e.xp_advantage,
+                    "radiant_gold_by_player": json.dumps(e.radiant_gold_by_player),
+                    "dire_gold_by_player": json.dumps(e.dire_gold_by_player),
+                    "radiant_xp_by_player": json.dumps(e.radiant_xp_by_player),
+                    "dire_xp_by_player": json.dumps(e.dire_xp_by_player),
+                    "radiant_net_worth": json.dumps(e.radiant_net_worth),
+                    "dire_net_worth": json.dumps(e.dire_net_worth),
+                    "radiant_net_worth_total": e.radiant_net_worth_total,
+                    "dire_net_worth_total": e.dire_net_worth_total,
+                    "net_worth_advantage": e.net_worth_advantage,
                 })
             df = pd.DataFrame(data)
         
@@ -243,6 +258,7 @@ class ParquetStorage:
             "clock_zero_source": result.metadata.clock_zero_source,
             "ticks_per_second": result.metadata.ticks_per_second,
             "time_mapping": result.metadata.time_mapping,
+            "inventory_slot_contract_version": result.metadata.inventory_slot_contract_version,
             "pause_intervals": pause_intervals,
             "total_ticks": result.total_ticks,
             "parse_time_ms": result.parse_time_ms,
@@ -394,7 +410,9 @@ class ParquetStorage:
 
         if "game_time" not in df.columns:
             df["game_time"] = pd.NA
-        
+        if "items" not in df.columns:
+            df["items"] = pd.NA
+
         return df
     
     def get_kills(self, match_id: int) -> pd.DataFrame:
@@ -443,14 +461,38 @@ class ParquetStorage:
         
         Returns:
             DataFrame with columns: tick, game_time, radiant_gold, dire_gold,
-            radiant_xp, dire_xp, gold_advantage, xp_advantage
+            radiant_xp, dire_xp, gold_advantage, xp_advantage, and optional
+            per-player gold/xp/net worth arrays.
         """
         parquet_path = self.get_match_dir(match_id) / "economy.parquet"
         
         if not parquet_path.exists():
             return pd.DataFrame()
         
-        return pq.read_table(parquet_path).to_pandas()
+        df = pq.read_table(parquet_path).to_pandas()
+
+        array_columns = [
+            "radiant_gold_by_player",
+            "dire_gold_by_player",
+            "radiant_xp_by_player",
+            "dire_xp_by_player",
+            "radiant_net_worth",
+            "dire_net_worth",
+        ]
+        for column in array_columns:
+            if column not in df.columns:
+                df[column] = pd.NA
+
+        scalar_columns = [
+            "radiant_net_worth_total",
+            "dire_net_worth_total",
+            "net_worth_advantage",
+        ]
+        for column in scalar_columns:
+            if column not in df.columns:
+                df[column] = 0
+
+        return df
     
     def get_metadata(self, match_id: int) -> Optional[dict]:
         """Get match metadata."""

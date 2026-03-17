@@ -1798,320 +1798,398 @@ export function TeamProfilePage({
   };
 
   return (
-    <div className="min-h-full bg-dota-bg p-6 text-white">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-dota-gold">战队档案</h1>
-            <p className="mt-1 text-gray-400">
-              基于 OpenDota 同步比赛的战队档案视图。
-            </p>
+    <div className="workspace-page bg-dota-bg">
+      <div className="workspace-stack">
+        <div className="workspace-header border-amber-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]">
+          <div className="workspace-header-row">
+            <div>
+              <p className="workspace-eyebrow text-amber-300/80">Team Archive</p>
+              <h1 className="workspace-title text-dota-gold">战队档案</h1>
+              <p className="workspace-description">
+                基于 OpenDota 同步比赛的战队档案视图，更适合长期跟踪某支战队的联赛分布、可见比赛动作和回放准备情况。
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 xl:min-w-[420px] xl:items-end">
+              {onBackHome && (
+                <button
+                  onClick={onBackHome}
+                  className="workspace-subtle-button"
+                >
+                  返回首页
+                </button>
+              )}
+
+              {currentTeamId !== null ? (
+                <div className="workspace-kpi-grid w-full">
+                  <div className="workspace-kpi">
+                    <p className="workspace-kpi-label">战队 ID</p>
+                    <p className="workspace-kpi-value">{currentTeamId}</p>
+                    <p className="workspace-kpi-hint">当前聚焦目标</p>
+                  </div>
+                  <div className="workspace-kpi">
+                    <p className="workspace-kpi-label">筛选命中</p>
+                    <p className="workspace-kpi-value">{filteredMatches.length} 场</p>
+                    <p className="workspace-kpi-hint">当前视图保留的比赛</p>
+                  </div>
+                  <div className="workspace-kpi">
+                    <p className="workspace-kpi-label">当前展开</p>
+                    <p className="workspace-kpi-value">{visibleMatches.length} 场</p>
+                    <p className="workspace-kpi-hint">已展开可操作比赛</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-950/60 px-4 py-4 text-sm text-slate-400">
+                  输入战队 ID 后，这里会切换成战队级概览。
+                </div>
+              )}
+            </div>
           </div>
-          <button
-            onClick={onBackHome}
-            className="rounded border border-gray-600 bg-dota-surface px-4 py-2 text-sm text-white hover:bg-dota-primary"
-          >
-            返回首页
-          </button>
+
+          <div className="workspace-pill-row">
+            <span className="workspace-pill">快照 {quickSnapshots.length}</span>
+            <span className="workspace-pill">历史动作 {visibleActionHistory.length}</span>
+            <span className="workspace-pill">联赛筛选 {selectedLeagueFilterKey === 'all' ? '全部' : selectedLeagueFilterKey}</span>
+            {focusLatestLeague && <span className="rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-1.5 text-xs text-fuchsia-200">聚焦最近联赛</span>}
+          </div>
         </div>
 
-        <div className="card mb-5 p-5">
-          <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
-            <div>
-              <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
-              <input
-                aria-label="战队 ID"
-                value={teamIdInput}
-                onChange={(event) => setTeamIdInput(event.target.value)}
-                placeholder="例如 15"
-                className="w-full rounded border border-gray-600 bg-dota-bg px-3 py-2 text-white placeholder-gray-500 focus:border-dota-primary focus:outline-none"
-              />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_380px]">
+          <div className="workspace-panel">
+            <div className="workspace-panel-header">
+              <h2 className="workspace-panel-title">战队查询与视角</h2>
+              <p className="workspace-panel-description">先确定战队和样本范围，再决定是按联赛筛选、按下载状态过滤，还是直接跳去准备回放。</p>
             </div>
-            <div>
-              <label className="mb-1.5 block text-sm text-gray-400">数量上限</label>
-              <input
-                aria-label="数量上限"
-                value={limitInput}
-                onChange={(event) => setLimitInput(event.target.value)}
-                placeholder="20"
-                className="w-full rounded border border-gray-600 bg-dota-bg px-3 py-2 text-white placeholder-gray-500 focus:border-dota-primary focus:outline-none"
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="rounded bg-dota-primary px-5 py-2 font-medium text-white hover:bg-blue-700"
-              >
-                查询
-              </button>
-            </div>
-          </form>
-          <div className="mt-4 border-t border-gray-700 pt-4">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-300">预设视图</span>
-              <button
-                type="button"
-                aria-label="预设 全部比赛"
-                onClick={() => {
-                  void applyPreset('all_matches');
-                }}
-                className={`rounded border px-3 py-1.5 text-sm ${activePresetKey === 'all_matches'
-                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
-                  : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
-                  }`}
-              >
-                全部比赛
-              </button>
-              <button
-                type="button"
-                aria-label="预设 仅有下载状态"
-                onClick={() => {
-                  void applyPreset('with_download_status');
-                }}
-                className={`rounded border px-3 py-1.5 text-sm ${activePresetKey === 'with_download_status'
-                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
-                  : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
-                  }`}
-              >
-                仅有下载状态
-              </button>
-              <button
-                type="button"
-                aria-label="预设 最近 20 场"
-                onClick={() => {
-                  void applyPreset('latest_20');
-                }}
-                className={`rounded border px-3 py-1.5 text-sm ${activePresetKey === 'latest_20'
-                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
-                  : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
-                  }`}
-              >
-                最近 20 场
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-300">快速快照</span>
-              <label className="sr-only" htmlFor="team-profile-snapshot-name">
-                快照名称
+
+            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
+                <input
+                  aria-label="战队 ID"
+                  value={teamIdInput}
+                  onChange={(event) => setTeamIdInput(event.target.value)}
+                  placeholder="例如 15"
+                  className="workspace-input focus:border-dota-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm text-gray-400">数量上限</label>
+                <input
+                  aria-label="数量上限"
+                  value={limitInput}
+                  onChange={(event) => setLimitInput(event.target.value)}
+                  placeholder="20"
+                  className="workspace-input focus:border-dota-primary"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="rounded-2xl bg-dota-primary px-5 py-2.5 font-medium text-white hover:bg-blue-700"
+                >
+                  查询
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="workspace-checkpanel text-sm text-gray-300">
+                <input
+                  aria-label="仅显示有下载状态"
+                  type="checkbox"
+                  checked={onlyWithDownloadStatus}
+                  onChange={(event) => setOnlyWithDownloadStatus(event.target.checked)}
+                  className="h-4 w-4 rounded border-gray-500 bg-dota-bg"
+                />
+                仅显示有下载状态
               </label>
-              <input
-                id="team-profile-snapshot-name"
-                aria-label="快照名称"
-                value={snapshotNameInput}
-                onChange={(event) => setSnapshotNameInput(event.target.value)}
-                placeholder="快照名称"
-                className="w-44 rounded border border-gray-600 bg-dota-bg px-2.5 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:border-dota-primary focus:outline-none"
-              />
+
               <button
                 type="button"
-                aria-label="保存快照"
-                onClick={handleSaveQuickSnapshot}
-                className="rounded border border-violet-700/50 bg-violet-900/20 px-3 py-1.5 text-sm text-violet-200 hover:border-violet-500/60 hover:text-violet-100"
+                aria-label="切换开始时间排序"
+                onClick={() => setSortOrder((current) => (current === 'desc' ? 'asc' : 'desc'))}
+                className="workspace-subtle-button justify-self-start text-left"
               >
-                保存快照
+                排序：{sortOrder === 'desc' ? '最新优先' : '最旧优先'}
               </button>
-              <label className="sr-only" htmlFor="team-profile-snapshot-list">
-                快照列表
-              </label>
-              <select
-                id="team-profile-snapshot-list"
-                aria-label="快照列表"
-                value={selectedSnapshotName}
-                onChange={(event) => setSelectedSnapshotName(event.target.value)}
-                disabled={quickSnapshots.length === 0}
-                className="w-48 rounded border border-gray-600 bg-dota-bg px-2.5 py-1.5 text-sm text-gray-200 focus:border-dota-primary focus:outline-none disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-              >
-                {quickSnapshots.length === 0 ? (
-                  <option value="">暂无快照</option>
-                ) : (
-                  quickSnapshots.map((snapshot) => (
-                    <option key={snapshot.name} value={snapshot.name}>
-                      {snapshot.name}
+
+              <label className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-gray-300">
+                <span className="shrink-0">联赛快捷筛选</span>
+                <select
+                  aria-label="联赛快捷筛选"
+                  value={selectedLeagueFilterKey}
+                  onChange={(event) => handleApplyLeagueQuickFilter(event.target.value)}
+                  disabled={focusLatestLeague}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-gray-200 focus:outline-none disabled:text-gray-500"
+                >
+                  <option value="all">全部</option>
+                  {leagueQuickFilterOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
                     </option>
-                  ))
-                )}
-              </select>
-              <button
-                type="button"
-                aria-label="加载快照"
-                onClick={() => {
-                  void handleLoadQuickSnapshot();
-                }}
-                disabled={!selectedSnapshot || loading}
-                className="rounded border border-violet-700/50 bg-violet-900/20 px-3 py-1.5 text-sm text-violet-200 hover:border-violet-500/60 hover:text-violet-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-              >
-                加载快照
-              </button>
-              <button
-                type="button"
-                aria-label="应用快照"
-                onClick={() => {
-                  void handleApplyQuickSnapshot();
-                }}
-                disabled={!selectedSnapshot || loading}
-                className="rounded border border-violet-700/50 bg-violet-900/20 px-3 py-1.5 text-sm text-violet-200 hover:border-violet-500/60 hover:text-violet-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-              >
-                应用快照
-              </button>
-              <button
-                type="button"
-                aria-label="删除快照"
-                onClick={handleDeleteSnapshot}
-                disabled={!selectedSnapshot || loading}
-                className="rounded border border-rose-700/50 bg-rose-900/20 px-3 py-1.5 text-sm text-rose-200 hover:border-rose-500/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-              >
-                删除快照
-              </button>
-              <button
-                type="button"
-                aria-label="清空全部快照"
-                onClick={handleClearAllSnapshots}
-                disabled={quickSnapshots.length === 0 || loading}
-                className="rounded border border-rose-700/50 bg-rose-900/20 px-3 py-1.5 text-sm text-rose-200 hover:border-rose-500/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-              >
-                清空全部快照
-              </button>
-              <button
-                type="button"
-                aria-label="导出快照（.json）"
-                onClick={handleExportSnapshots}
-                disabled={quickSnapshots.length === 0}
-                className="rounded border border-sky-700/60 bg-sky-900/20 px-3 py-1.5 text-sm text-sky-200 hover:border-sky-500/60 hover:text-sky-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-              >
-                导出快照（.json）
-              </button>
-              <button
-                type="button"
-                aria-label="导入快照（.json）"
-                onClick={handleTriggerSnapshotImport}
-                className="rounded border border-sky-700/60 bg-sky-900/20 px-3 py-1.5 text-sm text-sky-200 hover:border-sky-500/60 hover:text-sky-100"
-              >
-                导入快照（.json）
-              </button>
-              <input
-                ref={snapshotImportInputRef}
-                aria-label="导入快照文件"
-                type="file"
-                accept="application/json,.json"
-                onChange={(event) => {
-                  void handleImportSnapshots(event);
-                }}
-                className="hidden"
-              />
-              <span className="text-xs text-gray-500">
-                {selectedSnapshot
-                  ? `已选择：${selectedSnapshot.name}（${new Date(selectedSnapshot.savedAtMs).toLocaleTimeString()}）`
-                  : '尚未保存快照。'}
-              </span>
+                  ))}
+                </select>
+              </label>
+
+              <label className="workspace-checkpanel text-sm text-gray-300">
+                <input
+                  aria-label="聚焦：最近联赛"
+                  type="checkbox"
+                  checked={focusLatestLeague}
+                  onChange={(event) => setFocusLatestLeague(event.target.checked)}
+                  className="h-4 w-4 rounded border-gray-500 bg-dota-bg"
+                />
+                聚焦：最近联赛
+              </label>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input
-                aria-label="仅显示有下载状态"
-                type="checkbox"
-                checked={onlyWithDownloadStatus}
-                onChange={(event) => setOnlyWithDownloadStatus(event.target.checked)}
-                className="h-4 w-4 rounded border-gray-500 bg-dota-bg"
-              />
-              仅显示有下载状态
-            </label>
-            <button
-              type="button"
-              aria-label="切换开始时间排序"
-              onClick={() => setSortOrder((current) => (current === 'desc' ? 'asc' : 'desc'))}
-              className="rounded border border-gray-600 bg-dota-bg px-3 py-1.5 text-sm text-gray-200 hover:border-gray-500"
-            >
-              排序：{sortOrder === 'desc' ? '最新优先' : '最旧优先'}
-            </button>
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <span>联赛快捷筛选</span>
-              <select
-                aria-label="联赛快捷筛选"
-                value={selectedLeagueFilterKey}
-                onChange={(event) => handleApplyLeagueQuickFilter(event.target.value)}
-                disabled={focusLatestLeague}
-                className="rounded border border-gray-600 bg-dota-bg px-2.5 py-1.5 text-sm text-gray-200 focus:border-dota-primary focus:outline-none"
-              >
-                <option value="all">全部</option>
-                {leagueQuickFilterOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input
-                aria-label="聚焦：最近联赛"
-                type="checkbox"
-                checked={focusLatestLeague}
-                onChange={(event) => setFocusLatestLeague(event.target.checked)}
-                className="h-4 w-4 rounded border-gray-500 bg-dota-bg"
-              />
-              聚焦：最近联赛
-            </label>
-            <button
-              type="button"
-              aria-label="在比赛数据库打开当前可见项"
-              onClick={handleOpenVisibleInMatchDatabase}
-              disabled={isVisibleBatchActionRunning || currentTeamId === null}
-              className="rounded border border-cyan-700/60 bg-cyan-900/20 px-3 py-1.5 text-sm text-cyan-200 hover:border-cyan-500/60 hover:text-cyan-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-            >
-              在比赛数据库打开当前可见项
-            </button>
-            <button
-              type="button"
-              aria-label="准备当前可见比赛"
-              onClick={() => {
-                void handlePrepareVisibleMatches();
-              }}
-              disabled={isVisibleBatchActionRunning || visibleMatches.length === 0}
-              className="rounded border border-emerald-700/60 bg-emerald-900/20 px-3 py-1.5 text-sm text-emerald-200 hover:border-emerald-500/60 hover:text-emerald-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-            >
-              {isPreparingVisibleMatches ? '正在准备当前可见比赛...' : '准备当前可见比赛'}
-            </button>
-            <button
-              type="button"
-              aria-label="准备并打开首场回放（可见）"
-              onClick={() => {
-                void handlePrepareAndOpenFirstVisibleReplay();
-              }}
-              disabled={isVisibleBatchActionRunning || visibleMatches.length === 0}
-              className="rounded border border-fuchsia-700/60 bg-fuchsia-900/20 px-3 py-1.5 text-sm text-fuchsia-200 hover:border-fuchsia-500/60 hover:text-fuchsia-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-            >
-              {isPreparingAndOpeningVisibleReplay
-                ? '正在准备可见比赛并打开回放...'
-                : '准备并打开首场回放（可见）'}
-            </button>
-            <button
-              type="button"
-              aria-label="导出可见比赛（.txt）"
-              onClick={handleExportVisibleMatches}
-              disabled={visibleMatches.length === 0 || isVisibleBatchActionRunning}
-              className="rounded border border-orange-700/60 bg-orange-900/20 px-3 py-1.5 text-sm text-orange-200 hover:border-orange-500/60 hover:text-orange-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-            >
-              导出可见比赛（.txt）
-            </button>
-            <button
-              type="button"
-              aria-label="复制可见比赛 ID"
-              onClick={() => {
-                void handleCopyVisibleMatchIds();
-              }}
-              disabled={visibleMatches.length === 0 || isVisibleBatchActionRunning}
-              className="rounded border border-indigo-700/60 bg-indigo-900/20 px-3 py-1.5 text-sm text-indigo-200 hover:border-indigo-500/60 hover:text-indigo-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
-            >
-              复制可见比赛 ID
-            </button>
-            <span className="text-xs text-gray-500">
-              已按联赛分组。当前显示 {filteredMatches.length} / {matches.length} 场比赛。
-            </span>
-            {focusLatestLeague && (
-              <span className="text-xs text-fuchsia-300">
-                聚焦已开启：锁定到当前筛选结果中的最近联赛。
-              </span>
-            )}
+
+          <div className="space-y-4">
+            <div className="workspace-panel">
+              <div className="workspace-panel-header">
+                <h2 className="workspace-panel-title">快捷视图与快照</h2>
+                <p className="workspace-panel-description">把常用视角固定成预设，或者把当前状态保存成快照，方便回到某个分析上下文。</p>
+              </div>
+
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="预设 全部比赛"
+                  onClick={() => {
+                    void applyPreset('all_matches');
+                  }}
+                  className={`rounded-2xl border px-3 py-2 text-sm ${activePresetKey === 'all_matches'
+                    ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
+                    : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
+                    }`}
+                >
+                  全部比赛
+                </button>
+                <button
+                  type="button"
+                  aria-label="预设 仅有下载状态"
+                  onClick={() => {
+                    void applyPreset('with_download_status');
+                  }}
+                  className={`rounded-2xl border px-3 py-2 text-sm ${activePresetKey === 'with_download_status'
+                    ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
+                    : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
+                    }`}
+                >
+                  仅有下载状态
+                </button>
+                <button
+                  type="button"
+                  aria-label="预设 最近 20 场"
+                  onClick={() => {
+                    void applyPreset('latest_20');
+                  }}
+                  className={`rounded-2xl border px-3 py-2 text-sm ${activePresetKey === 'latest_20'
+                    ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
+                    : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
+                    }`}
+                >
+                  最近 20 场
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <label className="sr-only" htmlFor="team-profile-snapshot-name">
+                  快照名称
+                </label>
+                <input
+                  id="team-profile-snapshot-name"
+                  aria-label="快照名称"
+                  value={snapshotNameInput}
+                  onChange={(event) => setSnapshotNameInput(event.target.value)}
+                  placeholder="快照名称"
+                  className="workspace-input focus:border-dota-primary"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    aria-label="保存快照"
+                    onClick={handleSaveQuickSnapshot}
+                    className="rounded-2xl border border-violet-700/50 bg-violet-900/20 px-3 py-2 text-sm text-violet-200 hover:border-violet-500/60 hover:text-violet-100"
+                  >
+                    保存快照
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="导出快照（.json）"
+                    onClick={handleExportSnapshots}
+                    disabled={quickSnapshots.length === 0}
+                    className="rounded-2xl border border-sky-700/60 bg-sky-900/20 px-3 py-2 text-sm text-sky-200 hover:border-sky-500/60 hover:text-sky-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  >
+                    导出快照
+                  </button>
+                </div>
+
+                <label className="sr-only" htmlFor="team-profile-snapshot-list">
+                  快照列表
+                </label>
+                <select
+                  id="team-profile-snapshot-list"
+                  aria-label="快照列表"
+                  value={selectedSnapshotName}
+                  onChange={(event) => setSelectedSnapshotName(event.target.value)}
+                  disabled={quickSnapshots.length === 0}
+                  className="workspace-select focus:border-dota-primary disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                >
+                  {quickSnapshots.length === 0 ? (
+                    <option value="">暂无快照</option>
+                  ) : (
+                    quickSnapshots.map((snapshot) => (
+                      <option key={snapshot.name} value={snapshot.name}>
+                        {snapshot.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    aria-label="加载快照"
+                    onClick={() => {
+                      void handleLoadQuickSnapshot();
+                    }}
+                    disabled={!selectedSnapshot || loading}
+                    className="rounded-2xl border border-violet-700/50 bg-violet-900/20 px-3 py-2 text-sm text-violet-200 hover:border-violet-500/60 hover:text-violet-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  >
+                    加载快照
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="应用快照"
+                    onClick={() => {
+                      void handleApplyQuickSnapshot();
+                    }}
+                    disabled={!selectedSnapshot || loading}
+                    className="rounded-2xl border border-violet-700/50 bg-violet-900/20 px-3 py-2 text-sm text-violet-200 hover:border-violet-500/60 hover:text-violet-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  >
+                    应用快照
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    aria-label="删除快照"
+                    onClick={handleDeleteSnapshot}
+                    disabled={!selectedSnapshot || loading}
+                    className="rounded-2xl border border-rose-700/50 bg-rose-900/20 px-3 py-2 text-sm text-rose-200 hover:border-rose-500/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  >
+                    删除快照
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="清空全部快照"
+                    onClick={handleClearAllSnapshots}
+                    disabled={quickSnapshots.length === 0 || loading}
+                    className="rounded-2xl border border-rose-700/50 bg-rose-900/20 px-3 py-2 text-sm text-rose-200 hover:border-rose-500/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  >
+                    清空全部快照
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="导入快照（.json）"
+                  onClick={handleTriggerSnapshotImport}
+                  className="rounded-2xl border border-sky-700/60 bg-sky-900/20 px-3 py-2 text-sm text-sky-200 hover:border-sky-500/60 hover:text-sky-100"
+                >
+                  导入快照（.json）
+                </button>
+                <input
+                  ref={snapshotImportInputRef}
+                  aria-label="导入快照文件"
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(event) => {
+                    void handleImportSnapshots(event);
+                  }}
+                  className="hidden"
+                />
+                <p className="text-xs text-gray-500">
+                  {selectedSnapshot
+                    ? `已选择：${selectedSnapshot.name}（${new Date(selectedSnapshot.savedAtMs).toLocaleTimeString()}）`
+                    : '尚未保存快照。'}
+                </p>
+              </div>
+            </div>
+
+            <div className="workspace-panel">
+              <div className="workspace-panel-header">
+                <h2 className="workspace-panel-title">当前可见动作</h2>
+                <p className="workspace-panel-description">围绕“当前筛选 + 当前展开”这一批比赛执行准备、跳转和导出动作。</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  aria-label="在比赛数据库打开当前可见项"
+                  onClick={handleOpenVisibleInMatchDatabase}
+                  disabled={isVisibleBatchActionRunning || currentTeamId === null}
+                  className="rounded-2xl border border-cyan-700/60 bg-cyan-900/20 px-3 py-2 text-sm text-cyan-200 hover:border-cyan-500/60 hover:text-cyan-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                >
+                  在比赛数据库打开当前可见项
+                </button>
+                <button
+                  type="button"
+                  aria-label="准备当前可见比赛"
+                  onClick={() => {
+                    void handlePrepareVisibleMatches();
+                  }}
+                  disabled={isVisibleBatchActionRunning || visibleMatches.length === 0}
+                  className="rounded-2xl border border-emerald-700/60 bg-emerald-900/20 px-3 py-2 text-sm text-emerald-200 hover:border-emerald-500/60 hover:text-emerald-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                >
+                  {isPreparingVisibleMatches ? '正在准备当前可见比赛...' : '准备当前可见比赛'}
+                </button>
+                <button
+                  type="button"
+                  aria-label="准备并打开首场回放（可见）"
+                  onClick={() => {
+                    void handlePrepareAndOpenFirstVisibleReplay();
+                  }}
+                  disabled={isVisibleBatchActionRunning || visibleMatches.length === 0}
+                  className="rounded-2xl border border-fuchsia-700/60 bg-fuchsia-900/20 px-3 py-2 text-sm text-fuchsia-200 hover:border-fuchsia-500/60 hover:text-fuchsia-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                >
+                  {isPreparingAndOpeningVisibleReplay
+                    ? '正在准备可见比赛并打开回放...'
+                    : '准备并打开首场回放（可见）'}
+                </button>
+                <button
+                  type="button"
+                  aria-label="导出可见比赛（.txt）"
+                  onClick={handleExportVisibleMatches}
+                  disabled={visibleMatches.length === 0 || isVisibleBatchActionRunning}
+                  className="rounded-2xl border border-orange-700/60 bg-orange-900/20 px-3 py-2 text-sm text-orange-200 hover:border-orange-500/60 hover:text-orange-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                >
+                  导出可见比赛（.txt）
+                </button>
+                <button
+                  type="button"
+                  aria-label="复制可见比赛 ID"
+                  onClick={() => {
+                    void handleCopyVisibleMatchIds();
+                  }}
+                  disabled={visibleMatches.length === 0 || isVisibleBatchActionRunning}
+                  className="rounded-2xl border border-indigo-700/60 bg-indigo-900/20 px-3 py-2 text-sm text-indigo-200 hover:border-indigo-500/60 hover:text-indigo-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                >
+                  复制可见比赛 ID
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/60 px-4 py-3 text-sm text-gray-300">
+                已按联赛分组。筛选命中 {filteredMatches.length} / {matches.length} 场，当前展开可操作 {visibleMatches.length} 场。
+              </div>
+              {focusLatestLeague && (
+                <div className="mt-3 rounded-2xl border border-fuchsia-700/40 bg-fuchsia-900/20 px-4 py-3 text-sm text-fuchsia-200">
+                  聚焦已开启：锁定到当前筛选结果中的最近联赛。
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2134,7 +2212,7 @@ export function TeamProfilePage({
           </div>
         )}
 
-        <div className="card mb-5 p-5">
+        <div className="workspace-panel">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-dota-gold">操作历史</h2>
             <span className="text-xs text-gray-500">仅会话内有效，最多保留最近 {ACTION_HISTORY_LIMIT} 条。</span>
@@ -2146,7 +2224,7 @@ export function TeamProfilePage({
                 aria-label="历史筛选"
                 value={historyFilterKey}
                 onChange={(event) => setHistoryFilterKey(event.target.value as ActionHistoryFilterKey)}
-                className="rounded border border-gray-600 bg-dota-bg px-2.5 py-1.5 text-sm text-gray-200 focus:border-dota-primary focus:outline-none"
+                className="workspace-select max-w-[240px] px-2.5 py-1.5 text-sm focus:border-dota-primary"
               >
                 {ACTION_HISTORY_FILTER_OPTIONS.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -2190,11 +2268,11 @@ export function TeamProfilePage({
             </button>
           </div>
           {actionHistory.length === 0 ? (
-            <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
+            <div className="rounded-2xl border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
               暂无操作记录。
             </div>
           ) : visibleActionHistory.length === 0 ? (
-            <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
+            <div className="rounded-2xl border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
               当前筛选下无历史记录。
             </div>
           ) : (
@@ -2202,7 +2280,7 @@ export function TeamProfilePage({
               {visibleActionHistory.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded border border-gray-700 bg-dota-bg/70 px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-700 bg-dota-bg/70 px-3 py-2"
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-100">{entry.actionName}</p>
@@ -2247,7 +2325,7 @@ export function TeamProfilePage({
         </div>
 
         {currentTeamId !== null && (
-          <div className="card mb-5 p-5">
+          <div className="workspace-panel">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-dota-gold">赛事摘要</h2>
               <span className="text-xs text-gray-500">
@@ -2255,17 +2333,17 @@ export function TeamProfilePage({
               </span>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3">
+              <div className="rounded-2xl border border-gray-700 bg-dota-bg/70 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">总比赛数</p>
                 <p className="mt-1 text-2xl font-semibold text-white">{tournamentSummary.totalMatches}</p>
               </div>
-              <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3">
+              <div className="rounded-2xl border border-gray-700 bg-dota-bg/70 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">赛事数</p>
                 <p className="mt-1 text-2xl font-semibold text-white">
                   {tournamentSummary.tournamentsCount}
                 </p>
               </div>
-              <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3">
+              <div className="rounded-2xl border border-gray-700 bg-dota-bg/70 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">最近比赛</p>
                 <p className="mt-1 text-base font-medium text-white">
                   {formatUnixTimestampLocal(tournamentSummary.recentMatchStartTime)}
@@ -2276,7 +2354,7 @@ export function TeamProfilePage({
         )}
 
         {currentTeamId !== null && (
-          <div className="card mb-5 p-5" data-testid="league-compare">
+          <div className="workspace-panel" data-testid="league-compare">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-dota-gold">联赛对比</h2>
               <div className="flex items-center gap-2">
@@ -2366,7 +2444,7 @@ export function TeamProfilePage({
               </div>
             )}
             {leagueCompareItems.length === 0 ? (
-              <div className="rounded border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
+              <div className="rounded-2xl border border-gray-700 bg-dota-bg/70 px-4 py-3 text-sm text-gray-400">
                 暂无联赛对比数据。
               </div>
             ) : (
@@ -2436,19 +2514,19 @@ export function TeamProfilePage({
         )}
 
         {loading ? (
-          <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
+          <div className="workspace-panel py-8 text-center text-gray-400">
             加载中...
           </div>
         ) : currentTeamId === null ? (
-          <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
+          <div className="workspace-panel py-8 text-center text-gray-400">
             请输入战队 ID 并点击查询。
           </div>
         ) : matches.length === 0 ? (
-          <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
+          <div className="workspace-panel py-8 text-center text-gray-400">
             未找到 team_id 为 {currentTeamId} 的近期比赛。
           </div>
         ) : groupedMatches.length === 0 ? (
-          <div className="rounded-lg border border-gray-700 bg-dota-surface px-4 py-8 text-center text-gray-400">
+          <div className="workspace-panel py-8 text-center text-gray-400">
             当前筛选条件下没有匹配比赛。
           </div>
         ) : (
@@ -2462,7 +2540,7 @@ export function TeamProfilePage({
               <div
                 key={group.key}
                 data-testid={`league-group-${group.key}`}
-                className="card overflow-hidden p-0"
+                className="workspace-table-shell"
               >
                 <div className="flex items-center justify-between border-b border-gray-700 bg-gray-900/50 px-4 py-3">
                   <div>

@@ -75,6 +75,17 @@ export interface HeatmapBounds {
   max_y: number;
 }
 
+export interface PathOverlayPoint {
+  x: number;
+  y: number;
+}
+
+export interface PathOverlay {
+  hero_name: string;
+  team: 'radiant' | 'dire';
+  points: PathOverlayPoint[];
+}
+
 /**
  * Renderer configuration
  */
@@ -130,6 +141,7 @@ export class DotaMapRenderer {
   private heroStates: Map<number, HeroState> = new Map();
   private showPaths: boolean = false;
   private pathHistory: Map<string, Array<{x: number, y: number}>> = new Map();
+  private readonly animateTick = () => this.animate();
   /** 按英雄 ID 索引的纹理缓存 */
   private heroTexturesById: Map<number, PIXI.Texture> = new Map();
   /** 按英雄名称索引的纹理缓存 (用于后端返回英雄名而非 ID 的情况) */
@@ -181,6 +193,7 @@ export class DotaMapRenderer {
       height: this.config.height,
       backgroundColor: this.config.backgroundColor,
       antialias: true,
+      preference: 'webgl',
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
       autoStart: true,
@@ -232,7 +245,7 @@ export class DotaMapRenderer {
     }
     
     // 添加动画循环
-    this.app.ticker.add(this.animate.bind(this));
+    this.app.ticker.add(this.animateTick);
     
     this.initialized = true;
     console.log('[DotaMapRenderer] Initialization complete');
@@ -602,7 +615,6 @@ export class DotaMapRenderer {
       if (!hero) continue;
       
       const iconUrl = `/assets/dota/heroes/icons/${hero.name}.png`;
-      
       loadPromises.push(
         PIXI.Assets.load(iconUrl)
           .then((texture: PIXI.Texture) => {
@@ -1070,6 +1082,17 @@ export class DotaMapRenderer {
     return this.coordinateMapper.screenToGame(screenX, screenY);
   }
 
+  private destroyContainerChildren(container?: PIXI.Container): void {
+    if (!container) {
+      return;
+    }
+
+    const children = container.removeChildren();
+    for (const child of children) {
+      child.destroy({ children: true });
+    }
+  }
+
   /**
    * 创建英雄图形（圆形 fallback）
    */
@@ -1331,7 +1354,7 @@ export class DotaMapRenderer {
       return;
     }
     
-    this.wardsContainer.removeChildren();
+    this.destroyContainerChildren(this.wardsContainer);
 
     for (const ward of wards) {
       const screenPos = this.gameToScreen(ward.x, ward.y);
@@ -1359,7 +1382,7 @@ export class DotaMapRenderer {
       return;
     }
 
-    this.killsContainer.removeChildren();
+    this.destroyContainerChildren(this.killsContainer);
 
     const window = DotaMapRenderer.KILL_TIME_WINDOW;
     const minAlpha = DotaMapRenderer.KILL_MARKER_MIN_ALPHA;
@@ -1411,7 +1434,45 @@ export class DotaMapRenderer {
    */
   clearKillMarkers(): void {
     if (this.killsContainer) {
-      this.killsContainer.removeChildren();
+      this.destroyContainerChildren(this.killsContainer);
+    }
+  }
+
+  renderPathOverlays(paths: PathOverlay[]): void {
+    if (!this.initialized || !this.app?.stage || !this.showPaths) {
+      return;
+    }
+
+    this.destroyContainerChildren(this.pathsContainer);
+
+    for (const path of paths) {
+      if (!Array.isArray(path.points) || path.points.length < 2) {
+        continue;
+      }
+
+      const gfx = new PIXI.Graphics();
+      const color = path.team === 'radiant' ? 0x22c55e : 0xef4444;
+
+      for (let index = 1; index < path.points.length; index++) {
+        const previous = path.points[index - 1];
+        const current = path.points[index];
+        const from = this.gameToScreen(previous.x, previous.y);
+        const to = this.gameToScreen(current.x, current.y);
+        const progress = index / (path.points.length - 1);
+        const alpha = 0.12 + 0.38 * progress;
+
+        gfx.moveTo(from.x, from.y);
+        gfx.lineTo(to.x, to.y);
+        gfx.stroke({ width: 2.5, color, alpha });
+      }
+
+      this.pathsContainer.addChild(gfx);
+    }
+  }
+
+  clearPathOverlays(): void {
+    if (this.pathsContainer) {
+      this.destroyContainerChildren(this.pathsContainer);
     }
   }
 
@@ -1427,7 +1488,7 @@ export class DotaMapRenderer {
       return;
     }
 
-    this.pathsContainer.removeChildren();
+    this.destroyContainerChildren(this.pathsContainer);
 
     for (const pos of heroPositions) {
       const screenPos = this.gameToScreen(pos.x, pos.y);
@@ -1486,7 +1547,7 @@ export class DotaMapRenderer {
     if (!enabled) {
       this.pathHistory.clear();
       if (this.pathsContainer) {
-        this.pathsContainer.removeChildren();
+        this.destroyContainerChildren(this.pathsContainer);
       }
     }
   }
@@ -1559,7 +1620,7 @@ export class DotaMapRenderer {
         const sx = topLeft.x + col * cellW;
         const sy = topLeft.y + (resolution - 1 - row) * cellH;
         const color = DotaMapRenderer.heatmapColor(value);
-        const alpha = 0.15 + value * 0.45;
+        const alpha = 0.24 + value * 0.62;
 
         gfx.rect(sx, sy, cellW, cellH);
         gfx.fill({ color, alpha });
@@ -1575,7 +1636,7 @@ export class DotaMapRenderer {
    */
   clearHeatmap(): void {
     if (this.heatmapContainer) {
-      this.heatmapContainer.removeChildren();
+      this.destroyContainerChildren(this.heatmapContainer);
     }
   }
 
@@ -1592,20 +1653,20 @@ export class DotaMapRenderer {
    */
   clear(): void {
     if (this.heroesContainer) {
-      this.heroesContainer.removeChildren();
+      this.destroyContainerChildren(this.heroesContainer);
     }
     if (this.wardsContainer) {
-      this.wardsContainer.removeChildren();
+      this.destroyContainerChildren(this.wardsContainer);
     }
     if (this.killsContainer) {
-      this.killsContainer.removeChildren();
+      this.destroyContainerChildren(this.killsContainer);
     }
     if (this.pathsContainer) {
-      this.pathsContainer.removeChildren();
+      this.destroyContainerChildren(this.pathsContainer);
     }
     this.pathHistory.clear();
     if (this.heatmapContainer) {
-      this.heatmapContainer.removeChildren();
+      this.destroyContainerChildren(this.heatmapContainer);
     }
     this.heroStates.clear();
   }
@@ -1617,8 +1678,9 @@ export class DotaMapRenderer {
     this.initialized = false;
     this.clear();
     if (this.app) {
+      this.app.ticker.remove(this.animateTick);
       this.app.ticker.stop();
-      this.app.destroy(true, { children: true, texture: true });
+      this.app.destroy(true, { children: true });
     }
     this.heroTexturesById.clear();
     this.heroTexturesByName.clear();
@@ -1626,6 +1688,7 @@ export class DotaMapRenderer {
     this.wardTextures.observer.dire = undefined;
     this.wardTextures.sentry.radiant = undefined;
     this.wardTextures.sentry.dire = undefined;
+    this.texturesLoaded = false;
   }
 
   /**

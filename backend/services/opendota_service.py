@@ -44,6 +44,50 @@ class OpenDotaService:
 
         return await self._fetch_list_endpoint(path="/proMatches", bounded_limit=bounded_limit)
 
+    async def fetch_player_matches(
+        self,
+        account_id: int,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        leagueid: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch player match history directly from OpenDota search endpoint."""
+        bounded_limit = max(1, min(limit, 100))
+        params: dict[str, int] = {
+            "limit": bounded_limit,
+            "offset": max(0, offset),
+            "significant": 0,
+        }
+        if leagueid is not None and leagueid > 0:
+            params["leagueid"] = leagueid
+
+        return await self._fetch_list_endpoint(
+            path=f"/players/{account_id}/matches",
+            bounded_limit=bounded_limit,
+            params=params,
+        )
+
+    async def fetch_league_matches(
+        self,
+        league_id: int,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Fetch league matches directly from OpenDota search endpoint."""
+        bounded_limit = max(1, min(limit, 100))
+        params: dict[str, int] = {
+            "limit": bounded_limit,
+            "offset": max(0, offset),
+        }
+
+        return await self._fetch_list_endpoint(
+            path=f"/leagues/{league_id}/matches",
+            bounded_limit=bounded_limit,
+            params=params,
+        )
+
     async def fetch_teams(self, limit: int = 100) -> list[dict[str, Any]]:
         """Fetch OpenDota teams reference data."""
         bounded_limit = max(1, min(limit, 200))
@@ -87,7 +131,13 @@ class OpenDotaService:
             f"{match_id}_{replay_salt_value}.dem.bz2"
         )
 
-    async def _fetch_list_endpoint(self, *, path: str, bounded_limit: int) -> list[dict[str, Any]]:
+    async def _fetch_list_endpoint(
+        self,
+        *,
+        path: str,
+        bounded_limit: int,
+        params: dict[str, int] | None = None,
+    ) -> list[dict[str, Any]]:
         """Fetch a list endpoint and apply shared timeout/error handling."""
 
         try:
@@ -97,7 +147,7 @@ class OpenDotaService:
                 headers=self._request_headers(),
                 trust_env=False,
             ) as client:
-                response = await client.get(path)
+                response = await client.get(path, params=params)
                 response.raise_for_status()
 
             payload = response.json()

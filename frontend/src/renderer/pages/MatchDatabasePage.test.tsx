@@ -37,6 +37,7 @@ function createTaskDetails(status: string) {
 describe('MatchDatabasePage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.stubGlobal('confirm', vi.fn(() => true));
   });
 
   afterEach(() => {
@@ -268,7 +269,7 @@ describe('MatchDatabasePage', () => {
           radiant_team_name: 'Team Liquid',
           dire_team_name: 'Team Falcons',
           league_name: 'DreamLeague',
-          download_status: 'prepared',
+          download_status: 'completed',
           download_task_id: 'task-8674716612-1',
           download_attempt_count: 1,
         },
@@ -284,9 +285,39 @@ describe('MatchDatabasePage', () => {
     expect(onOpenReplay).toHaveBeenCalledWith({
       source: 'match_database',
       matchId: 8674716612,
-      downloadStatus: 'prepared',
+      downloadStatus: 'completed',
       downloadTaskId: 'task-8674716612-1',
     });
+  });
+
+  it('disables replay entry when match is not ready yet', async () => {
+    vi.spyOn(matchDatabaseService, 'getMatchDatabase').mockResolvedValue({
+      status: 'ok',
+      total: 1,
+      limit: 20,
+      offset: 0,
+      matches: [
+        {
+          match_id: 8674716612,
+          start_time: 1700054321,
+          duration: 2450,
+          radiant_team_id: 15,
+          dire_team_id: 2163,
+          leagueid: 15475,
+          radiant_team_name: 'Team Liquid',
+          dire_team_name: 'Team Falcons',
+          league_name: 'DreamLeague',
+          download_status: 'prepared',
+          download_task_id: 'task-8674716612-1',
+          download_attempt_count: 1,
+        },
+      ],
+    });
+
+    render(<MatchDatabasePage onOpenReplay={vi.fn()} />);
+
+    const openReplayButton = await screen.findByRole('button', { name: '打开回放' });
+    expect((openReplayButton as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('runs batch action on checked matches and shows summary with failed examples', async () => {
@@ -388,7 +419,7 @@ describe('MatchDatabasePage', () => {
     });
 
     expect((batchDownloadButton as HTMLButtonElement).disabled).toBe(true);
-    expect(await screen.findByText('当前页无可选比赛。')).toBeTruthy();
+    expect(await screen.findByText('请先勾选要批量下载的比赛。')).toBeTruthy();
   });
 
   it('deletes replay for completed row when delete button clicked', async () => {
@@ -887,15 +918,15 @@ describe('MatchDatabasePage', () => {
       expect(detailsSpy).toHaveBeenCalledWith('task-8674716612-1');
     });
 
-    expect(await screen.findByText('task_id')).toBeTruthy();
-    expect(await screen.findByText('status')).toBeTruthy();
-    expect(await screen.findByText('attempt_count')).toBeTruthy();
-    expect(await screen.findByText('error_code')).toBeTruthy();
-    expect(await screen.findByText('error_message')).toBeTruthy();
-    expect(await screen.findByText('download_path')).toBeTruthy();
-    expect(await screen.findByText('updated_at')).toBeTruthy();
+    expect(await screen.findByText('任务 ID')).toBeTruthy();
+    expect(await screen.findByText('任务状态')).toBeTruthy();
+    expect((await screen.findAllByText('尝试次数')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('错误代码')).toBeTruthy();
+    expect(await screen.findByText('错误信息')).toBeTruthy();
+    expect(await screen.findByText('下载文件路径')).toBeTruthy();
+    expect(await screen.findByText('最近更新时间')).toBeTruthy();
     expect((await screen.findAllByText('task-8674716612-1')).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText('downloading')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('下载中')).length).toBeGreaterThan(0);
   });
 
   it.each(['completed', 'failed'])(

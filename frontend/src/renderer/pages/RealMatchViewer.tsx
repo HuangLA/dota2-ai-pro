@@ -3,20 +3,48 @@
  * 显示解析后的录像数据，支持时间轴控制和平滑动画
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { usePlaybackStore } from '../store/playbackStore';
 import MapViewer from '../components/map/MapViewer';
-import { HeatmapBounds, HeroPosition, KillMarkerData, Ward } from '../components/map/DotaMapRenderer';
+import {
+  HeatmapBounds,
+  HeroPosition,
+  KillMarkerData,
+  PathOverlay,
+  Ward,
+} from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
 import AdvantageChart from '../components/charts/AdvantageChart';
 import backendAPI, {
   HudHeroMetric,
   Match,
+  MatchDetail,
+  MatchHeatmapResponse,
+  MovementPathsResponse,
   PlaybackTimeBasis,
   TickData,
   WardsResponse,
 } from '../api/backend';
+import { ParseTask, replayService } from '../api/replayService';
 import { getHeroByName, getHeroPortraitUrl } from '../data/heroes';
+import {
+  getItemFallbackShortLabel,
+  getItemIconCandidates,
+  getItemTooltipData,
+  getItemLabel,
+  isEnhancementItem,
+  isHiddenReplayItem,
+  isLikelyNeutralItem,
+  normalizeItemName,
+} from '../data/items';
 import { ReplayEntryContext } from '../types/replayContext';
 import {
   createGameClockMapper,
@@ -33,6 +61,24 @@ const DEFAULT_HERO_PORTRAIT_URL = '/assets/dota/heroes/default.png';
 const TEAM_HERO_COUNT = 5;
 const HUD_REQUEST_THROTTLE_MS = 500;
 const HUD_VISIBLE_ROW_COUNT = 10;
+const DEFAULT_HEATMAP_GRID_SIZE = 64;
+const PARSE_TASK_POLLING_INTERVAL_MS = 2000;
+const LEGACY_ITEM_SLOT_WARNING_SNIPPET = '旧版物品槽契约';
+
+type VisualizationRangePreset = 'full' | 'opening5' | 'opening10' | 'opening15' | 'midgame15to25' | 'custom';
+
+interface CustomVisualizationRange {
+  start: string;
+  end: string;
+}
+
+interface HudItemSlots {
+  inventory: Array<string | null>;
+  backpack: Array<string | null>;
+  neutral: string | null;
+  enhancement: string | null;
+  extraStashCount: number;
+}
 
 interface TeamHeroPortrait {
   key: number;
@@ -57,6 +103,671 @@ interface HudHeroStatus {
   hp?: number;
   maxHp?: number;
   hpRatio?: number;
+}
+
+interface HeatmapSummary {
+  hero?: string | null;
+  team?: number | null;
+  totalSamples: number;
+  maxDensity: number;
+  timeRange: {
+    start: number;
+    end: number;
+  };
+}
+
+interface PathSummary {
+  heroCount: number;
+  timeRange: {
+    start: number;
+    end: number;
+  };
+  simplification: MovementPathsResponse['data']['simplification'];
+}
+
+interface LoadMatchDataOptions {
+  preserveAnalysisState?: boolean;
+  preserveCurrentTime?: boolean;
+}
+
+interface OverlayModeMeta {
+  title: string;
+  description: string;
+  densityLabel: string;
+  filterLabel: string;
+}
+
+type MapOverlayPanelKey = 'insight' | 'legend';
+
+interface MapOverlayPanelState {
+  x: number;
+  y: number;
+  open: boolean;
+}
+
+interface MapOverlayPanelDragState {
+  key: MapOverlayPanelKey;
+  offsetX: number;
+  offsetY: number;
+  containerRect: DOMRect;
+  panelWidth: number;
+  panelHeight: number;
+}
+
+const OVERLAY_MODE_META: Record<'none' | 'movement' | 'kill' | 'death', OverlayModeMeta> = {
+  none: {
+    title: '无热力图',
+    description: '当前只显示实时英雄位置、眼位、最近 5 秒死亡位置和可选路径轨迹。',
+    densityLabel: '未启用',
+    filterLabel: '仅实时图层',
+  },
+  movement: {
+    title: '移动热力图',
+    description: '颜色越热，代表所选英雄或队伍在该区域停留、经过的采样越密集。',
+    densityLabel: '位置采样密度',
+    filterLabel: '按英雄位置统计',
+  },
+  kill: {
+    title: '击杀热力图',
+    description: '颜色越热，代表该区域发生击杀的次数越多；队伍过滤按击杀者阵营统计。',
+    densityLabel: '击杀次数密度',
+    filterLabel: '按击杀者阵营统计',
+  },
+  death: {
+    title: '死亡热力图',
+    description: '颜色越热，代表该区域出现阵亡的次数越多；队伍过滤按阵亡英雄阵营统计。',
+    densityLabel: '阵亡次数密度',
+    filterLabel: '按阵亡者阵营统计',
+  },
+};
+
+const MAP_OVERLAY_PANEL_MARGIN = 12;
+const MAP_OVERLAY_PANEL_META: Record<MapOverlayPanelKey, { title: string; width: number }> = {
+  insight: {
+    title: '现在看到什么',
+    width: 280,
+  },
+  legend: {
+    title: '地图图例',
+    width: 250,
+  },
+};
+
+function clampMapOverlayPosition(
+  x: number,
+  y: number,
+  containerWidth: number,
+  containerHeight: number,
+  panelWidth: number,
+  panelHeight: number
+): { x: number; y: number } {
+  const maxX = Math.max(MAP_OVERLAY_PANEL_MARGIN, containerWidth - panelWidth - MAP_OVERLAY_PANEL_MARGIN);
+  const maxY = Math.max(MAP_OVERLAY_PANEL_MARGIN, containerHeight - panelHeight - MAP_OVERLAY_PANEL_MARGIN);
+
+  return {
+    x: clamp(x, MAP_OVERLAY_PANEL_MARGIN, maxX),
+    y: clamp(y, MAP_OVERLAY_PANEL_MARGIN, maxY),
+  };
+}
+
+function createDefaultMapOverlayPanels(mapViewportSize: number): Record<MapOverlayPanelKey, MapOverlayPanelState> {
+  return {
+    insight: {
+      x: MAP_OVERLAY_PANEL_MARGIN,
+      y: MAP_OVERLAY_PANEL_MARGIN,
+      open: true,
+    },
+    legend: {
+      x: Math.max(
+        MAP_OVERLAY_PANEL_MARGIN,
+        mapViewportSize - MAP_OVERLAY_PANEL_META.legend.width - MAP_OVERLAY_PANEL_MARGIN
+      ),
+      y: MAP_OVERLAY_PANEL_MARGIN,
+      open: false,
+    },
+  };
+}
+
+function getTeamPerspectiveLabel(team: number | null | undefined): string {
+  if (team === 2) {
+    return '天辉';
+  }
+  if (team === 3) {
+    return '夜魇';
+  }
+  return '全部队伍';
+}
+
+function ItemIcon({ itemName, className = 'h-full w-full' }: { itemName: string; className?: string }) {
+  const [broken, setBroken] = useState(false);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const normalizedItemName = normalizeItemName(itemName);
+  const label = getItemLabel(itemName);
+  const iconCandidates = getItemIconCandidates(itemName);
+
+  useEffect(() => {
+    setBroken(false);
+    setCandidateIndex(0);
+  }, [itemName]);
+
+  if (!normalizedItemName) {
+    return (
+      <div className={`flex h-full w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-slate-700 bg-slate-900/70 text-[10px] font-semibold text-slate-500 ${className}`}>
+        --
+      </div>
+    );
+  }
+
+  if (broken) {
+    return (
+      <div
+        title={label}
+        className={`flex h-full w-full items-center justify-center overflow-hidden rounded-md border border-slate-700 bg-slate-900/80 px-1 text-[10px] font-semibold text-slate-200 ${className}`}
+      >
+        {getItemFallbackShortLabel(itemName)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={iconCandidates[candidateIndex]}
+      alt={`${label} 图标`}
+      title={label}
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      onError={() => {
+        if (candidateIndex < iconCandidates.length - 1) {
+          setCandidateIndex((current) => current + 1);
+          return;
+        }
+        setBroken(true);
+      }}
+      className={`block h-full w-full overflow-hidden rounded-md border border-slate-700/80 bg-slate-950/95 object-contain p-0 shadow-[0_4px_12px_rgba(2,6,23,0.28)] ${className}`}
+    />
+  );
+}
+
+function ItemTooltipCard({
+  slotId,
+  tooltipData,
+}: {
+  slotId: string;
+  tooltipData: NonNullable<ReturnType<typeof getItemTooltipData>>;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-700/90 bg-slate-950/96 p-3 shadow-[0_24px_48px_rgba(2,6,23,0.65)] backdrop-blur-md">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-50">{tooltipData.name}</p>
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[10px]">
+            <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-0.5 text-slate-200">
+              {tooltipData.categoryLabel}
+            </span>
+            {tooltipData.tierLabel && (
+              <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-100">
+                {tooltipData.tierLabel}
+              </span>
+            )}
+            {tooltipData.enhancement && (
+              <span className="rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-amber-100">
+                附魔：{tooltipData.enhancement.name}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5 text-[10px] text-slate-300">
+          {tooltipData.costLabel && (
+            <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-0.5">
+              售价 {tooltipData.costLabel}
+            </span>
+          )}
+          {tooltipData.manaCostLabel && (
+            <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-0.5">
+              法力 {tooltipData.manaCostLabel}
+            </span>
+          )}
+          {tooltipData.cooldownLabel && (
+            <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2 py-0.5">
+              冷却 {tooltipData.cooldownLabel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {tooltipData.attributes.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">属性</p>
+          <div className="mt-1.5 space-y-1">
+            {tooltipData.attributes.map((line) => (
+              <p key={`${slotId}-${line}`} className="text-[11px] leading-5 text-slate-200">
+                {line}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tooltipData.abilities.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">效果</p>
+          <div className="mt-1.5 space-y-2">
+            {tooltipData.abilities.map((ability) => (
+              <div key={`${slotId}-${ability.typeLabel}-${ability.title}`}>
+                <p className="text-[11px] font-medium text-slate-100">
+                  {ability.typeLabel} · {ability.title}
+                </p>
+                {ability.summary && <p className="mt-1 text-[11px] leading-5 text-slate-300">{ability.summary}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tooltipData.enhancement && (
+        <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-2.5">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-100">
+              附魔
+            </span>
+            <p className="text-[12px] font-semibold text-amber-50">{tooltipData.enhancement.name}</p>
+          </div>
+          {tooltipData.enhancement.attributes.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {tooltipData.enhancement.attributes.map((line) => (
+                <p key={`${slotId}-${tooltipData.enhancement?.name}-${line}`} className="text-[11px] leading-5 text-amber-50/90">
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
+          {tooltipData.enhancement.abilities.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {tooltipData.enhancement.abilities.map((ability) => (
+                <div key={`${slotId}-${tooltipData.enhancement?.name}-${ability.title}`}>
+                  <p className="text-[11px] font-medium text-amber-50">
+                    {ability.typeLabel} · {ability.title}
+                  </p>
+                  {ability.summary && <p className="mt-1 text-[11px] leading-5 text-amber-50/85">{ability.summary}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tooltipData.notes.length > 0 && (
+        <div className="mt-3 border-t border-slate-800/80 pt-2">
+          {tooltipData.notes.map((note) => (
+            <p key={`${slotId}-${note}`} className="text-[10px] leading-5 text-slate-500">
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItemSlot({
+  itemName,
+  slotId,
+  enhancementName,
+  sizeClass = 'w-full aspect-[3/2]',
+  variant = 'inventory',
+}: {
+  itemName?: string;
+  slotId: string;
+  enhancementName?: string;
+  sizeClass?: string;
+  variant?: 'inventory' | 'backpack' | 'neutral';
+}) {
+  const label = itemName ? getItemLabel(itemName) : '空位';
+  const hiddenReplayItem = itemName ? isHiddenReplayItem(itemName) : false;
+  const hiddenReplayId = itemName ? normalizeItemName(itemName) : '';
+  const slotRef = useRef<HTMLDivElement | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number; placeAbove: boolean } | null>(
+    null
+  );
+  const tooltipData =
+    itemName && !hiddenReplayItem
+      ? getItemTooltipData(itemName, {
+          enhancementName: variant === 'neutral' ? enhancementName ?? null : null,
+        })
+      : null;
+  const shellClass =
+    variant === 'neutral'
+      ? enhancementName
+        ? 'border-amber-400/35 bg-amber-500/8 shadow-[0_0_0_1px_rgba(251,191,36,0.14)]'
+        : 'border-amber-500/25 bg-amber-500/5'
+      : variant === 'backpack'
+        ? 'border-slate-700/70 bg-slate-950/70'
+        : 'border-slate-700/80 bg-slate-950/80';
+  const emptyShellClass =
+    variant === 'neutral'
+      ? 'border-amber-500/20 bg-slate-950/65'
+      : 'border-slate-700/70 bg-slate-950/55';
+
+  useEffect(() => {
+    if (!tooltipOpen || !tooltipData || !slotRef.current || typeof window === 'undefined') {
+      setTooltipPosition(null);
+      return;
+    }
+
+    const updateTooltipPosition = () => {
+      if (!slotRef.current) {
+        return;
+      }
+
+      const rect = slotRef.current.getBoundingClientRect();
+      const tooltipWidth = 320;
+      const viewportPadding = 12;
+      const verticalOffset = 12;
+      const estimatedTooltipHeight = tooltipData.enhancement ? 380 : 300;
+      const nextLeft = Math.min(
+        Math.max(rect.left + rect.width / 2 - tooltipWidth / 2, viewportPadding),
+        window.innerWidth - tooltipWidth - viewportPadding
+      );
+      const placeAbove =
+        rect.bottom + verticalOffset + estimatedTooltipHeight > window.innerHeight - viewportPadding &&
+        rect.top > estimatedTooltipHeight + viewportPadding;
+
+      setTooltipPosition({
+        left: nextLeft,
+        top: placeAbove ? rect.top - verticalOffset : rect.bottom + verticalOffset,
+        placeAbove,
+      });
+    };
+
+    updateTooltipPosition();
+    window.addEventListener('resize', updateTooltipPosition);
+    window.addEventListener('scroll', updateTooltipPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateTooltipPosition);
+      window.removeEventListener('scroll', updateTooltipPosition, true);
+    };
+  }, [tooltipData, tooltipOpen]);
+
+  if (!itemName) {
+    return (
+      <div
+        key={slotId}
+        title={label}
+        className={`min-w-0 rounded-lg border border-dashed ${emptyShellClass} p-0.5`}
+      >
+        <div className={sizeClass}>
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-slate-700/70 bg-slate-950/80 text-[10px] font-semibold text-slate-500">
+            --
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hiddenReplayItem) {
+    return (
+      <div
+        key={slotId}
+        title={label}
+        className="min-w-0 rounded-lg border border-amber-500/30 bg-amber-500/5 p-1"
+      >
+        <div className={sizeClass}>
+          <div className="flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-md border border-amber-500/20 bg-slate-950/90 px-2 text-center">
+            <span className="text-[9px] uppercase tracking-[0.16em] text-amber-200/75">隐藏 ID</span>
+            <span className="mt-1 break-all font-mono text-[10px] leading-4 text-amber-100">{hiddenReplayId}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={slotRef}
+      key={slotId}
+      title={label}
+      onMouseEnter={() => setTooltipOpen(true)}
+      onMouseLeave={() => setTooltipOpen(false)}
+      className={`relative min-w-0 rounded-lg border p-0.5 transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(8,15,34,0.3)] ${shellClass}`}
+    >
+      <div className={sizeClass}>
+        <ItemIcon itemName={itemName} className="h-full w-full" />
+      </div>
+      {tooltipData &&
+        tooltipOpen &&
+        tooltipPosition &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            data-testid={`item-tooltip-${slotId}`}
+            className="pointer-events-none fixed z-[200] w-80"
+            style={{
+              left: tooltipPosition.left,
+              top: tooltipPosition.top,
+              transform: tooltipPosition.placeAbove ? 'translateY(-100%)' : undefined,
+            }}
+          >
+            <ItemTooltipCard slotId={slotId} tooltipData={tooltipData} />
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+function extractHudItemSlots(items: Array<string | null | undefined>): HudItemSlots {
+  const normalizedItems = items.map((item) => {
+    if (typeof item !== 'string') {
+      return null;
+    }
+    const trimmed = item.trim();
+    return trimmed ? trimmed : null;
+  });
+
+  const inventory = Array.from({ length: 6 }, (_, index) => normalizedItems[index] ?? null);
+  const backpack = Array.from({ length: 3 }, (_, index) => normalizedItems[index + 6] ?? null);
+
+  const hasExplicitNeutralSlot =
+    normalizedItems.length > 16 ||
+    normalizedItems.some((item, index) => index === 16 && item !== undefined);
+  const explicitNeutral = hasExplicitNeutralSlot ? normalizedItems[16] ?? null : null;
+  const explicitEnhancement =
+    normalizedItems.length > 17 && normalizedItems[17] && isEnhancementItem(normalizedItems[17])
+      ? normalizedItems[17]
+      : null;
+
+  let inferredNeutralIndex = -1;
+  if (!hasExplicitNeutralSlot) {
+    for (let index = normalizedItems.length - 1; index >= 9; index -= 1) {
+      const candidate = normalizedItems[index];
+      if (!candidate || isEnhancementItem(candidate)) {
+        continue;
+      }
+      if (isLikelyNeutralItem(candidate)) {
+        inferredNeutralIndex = index;
+        break;
+      }
+    }
+  }
+
+  const neutral =
+    explicitNeutral ??
+    (inferredNeutralIndex >= 0 ? normalizedItems[inferredNeutralIndex] ?? null : null);
+
+  const extraStashCount = normalizedItems.filter((item, index) => {
+    if (!item || index < 9) {
+      return false;
+    }
+    if (index === inferredNeutralIndex) {
+      return false;
+    }
+    if (hasExplicitNeutralSlot && index === 16) {
+      return false;
+    }
+    if (index === 17 && isEnhancementItem(item)) {
+      return false;
+    }
+    return true;
+  }).length;
+
+  return {
+    inventory,
+    backpack,
+    neutral,
+    enhancement: explicitEnhancement,
+    extraStashCount,
+  };
+}
+
+function formatGameClockInput(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0:00';
+  }
+
+  const rounded = Math.round(value);
+  const sign = rounded < 0 ? '-' : '';
+  const absolute = Math.abs(rounded);
+  const minutes = Math.floor(absolute / 60);
+  const seconds = absolute % 60;
+
+  return `${sign}${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function parseGameClockInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const sign = trimmed.startsWith('-') ? -1 : 1;
+  const raw = trimmed.replace(/^[+-]/, '');
+
+  if (raw.includes(':')) {
+    const [minutesPart, secondsPart] = raw.split(':');
+    if (!minutesPart || secondsPart === undefined) {
+      return null;
+    }
+
+    const minutes = Number(minutesPart);
+    const seconds = Number(secondsPart);
+    if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || seconds < 0 || seconds >= 60) {
+      return null;
+    }
+
+    return sign * (Math.abs(minutes) * 60 + seconds);
+  }
+
+  const numericMinutes = Number(raw);
+  if (!Number.isFinite(numericMinutes)) {
+    return null;
+  }
+
+  return sign * Math.round(Math.abs(numericMinutes) * 60);
+}
+
+function resolveVisualizationTimeRange(
+  preset: VisualizationRangePreset,
+  minSourceTime: number,
+  maxSourceTime: number,
+  mapper: GameClockMapper,
+  customRange?: CustomVisualizationRange
+): { startTime: number; endTime: number; error?: string | null } {
+  const safeMin = Number.isFinite(minSourceTime) ? minSourceTime : 0;
+  const safeMax = Number.isFinite(maxSourceTime) && maxSourceTime >= safeMin
+    ? maxSourceTime
+    : safeMin;
+
+  const clampSourceTime = (value: number) => clamp(value, safeMin, safeMax);
+  const toSourceRange = (startClock: number, endClock: number) => {
+    const startTime = clampSourceTime(mapper.gameClockToSource(startClock));
+    const endTime = clampSourceTime(mapper.gameClockToSource(endClock));
+    return {
+      startTime: Math.min(startTime, endTime),
+      endTime: Math.max(startTime, endTime),
+    };
+  };
+
+  if (preset === 'opening5') {
+    return toSourceRange(0, 300);
+  }
+
+  if (preset === 'opening10') {
+    return toSourceRange(0, 600);
+  }
+
+  if (preset === 'opening15') {
+    return toSourceRange(0, 900);
+  }
+
+  if (preset === 'midgame15to25') {
+    return toSourceRange(900, 1500);
+  }
+
+  if (preset === 'custom') {
+    const startClock = parseGameClockInput(customRange?.start ?? '');
+    const endClock = parseGameClockInput(customRange?.end ?? '');
+
+    if (startClock === null || endClock === null) {
+      return {
+        startTime: safeMin,
+        endTime: safeMax,
+        error: '自定义区间格式不正确，请输入 mm:ss，例如 12:30 或 -1:30。',
+      };
+    }
+
+    if (endClock <= startClock) {
+      return {
+        startTime: safeMin,
+        endTime: safeMax,
+        error: '自定义区间结束时间必须晚于开始时间。',
+      };
+    }
+
+    return toSourceRange(startClock, endClock);
+  }
+
+  return { startTime: safeMin, endTime: safeMax };
+}
+
+function buildDenseHeatmapGrid(
+  gridSize: number,
+  maxDensity: number,
+  cells: Array<{ grid_x: number; grid_y: number; density: number }>
+): number[][] {
+  const safeSize = Math.max(1, gridSize);
+  const grid = Array.from({ length: safeSize }, () => Array(safeSize).fill(0));
+  const normalizer = maxDensity > 0 ? maxDensity : 1;
+
+  for (const cell of cells) {
+    if (
+      cell.grid_y < 0 ||
+      cell.grid_y >= safeSize ||
+      cell.grid_x < 0 ||
+      cell.grid_x >= safeSize
+    ) {
+      continue;
+    }
+    grid[cell.grid_y][cell.grid_x] = cell.density / normalizer;
+  }
+
+  return grid;
+}
+
+function toPathOverlays(
+  paths: Array<{ hero: string; team: number; points: Array<{ x: number; y: number }> }>
+): PathOverlay[] {
+  return paths
+    .filter((path) => Array.isArray(path.points) && path.points.length > 1)
+    .map((path) => ({
+      hero_name: path.hero,
+      team: path.team === 2 ? 'radiant' : 'dire',
+      points: path.points.map((point) => ({
+        x: point.x,
+        y: point.y,
+      })),
+    }));
 }
 
 function extractTeamLineups(ticks: TickData[]): TeamLineups {
@@ -238,6 +949,7 @@ export interface RealMatchViewerProps {
 
 export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatchViewerProps) {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [selectedMatchDetail, setSelectedMatchDetail] = useState<MatchDetail | null>(null);
   const { selectedMatch, setSelectedMatch, currentTime, setCurrentTime, currentDisplayGameTime, setCurrentDisplayGameTime, isPauseActive, setIsPauseActive, loading, setLoading, error, setError } = usePlaybackStore();
 
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
@@ -253,7 +965,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
   const [showCalibration, setShowCalibration] = useState(false);
   const [timeBasisSource, setTimeBasisSource] = useState<'game_time' | 'fallback'>('fallback');
-  const [timeBasisStrategy, setTimeBasisStrategy] = useState<GameClockMapper['strategy']>('fallback_pre_game_anchor');
+  const [, setTimeBasisStrategy] = useState<GameClockMapper['strategy']>('fallback_pre_game_anchor');
   const [timeBasisOffsetSeconds, setTimeBasisOffsetSeconds] = useState(0);
   const [teamLineups, setTeamLineups] = useState<TeamLineups>({ radiant: [], dire: [] });
   const [hudHeroStatus, setHudHeroStatus] = useState<Record<number, HudHeroStatus>>({});
@@ -262,38 +974,104 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const [hudMetrics, setHudMetrics] = useState<HudHeroMetric[]>([]);
   const [hudMetricsLoading, setHudMetricsLoading] = useState(false);
   const [hudMetricsError, setHudMetricsError] = useState<string | null>(null);
+  const [hudMetricsWarnings, setHudMetricsWarnings] = useState<string[]>([]);
   const [heatmapType, setHeatmapType] = useState<'none' | 'movement' | 'kill' | 'death'>('none');
+  const [heatmapRangePreset, setHeatmapRangePreset] = useState<VisualizationRangePreset>('full');
+  const [heatmapCustomRange, setHeatmapCustomRange] = useState<CustomVisualizationRange>({ start: '-1:30', end: '10:00' });
+  const [heatmapHeroFilter, setHeatmapHeroFilter] = useState<string>('all');
+  const [heatmapTeamFilter, setHeatmapTeamFilter] = useState<'all' | 'radiant' | 'dire'>('all');
   const [heatmapGrid, setHeatmapGrid] = useState<number[][] | null>(null);
   const [heatmapBounds, setHeatmapBounds] = useState<HeatmapBounds | null>(null);
+  const [heatmapSummary, setHeatmapSummary] = useState<HeatmapSummary | null>(null);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [heatmapError, setHeatmapError] = useState<string | null>(null);
+  const [pathOverlays, setPathOverlays] = useState<PathOverlay[] | null>(null);
+  const [pathRangePreset, setPathRangePreset] = useState<VisualizationRangePreset>('full');
+  const [pathCustomRange, setPathCustomRange] = useState<CustomVisualizationRange>({ start: '-1:30', end: '10:00' });
+  const [pathHeroFilter, setPathHeroFilter] = useState<string>('all');
+  const [pathSimplify, setPathSimplify] = useState(true);
+  const [pathEpsilon, setPathEpsilon] = useState(100);
+  const [pathSummary, setPathSummary] = useState<PathSummary | null>(null);
+  const [pathLoading, setPathLoading] = useState(false);
+  const [pathError, setPathError] = useState<string | null>(null);
+  const [cleanMapForHeroFocus, setCleanMapForHeroFocus] = useState(true);
+  const [expandedHudHeroes, setExpandedHudHeroes] = useState<Record<number, boolean>>({});
+  const [mapWorkbenchExpanded, setMapWorkbenchExpanded] = useState(false);
+  const [replayContextWarning, setReplayContextWarning] = useState<string | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1440
+  );
+  const [mapOverlayPanels, setMapOverlayPanels] = useState<Record<MapOverlayPanelKey, MapOverlayPanelState>>(
+    () => createDefaultMapOverlayPanels(620)
+  );
+  const [draggingMapOverlayPanel, setDraggingMapOverlayPanel] = useState<MapOverlayPanelKey | null>(null);
+  const [reparseTask, setReparseTask] = useState<ParseTask | null>(null);
+  const [reparseFeedback, setReparseFeedback] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
 
   const allTicksRef = useRef<TickData[]>([]);
   const allWardsRef = useRef<WardsResponse | null>(null);
   const gameClockMapperRef = useRef<GameClockMapper>(createGameClockMapper([]));
   const deathIntervalsRef = useRef<Map<number, DeathInterval[]>>(new Map());
   const killMarkersRef = useRef<KillMarkerData[]>([]);
+  const selectedMatchRef = useRef<number | null>(selectedMatch ?? null);
+  const currentTimeRef = useRef<number>(currentTime);
+  const preferredMatchIdRef = useRef<number | null>(initialMatchId ?? null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hudRequestAbortControllerRef = useRef<AbortController | null>(null);
   const hudThrottleTimeoutRef = useRef<number | null>(null);
   const pendingHudSourceTimeRef = useRef<number | null>(null);
   const lastHudRequestAtRef = useRef(0);
   const hudRequestSequenceRef = useRef(0);
+  const mapOverlayContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapOverlayPanelRefs = useRef<Record<MapOverlayPanelKey, HTMLDivElement | null>>({
+    insight: null,
+    legend: null,
+  });
+  const mapOverlayDragStateRef = useRef<MapOverlayPanelDragState | null>(null);
+  const hasInitializedMapOverlayPanelsRef = useRef(false);
 
   useEffect(() => {
     loadMatches();
   }, []);
 
   useEffect(() => {
-    setSelectedMatch(initialMatchId ?? null);
-  }, [initialMatchId]);
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    selectedMatchRef.current = selectedMatch ?? null;
+  }, [selectedMatch]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    if (initialMatchId === undefined || initialMatchId === null) {
+      return;
+    }
+
+    preferredMatchIdRef.current = initialMatchId;
+    selectedMatchRef.current = initialMatchId;
+    setSelectedMatch(initialMatchId);
+  }, [initialMatchId, setSelectedMatch]);
 
   useEffect(() => {
     if (
       replayEntryContext?.source === 'match_database' ||
       replayEntryContext?.source === 'replay_library'
     ) {
+      preferredMatchIdRef.current = replayEntryContext.matchId;
+      selectedMatchRef.current = replayEntryContext.matchId;
       setSelectedMatch(replayEntryContext.matchId);
     }
-  }, [replayEntryContext]);
+  }, [replayEntryContext, setSelectedMatch]);
 
   const replaySourceStatusText = replayEntryContext?.downloadStatus
     ? replayEntryContext.downloadStatus
@@ -327,6 +1105,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
     setHudMetricsLoading(true);
     setHudMetricsError(null);
+    setHudMetricsWarnings([]);
 
     const response = await backendAPI.getHudMetrics(selectedMatch, {
       gameTime,
@@ -345,6 +1124,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
     setHudMetrics(response.heroes.slice(0, HUD_VISIBLE_ROW_COUNT));
     setHudMetricsError(null);
+    setHudMetricsWarnings([
+      ...(Array.isArray(response.warnings) ? response.warnings : []),
+      ...(typeof response.message === 'string' && response.message.trim() ? [response.message.trim()] : []),
+    ].filter((warning, index, array) => array.indexOf(warning) === index));
     setHudMetricsLoading(false);
   }, [selectedMatch]);
 
@@ -382,13 +1165,53 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     }, HUD_REQUEST_THROTTLE_MS - elapsed);
   }, [fetchHudMetricsForSourceTime, selectedMatch]);
 
+  const resolvePreferredMatchId = (matchList: Match[]): number | null => {
+    if (matchList.length === 0) {
+      return null;
+    }
+
+    const candidateIds = [
+      preferredMatchIdRef.current,
+      selectedMatchRef.current,
+    ].filter((matchId): matchId is number => typeof matchId === 'number' && Number.isFinite(matchId));
+
+    for (const matchId of candidateIds) {
+      if (matchList.some((match) => match.match_id === matchId)) {
+        return matchId;
+      }
+    }
+
+    return matchList[0]?.match_id ?? null;
+  };
+
   const loadMatches = async () => {
     setLoading(true);
     try {
       const matchList = await backendAPI.getMatchList(10, 0);
       setMatches(matchList);
-      if (matchList.length > 0 && !selectedMatch) {
-        setSelectedMatch(matchList[0].match_id);
+
+      const nextSelectedMatchId = resolvePreferredMatchId(matchList);
+      const preferredMatchId = preferredMatchIdRef.current;
+      const preferredMatchAvailable =
+        typeof preferredMatchId === 'number' &&
+        matchList.some((match) => match.match_id === preferredMatchId);
+
+      if (
+        replayEntryContext &&
+        typeof preferredMatchId === 'number' &&
+        !preferredMatchAvailable &&
+        matchList.length > 0
+      ) {
+        setReplayContextWarning(
+          `目标比赛 ${preferredMatchId} 当前不在本地已解析列表中，已切换到最近可用回放。`
+        );
+      } else {
+        setReplayContextWarning(null);
+      }
+
+      if (nextSelectedMatchId !== null && nextSelectedMatchId !== selectedMatchRef.current) {
+        selectedMatchRef.current = nextSelectedMatchId;
+        setSelectedMatch(nextSelectedMatchId);
       }
     } catch (err) {
       setError('加载比赛列表失败');
@@ -398,7 +1221,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     }
   };
 
-  const loadAllMatchData = async (matchId: number) => {
+  const loadAllMatchData = async (matchId: number, options?: LoadMatchDataOptions) => {
+    const preserveAnalysisState = options?.preserveAnalysisState ?? false;
+    const preserveCurrentTime = options?.preserveCurrentTime ?? false;
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -406,6 +1232,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
     setLoading(true);
     setError(null);
+    setSelectedMatchDetail(null);
     setTimeBasisSource('fallback');
     setTimeBasisStrategy('fallback_pre_game_anchor');
     setTimeBasisOffsetSeconds(0);
@@ -415,18 +1242,27 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     setCurrentDisplayGameTime(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
     setHudMetrics([]);
     setHudMetricsError(null);
+    setHudMetricsWarnings([]);
     setHudMetricsLoading(false);
     clearPendingHudRequest();
     allTicksRef.current = [];
     allWardsRef.current = null;
     deathIntervalsRef.current = new Map();
     killMarkersRef.current = [];
-    setHeatmapType('none');
-    setHeatmapGrid(null);
-    setHeatmapBounds(null);
+    if (!preserveAnalysisState) {
+      setHeatmapType('none');
+      setHeatmapHeroFilter('all');
+      setHeatmapTeamFilter('all');
+      setPathHeroFilter('all');
+      setHeatmapGrid(null);
+      setHeatmapBounds(null);
+      setHeatmapSummary(null);
+      setPathSummary(null);
+    }
 
     try {
       const matchDetail = await backendAPI.getMatchDetail(matchId);
+      setSelectedMatchDetail(matchDetail);
       const duration = matchDetail?.duration || DEFAULT_DURATION;
 
       console.log(`[RealMatchViewer] 加载比赛 ${matchId} 的完整数据...`);
@@ -488,9 +1324,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           minSourceTime,
           maxSourceTime
         );
-        setCurrentTime(gameStartSourceTime);
-        updateDisplayForTime(gameStartSourceTime);
-        scheduleHudMetricsFetch(gameStartSourceTime);
+        const nextSourceTime = preserveCurrentTime
+          ? clamp(currentTimeRef.current, minSourceTime, maxSourceTime)
+          : gameStartSourceTime;
+        setCurrentTime(nextSourceTime);
+        updateDisplayForTime(nextSourceTime);
+        scheduleHudMetricsFetch(nextSourceTime);
       }
 
     } catch (err) {
@@ -498,6 +1337,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
         return;
       }
       setError('加载比赛数据失败');
+      setSelectedMatchDetail(null);
       console.error(err);
     } finally {
       setLoading(false);
@@ -523,6 +1363,100 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   useEffect(() => () => {
     clearPendingHudRequest();
   }, [clearPendingHudRequest]);
+
+  useEffect(() => {
+    setReparseTask(null);
+    setReparseFeedback(null);
+  }, [selectedMatch]);
+
+  useEffect(() => {
+    setExpandedHudHeroes({});
+  }, [selectedMatch]);
+
+  const handleRefreshCurrentMatch = () => {
+    if (!selectedMatch) {
+      return;
+    }
+
+    setReparseFeedback(null);
+    void loadAllMatchData(selectedMatch, {
+      preserveAnalysisState: true,
+      preserveCurrentTime: true,
+    });
+  };
+
+  const handleReparseCurrentMatch = async () => {
+    const replayPath = selectedMatchDetail?.replay_path;
+    if (!selectedMatch || !replayPath) {
+      setReparseFeedback({
+        type: 'error',
+        message: '当前比赛没有可用的本地 .dem 路径，无法重新解析。',
+      });
+      return;
+    }
+
+    try {
+      const task = await replayService.createParseTask(replayPath);
+      setReparseTask(task);
+      setReparseFeedback({
+        type: 'info',
+        message: `已提交重新解析任务，当前状态：${task.status}。完成后会自动刷新当前比赛。`,
+      });
+    } catch (reparseError) {
+      console.error('Failed to create replay parse task:', reparseError);
+      setReparseFeedback({
+        type: 'error',
+        message: '提交重新解析任务失败，请检查本地 replay 文件是否仍存在。',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!reparseTask || (reparseTask.status !== 'pending' && reparseTask.status !== 'running')) {
+      return;
+    }
+
+    const timer = window.setInterval(async () => {
+      try {
+        const task = await replayService.getParseTask(reparseTask.task_id);
+        setReparseTask(task);
+
+        if (task.status === 'completed') {
+          setReparseFeedback({
+            type: 'success',
+            message: '重新解析已完成，当前比赛数据已自动刷新。',
+          });
+          if (selectedMatch) {
+            void loadAllMatchData(selectedMatch, {
+              preserveAnalysisState: true,
+              preserveCurrentTime: true,
+            });
+          }
+          window.clearInterval(timer);
+          return;
+        }
+
+        if (task.status === 'failed' || task.status === 'cancelled') {
+          setReparseFeedback({
+            type: 'error',
+            message: task.error ?? `重新解析已结束，状态：${task.status}。`,
+          });
+          window.clearInterval(timer);
+        }
+      } catch (taskError) {
+        console.error('Failed to poll parse task:', taskError);
+        setReparseFeedback({
+          type: 'error',
+          message: '重新解析任务状态刷新失败，请稍后重试。',
+        });
+        window.clearInterval(timer);
+      }
+    }, PARSE_TASK_POLLING_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [reparseTask, selectedMatch]);
 
   /**
    * 找到指定时间前后的两个 tick，用于插值
@@ -755,36 +1689,201 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     updateDisplayForTime(currentTime);
   }, [teamLineups, updateDisplayForTime]);
 
+  useEffect(() => {
+    if (!selectedMatch) {
+      return;
+    }
+
+    const mapper = gameClockMapperRef.current;
+    const defaultRange = {
+      start: formatGameClockInput(mapper.sourceToGameClock(timelineMinTime)),
+      end: formatGameClockInput(mapper.sourceToGameClock(timelineMaxTime)),
+    };
+
+    setHeatmapCustomRange(defaultRange);
+    setPathCustomRange(defaultRange);
+  }, [selectedMatch, timelineMaxTime, timelineMinTime]);
+
   // Fetch heatmap data when type changes
   useEffect(() => {
     if (heatmapType === 'none' || !selectedMatch) {
       setHeatmapGrid(null);
       setHeatmapBounds(null);
+      setHeatmapSummary(null);
+      setHeatmapLoading(false);
+      setHeatmapError(null);
       return;
     }
 
-    let cancelled = false;
-    fetch(`http://localhost:8000/api/v1/visualization/${selectedMatch}/heatmap?type=${heatmapType}&resolution=64`)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+    const controller = new AbortController();
+    const resolvedRange = resolveVisualizationTimeRange(
+      heatmapRangePreset,
+      timelineMinTime,
+      timelineMaxTime,
+      gameClockMapperRef.current,
+      heatmapCustomRange
+    );
+    if (resolvedRange.error) {
+      setHeatmapGrid(null);
+      setHeatmapBounds(null);
+      setHeatmapSummary(null);
+      setHeatmapLoading(false);
+      setHeatmapError(resolvedRange.error);
+      return () => {
+        controller.abort();
+      };
+    }
+
+    const { startTime, endTime } = resolvedRange;
+
+    setHeatmapLoading(true);
+    setHeatmapError(null);
+
+    backendAPI
+      .getMatchHeatmap(selectedMatch, {
+        heatmapType,
+        gridSize: DEFAULT_HEATMAP_GRID_SIZE,
+        hero: heatmapHeroFilter === 'all' ? undefined : heatmapHeroFilter,
+        team: heatmapTeamFilter === 'radiant' ? 2 : heatmapTeamFilter === 'dire' ? 3 : undefined,
+        startTime,
+        endTime,
+        signal: controller.signal,
       })
-      .then(data => {
-        if (!cancelled) {
-          setHeatmapGrid(data.grid);
-          setHeatmapBounds(data.bounds);
+      .then((response: MatchHeatmapResponse | null) => {
+        if (controller.signal.aborted) {
+          return;
         }
-      })
-      .catch(err => {
-        console.error('[RealMatchViewer] Failed to fetch heatmap:', err);
-        if (!cancelled) {
+
+        if (!response?.data) {
           setHeatmapGrid(null);
           setHeatmapBounds(null);
+          setHeatmapSummary(null);
+          setHeatmapError('热力图请求失败。');
+          return;
+        }
+
+        const denseGrid = buildDenseHeatmapGrid(
+          response.data.grid_size,
+          response.data.max_density,
+          response.data.grid_data
+        );
+        setHeatmapGrid(denseGrid);
+        setHeatmapBounds(response.data.map_bounds);
+        setHeatmapSummary({
+          hero: response.data.hero,
+          team: response.data.team,
+          totalSamples: response.data.total_samples,
+          maxDensity: response.data.max_density,
+          timeRange: response.data.time_range,
+        });
+        if (response.data.total_samples === 0) {
+          setHeatmapError('当前时间范围没有热力图数据。');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setHeatmapLoading(false);
         }
       });
 
-    return () => { cancelled = true; };
-  }, [heatmapType, selectedMatch]);
+    return () => {
+      controller.abort();
+    };
+  }, [
+    heatmapCustomRange,
+    heatmapHeroFilter,
+    heatmapRangePreset,
+    heatmapTeamFilter,
+    heatmapType,
+    selectedMatch,
+    timelineMinTime,
+    timelineMaxTime,
+  ]);
+
+  useEffect(() => {
+    if (!showPaths || !selectedMatch) {
+      setPathOverlays(null);
+      setPathSummary(null);
+      setPathLoading(false);
+      setPathError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const resolvedRange = resolveVisualizationTimeRange(
+      pathRangePreset,
+      timelineMinTime,
+      timelineMaxTime,
+      gameClockMapperRef.current,
+      pathCustomRange
+    );
+    if (resolvedRange.error) {
+      setPathOverlays(null);
+      setPathSummary(null);
+      setPathLoading(false);
+      setPathError(resolvedRange.error);
+      return () => {
+        controller.abort();
+      };
+    }
+
+    const { startTime, endTime } = resolvedRange;
+
+    setPathLoading(true);
+    setPathError(null);
+
+    backendAPI
+      .getMovementPaths(selectedMatch, {
+        hero: pathHeroFilter === 'all' ? undefined : pathHeroFilter,
+        startTime,
+        endTime,
+        simplify: pathSimplify,
+        epsilon: pathEpsilon,
+        signal: controller.signal,
+      })
+      .then((response: MovementPathsResponse | null) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (!response?.data) {
+          setPathOverlays(null);
+          setPathSummary(null);
+          setPathError('路径分析请求失败。');
+          return;
+        }
+
+        const overlays = toPathOverlays(response.data.paths);
+        setPathOverlays(overlays);
+        setPathSummary({
+          heroCount: response.data.hero_count,
+          timeRange: response.data.time_range,
+          simplification: response.data.simplification,
+        });
+        if (overlays.length === 0) {
+          setPathError('当前筛选范围没有路径数据。');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setPathLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    pathCustomRange,
+    pathEpsilon,
+    pathHeroFilter,
+    pathRangePreset,
+    pathSimplify,
+    selectedMatch,
+    showPaths,
+    timelineMaxTime,
+    timelineMinTime,
+  ]);
 
   const handleTimeChange = useCallback((newTime: number) => {
     setCurrentTime(newTime);
@@ -821,15 +1920,76 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const currentGameClockLabel = isPauseActive
     ? `暂停中 · ${formatGameClockTime(currentDisplayGameTime)}`
     : formatGameClockTime(currentDisplayGameTime);
+  const matchDurationClockLabel = formatGameClockTime(
+    Math.max(0, gameClockMapperRef.current.sourceToGameClock(timelineMaxTime))
+  );
+
+  const selectedMatchRecord = matches.find((match) => match.match_id === selectedMatch) ?? null;
+  const selectedReplayPath = selectedMatchDetail?.replay_path ?? selectedMatchRecord?.replay_path ?? null;
+  const selectedReplayFileName = selectedReplayPath
+    ? selectedReplayPath.split(/[\\/]/).filter(Boolean).pop() ?? selectedReplayPath
+    : null;
+  const hasLegacyItemSlotWarning = hudMetricsWarnings.some((warning) =>
+    warning.toLowerCase().includes(LEGACY_ITEM_SLOT_WARNING_SNIPPET)
+  );
+  const isReparseTaskActive = reparseTask?.status === 'pending' || reparseTask?.status === 'running';
+
+  const mapViewportSize = (() => {
+    if (viewportWidth >= 1600) {
+      return 820;
+    }
+    if (viewportWidth >= 1400) {
+      return 760;
+    }
+    if (viewportWidth >= 1200) {
+      return 700;
+    }
+    if (viewportWidth >= 1024) {
+      return 620;
+    }
+    return Math.max(320, Math.min(680, viewportWidth - 48));
+  })();
+  const floatingOverlayEnabled = viewportWidth >= 1024;
+
+  useEffect(() => {
+    const defaultPanels = createDefaultMapOverlayPanels(mapViewportSize);
+
+    setMapOverlayPanels((current) => {
+      if (!hasInitializedMapOverlayPanelsRef.current) {
+        hasInitializedMapOverlayPanelsRef.current = true;
+        return defaultPanels;
+      }
+
+      return {
+        insight: {
+          ...current.insight,
+          ...clampMapOverlayPosition(
+            current.insight.x,
+            current.insight.y,
+            mapViewportSize,
+            mapViewportSize,
+            mapOverlayPanelRefs.current.insight?.offsetWidth ?? MAP_OVERLAY_PANEL_META.insight.width,
+            mapOverlayPanelRefs.current.insight?.offsetHeight ?? 260
+          ),
+        },
+        legend: {
+          ...current.legend,
+          ...clampMapOverlayPosition(
+            current.legend.x,
+            current.legend.y,
+            mapViewportSize,
+            mapViewportSize,
+            mapOverlayPanelRefs.current.legend?.offsetWidth ?? MAP_OVERLAY_PANEL_META.legend.width,
+            mapOverlayPanelRefs.current.legend?.offsetHeight ?? 220
+          ),
+        },
+      };
+    });
+  }, [mapViewportSize]);
 
   const getHeroLabel = (heroName: string, fallbackKey: number): string => {
     const heroData = getHeroByName(heroName || '');
     return heroData?.chineseName || heroName?.replace('npc_dota_hero_', '') || `英雄 ${fallbackKey}`;
-  };
-
-  const getHudHeroLabel = (heroName: string): string => {
-    const heroData = getHeroByName(heroName || '');
-    return heroData?.chineseName || heroName?.replace('npc_dota_hero_', '') || heroName || '未知英雄';
   };
 
   const getHudTeamLabel = (team: string): string => {
@@ -850,64 +2010,257 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     return Math.round(value).toLocaleString();
   };
 
-  const renderTeamPortraitStrip = (heroes: TeamHeroPortrait[], team: 'radiant' | 'dire') => {
-    const slots = Array.from({ length: TEAM_HERO_COUNT }, (_, index) => heroes[index] ?? null);
+  const formatHudStatValue = (value: number): string => {
+    if (!Number.isFinite(value)) {
+      return '-';
+    }
+
+    const absolute = Math.abs(value);
+    if (absolute >= 1000000) {
+      return `${(value / 1000000).toFixed(1).replace(/\.0$/, '')}m`;
+    }
+    if (absolute >= 10000) {
+      return `${(value / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    }
+    return Math.round(value).toLocaleString();
+  };
+
+  const normalizeHeroLookupKey = (heroName: string): string =>
+    heroName.replace('npc_dota_hero_', '').toLowerCase().replace(/_/g, '');
+
+  const hudMetricsByTeamHeroKey = (() => {
+    const metricsMap = new Map<string, HudHeroMetric>();
+    for (const metric of hudMetrics) {
+      const teamKey = getHudTeamLabel(metric.team) === '天辉' ? 'radiant' : 'dire';
+      metricsMap.set(`${teamKey}:${normalizeHeroLookupKey(metric.hero)}`, metric);
+    }
+    return metricsMap;
+  })();
+
+  const toggleHudHeroExpanded = useCallback((heroKey: number) => {
+    setExpandedHudHeroes((current) => ({
+      ...current,
+      [heroKey]: !current[heroKey],
+    }));
+  }, []);
+
+  const setHudLaneExpanded = useCallback(
+    (team: 'radiant' | 'dire', expanded: boolean) => {
+      const heroes = team === 'radiant' ? teamLineups.radiant : teamLineups.dire;
+      setExpandedHudHeroes((current) => {
+        const next = { ...current };
+        for (const hero of heroes) {
+          next[hero.key] = expanded;
+        }
+        return next;
+      });
+    },
+    [teamLineups]
+  );
+
+  const renderHudLane = (team: 'radiant' | 'dire') => {
+    const teamLabel = team === 'radiant' ? '天辉 HUD' : '夜魇 HUD';
+    const accentClass =
+      team === 'radiant'
+        ? 'border-emerald-500/30 bg-gradient-to-b from-emerald-950/30 via-slate-900/95 to-slate-950/95'
+        : 'border-rose-500/30 bg-gradient-to-b from-rose-950/30 via-slate-900/95 to-slate-950/95';
+    const accentTextClass = team === 'radiant' ? 'text-emerald-300' : 'text-rose-300';
+    const healthBarClass = team === 'radiant' ? 'bg-emerald-400/95' : 'bg-rose-400/95';
+    const laneHeroes = team === 'radiant' ? teamLineups.radiant : teamLineups.dire;
+    const slots = Array.from({ length: TEAM_HERO_COUNT }, (_, index) => laneHeroes[index] ?? null);
+    const expandedCount = laneHeroes.filter((hero) => hero && expandedHudHeroes[hero.key]).length;
+    const allExpanded = laneHeroes.length > 0 && expandedCount === laneHeroes.length;
 
     return (
-      <div className="pb-1">
-        <div className={`grid grid-cols-5 gap-1.5 ${team === 'dire' ? 'ml-auto' : ''}`}>
+      <div className={`rounded-2xl border p-2.5 shadow-[0_18px_48px_rgba(2,6,23,0.32)] ${accentClass}`}>
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`text-[11px] font-semibold uppercase tracking-[0.24em] ${accentTextClass}`}>
+              {teamLabel}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              默认折叠细节，优先总览 5 名英雄
+            </p>
+          </div>
+          <div className="shrink-0">
+            <div className="inline-flex items-center rounded-full border border-slate-800/80 bg-slate-950/75 p-1 shadow-[0_10px_24px_rgba(2,6,23,0.18)]">
+              <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-medium text-slate-400">
+                已展开 {expandedCount}/{laneHeroes.length || TEAM_HERO_COUNT}
+              </span>
+              <button
+                type="button"
+                onClick={() => setHudLaneExpanded(team, !allExpanded)}
+                className="rounded-full px-2.5 py-1 text-[10px] font-medium text-slate-300 transition hover:bg-slate-900/85 hover:text-slate-50"
+              >
+                {allExpanded ? '收起细节' : '展开细节'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2" data-testid={team === 'radiant' ? 'hud-radiant' : 'hud-dire'}>
           {slots.map((hero, index) => {
             if (!hero) {
               return (
                 <div
                   key={`${team}-empty-${index}`}
-                  className="aspect-[16/9] rounded-md border border-gray-700/80 bg-slate-900/70"
+                  className="h-[84px] rounded-xl border border-dashed border-slate-700/70 bg-slate-900/55"
                 />
               );
             }
 
-            const heroLabel = getHeroLabel(hero.heroName, hero.key);
-            const teamBorderClass = team === 'radiant' ? 'border-emerald-500/70' : 'border-rose-500/70';
-            const heroStatus = hudHeroStatus[hero.key];
-            const isDead = heroStatus ? !heroStatus.isAlive : false;
-            const healthPercent = Math.round(
-              clamp(heroStatus?.hpRatio ?? (isDead ? 0 : 1), 0, 1) * 100
+            const metric = hudMetricsByTeamHeroKey.get(
+              `${team}:${normalizeHeroLookupKey(hero.heroName)}`
             );
+            const heroStatus = hudHeroStatus[hero.key];
+            const heroLabel = getHeroLabel(hero.heroName, hero.key);
+            const isDead = heroStatus ? !heroStatus.isAlive : false;
+            const healthRatio = clamp(heroStatus?.hpRatio ?? (isDead ? 0 : 1), 0, 1);
+            const healthPercent = Math.round(healthRatio * 100);
             const healthCurrent = Math.max(0, Math.round(heroStatus?.hp ?? 0));
             const healthMax = Math.max(0, Math.round(heroStatus?.maxHp ?? 0));
-            const healthValueLabel = `${healthCurrent}/${healthMax}`;
+            const itemSlots = extractHudItemSlots(Array.isArray(metric?.items) ? metric.items : []);
+            const heroExpanded = Boolean(expandedHudHeroes[hero.key]);
+            const respawnLabel = isDead && typeof heroStatus?.respawnRemainingSeconds === 'number'
+              ? `${heroStatus.respawnRemainingSeconds}s 后复活`
+              : `${healthCurrent}/${healthMax} HP`;
 
             return (
               <div
                 key={hero.key}
-                className="relative pt-2"
+                className={`rounded-xl border border-slate-700/70 bg-slate-950/85 ${
+                  heroExpanded ? 'p-2' : 'p-1.5'
+                }`}
               >
-                {isDead && typeof heroStatus?.respawnRemainingSeconds === 'number' && (
-                  <span className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded-full border border-amber-300/65 bg-slate-900/95 px-2 py-[1px] text-[10px] font-semibold text-amber-200 shadow-sm">
-                    {heroStatus.respawnRemainingSeconds}s
-                  </span>
-                )}
-                <div
-                  className={`aspect-[16/9] overflow-hidden rounded-md border bg-slate-950/90 shadow-sm ${teamBorderClass}`}
-                  title={heroLabel}
-                >
-                  <img
-                    src={hero.portraitUrl}
-                    alt={heroLabel}
-                    className={`h-full w-full object-contain transition duration-200 ${isDead ? 'grayscale brightness-75' : 'grayscale-0 brightness-100'
-                      }`}
-                  />
-                </div>
-                <div className="group relative mt-1.5">
-                  <div className="h-2.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90 transition-[border-color,box-shadow] duration-150 group-hover:border-slate-500/90 group-hover:shadow-[0_0_0_1px_rgba(148,163,184,0.3),0_0_10px_rgba(15,23,42,0.55)]">
-                    <div
-                      className={`h-full transition-[width,filter,opacity] duration-150 ${team === 'radiant' ? 'bg-emerald-400/95' : 'bg-rose-400/95'} ${isDead ? 'opacity-60' : ''} group-hover:brightness-110`}
-                      style={{ width: `${healthPercent}%` }}
-                    />
+                <div className={`flex ${heroExpanded ? 'gap-2.5' : 'items-center gap-2'}`}>
+                  <div className="relative shrink-0">
+                    <div className={`overflow-hidden rounded-lg border bg-slate-950/95 ${
+                      heroExpanded ? 'h-12 w-12' : 'h-10 w-10'
+                    } ${team === 'radiant' ? 'border-emerald-500/45' : 'border-rose-500/45'}`}>
+                      <img
+                        src={hero.portraitUrl}
+                        alt={heroLabel}
+                        className={`h-full w-full object-contain ${isDead ? 'grayscale brightness-75' : ''}`}
+                      />
+                    </div>
+                    <span className="absolute -right-1.5 -top-1.5 rounded-full border border-slate-700/90 bg-slate-900/95 px-1.5 py-[1px] text-[9px] font-semibold text-slate-100 shadow-sm">
+                      Lv.{metric ? formatHudValue(metric.level) : '-'}
+                    </span>
                   </div>
-                  <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded border border-slate-500/70 bg-slate-950/95 px-1.5 py-[1px] text-[10px] font-semibold text-slate-100 opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
-                    {healthValueLabel}
-                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold text-slate-100">{heroLabel}</p>
+                        <p className={`text-[10px] ${isDead ? 'text-amber-300' : 'text-slate-400'}`}>
+                          {respawnLabel}
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="text-right">
+                          <p className="font-mono text-[11px] font-semibold text-slate-100">
+                            {metric ? `${formatHudValue(metric.kills)}/${formatHudValue(metric.deaths)}/${formatHudValue(metric.assists)}` : '-/-/-'}
+                          </p>
+                          <p className="text-[9px] uppercase tracking-[0.18em] text-slate-500">KDA</p>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid={`toggle-hud-hero-${team}-${hero.key}`}
+                          aria-expanded={heroExpanded}
+                          onClick={() => toggleHudHeroExpanded(hero.key)}
+                          className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition ${
+                            heroExpanded
+                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                              : 'border-slate-700/80 bg-slate-900/85 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                          }`}
+                        >
+                          {heroExpanded ? '收起' : '展开'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90">
+                      <div
+                        className={`h-full transition-[width,opacity] duration-200 ${healthBarClass} ${isDead ? 'opacity-60' : ''}`}
+                        style={{ width: `${healthPercent}%` }}
+                      />
+                    </div>
+
+                    {heroExpanded && (
+                      <>
+                        <div className="mt-1.5 grid grid-cols-3 gap-1 text-[9px]">
+                          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-1.5 py-1">
+                            <p className="text-slate-500">NW</p>
+                            <p
+                              className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-100"
+                              title={metric ? formatHudValue(metric.net_worth) : '-'}
+                            >
+                              {metric ? formatHudStatValue(metric.net_worth) : '-'}
+                            </p>
+                          </div>
+                          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-1.5 py-1">
+                            <p className="text-slate-500">GPM</p>
+                            <p
+                              className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-100"
+                              title={metric ? formatHudValue(metric.gpm) : '-'}
+                            >
+                              {metric ? formatHudStatValue(metric.gpm) : '-'}
+                            </p>
+                          </div>
+                          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-1.5 py-1">
+                            <p className="text-slate-500">XPM</p>
+                            <p
+                              className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-100"
+                              title={metric ? formatHudValue(metric.xpm) : '-'}
+                            >
+                              {metric ? formatHudStatValue(metric.xpm) : '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 rounded-xl border border-slate-800/70 bg-slate-950/50 p-1.5">
+                          <div className="grid gap-1.5">
+                            <div
+                              className="grid grid-cols-3 gap-1.5"
+                              data-testid={`hud-item-grid-${team}-${hero.key}-inventory`}
+                            >
+                              {itemSlots.inventory.map((itemName, itemIndex) => (
+                                <ItemSlot
+                                  key={`${hero.key}-inventory-${itemName || 'empty'}-${itemIndex}`}
+                                  slotId={`${hero.key}-inventory-${itemIndex}`}
+                                  itemName={itemName ?? undefined}
+                                  sizeClass="w-full aspect-[5/4]"
+                                  variant="inventory"
+                                />
+                              ))}
+                            </div>
+
+                            <div
+                              className="grid grid-cols-4 gap-1.5"
+                              data-testid={`hud-item-grid-${team}-${hero.key}-backpack`}
+                            >
+                              {itemSlots.backpack.map((itemName, itemIndex) => (
+                                <ItemSlot
+                                  key={`${hero.key}-backpack-${itemName || 'empty'}-${itemIndex}`}
+                                  slotId={`${hero.key}-backpack-${itemIndex}`}
+                                  itemName={itemName ?? undefined}
+                                  sizeClass="w-full aspect-[5/4]"
+                                  variant="backpack"
+                                />
+                              ))}
+                              <ItemSlot
+                                slotId={`${hero.key}-neutral`}
+                                itemName={itemSlots.neutral ?? undefined}
+                                enhancementName={itemSlots.enhancement ?? undefined}
+                                sizeClass="w-full aspect-[5/4]"
+                                variant="neutral"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -917,376 +2270,1196 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     );
   };
 
-  return (
-    <div className="min-h-screen bg-dota-bg p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-dota-gold mb-2">
-          录像回放查看器
-        </h1>
-        <p className="text-gray-400 mb-6">
-          查看解析后的 .dem 录像数据
-        </p>
+  const setMapOverlayOpen = useCallback((key: MapOverlayPanelKey, open: boolean) => {
+    if (!open && mapOverlayDragStateRef.current?.key === key) {
+      mapOverlayDragStateRef.current = null;
+      setDraggingMapOverlayPanel(null);
+    }
 
-        {replayEntryContext?.source === 'match_database' && (
-          <div className="mb-6 rounded-lg border border-cyan-500/50 bg-cyan-900/20 px-4 py-3 text-sm text-cyan-100">
-            <p>
-              来自比赛数据库 · match_id：<span className="font-mono">{replayEntryContext.matchId}</span>
-            </p>
-            {replaySourceStatusText && (
-              <p className="mt-1 text-cyan-200">
-                下载状态: <span className="font-mono">{replaySourceStatusText}</span>
+    setMapOverlayPanels((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        open,
+      },
+    }));
+  }, []);
+
+  const toggleMapOverlayOpen = useCallback((key: MapOverlayPanelKey) => {
+    setMapOverlayPanels((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        open: !current[key].open,
+      },
+    }));
+  }, []);
+
+  const hideAllMapOverlays = useCallback(() => {
+    setMapOverlayPanels((current) => ({
+      insight: {
+        ...current.insight,
+        open: false,
+      },
+      legend: {
+        ...current.legend,
+        open: false,
+      },
+    }));
+  }, []);
+
+  const restoreDefaultMapOverlays = useCallback(() => {
+    setMapOverlayPanels(createDefaultMapOverlayPanels(mapViewportSize));
+  }, [mapViewportSize]);
+
+  const resetMapOverlayPositions = useCallback(() => {
+    const defaultPanels = createDefaultMapOverlayPanels(mapViewportSize);
+
+    setMapOverlayPanels((current) => ({
+      insight: {
+        ...defaultPanels.insight,
+        open: current.insight.open,
+      },
+      legend: {
+        ...defaultPanels.legend,
+        open: current.legend.open,
+      },
+    }));
+  }, [mapViewportSize]);
+
+  const handleMapOverlayPointerDown = useCallback((
+    key: MapOverlayPanelKey,
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const container = mapOverlayContainerRef.current;
+    const panel = mapOverlayPanelRefs.current[key];
+    if (!container || !panel) {
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+
+    mapOverlayDragStateRef.current = {
+      key,
+      offsetX: event.clientX - panelRect.left,
+      offsetY: event.clientY - panelRect.top,
+      containerRect,
+      panelWidth: panelRect.width,
+      panelHeight: panelRect.height,
+    };
+    setDraggingMapOverlayPanel(key);
+  }, []);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragState = mapOverlayDragStateRef.current;
+      if (!dragState) {
+        return;
+      }
+
+      const nextPosition = clampMapOverlayPosition(
+        event.clientX - dragState.containerRect.left - dragState.offsetX,
+        event.clientY - dragState.containerRect.top - dragState.offsetY,
+        dragState.containerRect.width,
+        dragState.containerRect.height,
+        dragState.panelWidth,
+        dragState.panelHeight
+      );
+
+      setMapOverlayPanels((current) => ({
+        ...current,
+        [dragState.key]: {
+          ...current[dragState.key],
+          ...nextPosition,
+        },
+      }));
+    };
+
+    const handlePointerUp = () => {
+      if (!mapOverlayDragStateRef.current) {
+        return;
+      }
+
+      mapOverlayDragStateRef.current = null;
+      setDraggingMapOverlayPanel(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!floatingOverlayEnabled) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        (
+          activeElement.isContentEditable ||
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.tagName === 'SELECT'
+        )
+      ) {
+        return;
+      }
+
+      setMapOverlayPanels((current) => {
+        if (!current.insight.open && !current.legend.open) {
+          return current;
+        }
+
+        return {
+          insight: {
+            ...current.insight,
+            open: false,
+          },
+          legend: {
+            ...current.legend,
+            open: false,
+          },
+        };
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [floatingOverlayEnabled]);
+
+  const visualizationRangeOptions: Array<{ value: VisualizationRangePreset; label: string }> = [
+    { value: 'full', label: '整场' },
+    { value: 'opening5', label: '对线前 5 分钟' },
+    { value: 'opening10', label: '对线前 10 分钟' },
+    { value: 'opening15', label: '前 15 分钟' },
+    { value: 'midgame15to25', label: '15 到 25 分钟' },
+    { value: 'custom', label: '自定义区间' },
+  ];
+
+  const activeHeatmapLabel =
+    heatmapType === 'none'
+      ? '关闭'
+      : heatmapType === 'movement'
+        ? '移动热力图'
+        : heatmapType === 'kill'
+          ? '击杀热力图'
+          : '死亡热力图';
+
+  const activeRangeLabel =
+    heatmapRangePreset === 'custom'
+      ? `${heatmapCustomRange.start} 到 ${heatmapCustomRange.end}`
+      : visualizationRangeOptions.find((option) => option.value === heatmapRangePreset)?.label ?? '整场';
+
+  const pathHeroOptions = [...teamLineups.radiant, ...teamLineups.dire].map((hero) => ({
+    value: hero.heroName,
+    label: getHeroLabel(hero.heroName, hero.key),
+  }));
+
+  const heatmapHeroOptions = pathHeroOptions;
+  const activeOverlayMeta = OVERLAY_MODE_META[heatmapType];
+  const heatmapFocusLabel = heatmapHeroFilter !== 'all'
+    ? heatmapHeroOptions.find((option) => option.value === heatmapHeroFilter)?.label ?? '单英雄'
+    : getTeamPerspectiveLabel(
+      heatmapSummary?.team ??
+      (heatmapTeamFilter === 'radiant' ? 2 : heatmapTeamFilter === 'dire' ? 3 : null)
+    );
+  const effectiveHeatmapRange = heatmapSummary?.timeRange ?? {
+    start: timelineMinTime,
+    end: timelineMaxTime,
+  };
+  const pathFocusLabel =
+    pathHeroFilter === 'all'
+      ? `${pathSummary?.heroCount ?? 0} 名英雄`
+      : pathHeroOptions.find((option) => option.value === pathHeroFilter)?.label ?? '单英雄';
+  const pathCompressionLabel = pathSummary?.simplification.enabled
+    ? `${Math.round((pathSummary.simplification.reduction_ratio ?? 0) * 100)}%`
+    : '未压缩';
+  const activeHeatmapHeroName =
+    heatmapType !== 'none' && heatmapHeroFilter !== 'all' ? heatmapHeroFilter : null;
+  const activePathHeroName =
+    showPaths && pathHeroFilter !== 'all' ? pathHeroFilter : null;
+  const mapFocusHeroName = activePathHeroName ?? activeHeatmapHeroName;
+  const mapFocusHeroLabel = mapFocusHeroName
+    ? pathHeroOptions.find((option) => option.value === mapFocusHeroName)?.label ?? '单英雄'
+    : null;
+  const mapFocusSourceLabel = activePathHeroName ? '路径分析' : activeHeatmapHeroName ? '热力图' : null;
+  const isAnalysisOverlayActive = heatmapType !== 'none' || showPaths;
+  const isMapDeclutterActive = cleanMapForHeroFocus && isAnalysisOverlayActive;
+  const visibleHeroPositions = isMapDeclutterActive ? [] : heroPositions;
+  const visibleWards = isMapDeclutterActive ? [] : wards;
+  const visibleKillMarkers = isMapDeclutterActive ? [] : activeKillMarkers;
+  const anyMapOverlayOpen = mapOverlayPanels.insight.open || mapOverlayPanels.legend.open;
+
+  const renderMapIntegratedOverlay = () => {
+    if (!floatingOverlayEnabled) {
+      return null;
+    }
+
+    const renderFloatingPanel = (
+      key: MapOverlayPanelKey,
+      accentClassName: string,
+      content: ReactNode
+    ) => {
+      const panelState = mapOverlayPanels[key];
+      if (!panelState.open) {
+        return null;
+      }
+
+      return (
+        <div
+          ref={(node) => {
+            mapOverlayPanelRefs.current[key] = node;
+          }}
+          data-testid={`map-overlay-panel-${key}`}
+          className={`absolute overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-950/86 backdrop-blur-md ${
+            draggingMapOverlayPanel === key
+              ? 'z-30 shadow-[0_22px_60px_rgba(8,15,34,0.58)]'
+              : 'z-20 shadow-[0_16px_36px_rgba(2,6,23,0.45)]'
+          }`}
+          style={{
+            left: panelState.x,
+            top: panelState.y,
+            width: MAP_OVERLAY_PANEL_META[key].width,
+          }}
+        >
+          <div
+            data-testid={`map-overlay-drag-handle-${key}`}
+            onPointerDown={(event) => handleMapOverlayPointerDown(key, event)}
+            className="flex cursor-grab items-start justify-between gap-3 border-b border-slate-800/90 bg-slate-950/95 px-3 py-2.5 active:cursor-grabbing"
+          >
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${accentClassName}`}>
+                {MAP_OVERLAY_PANEL_META[key].title}
               </p>
-            )}
+              <p className="mt-1 text-[10px] text-slate-500">拖动标题栏可移动，右侧可随时隐藏。</p>
+            </div>
+            <button
+              type="button"
+              aria-label={`隐藏${MAP_OVERLAY_PANEL_META[key].title}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => setMapOverlayOpen(key, false)}
+              className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-[10px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+            >
+              隐藏
+            </button>
           </div>
-        )}
 
-        {replayEntryContext?.source === 'replay_library' && (
-          <div className="mb-6 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-100">
-            来自回放库 · match_id：<span className="font-mono">{replayEntryContext.matchId}</span>
-          </div>
-        )}
+          <div className="p-3">{content}</div>
+        </div>
+      );
+    };
 
-        {error && (
-          <div className="bg-red-900/20 border border-red-700 p-4 rounded mb-6">
-            <p className="text-red-400">{error}</p>
-          </div>
-        )}
+    return (
+      <>
+        {renderFloatingPanel(
+          'insight',
+          'text-cyan-300/85',
+          <>
+            <p className="text-sm font-semibold text-slate-100">{activeOverlayMeta.title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-300">{activeOverlayMeta.description}</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 space-y-4">
-            <div className="card p-4">
-              <h3 className="text-lg font-medium mb-3">选择比赛</h3>
-
-              {matches.length === 0 ? (
-                <div className="text-gray-400 text-sm">
-                  <p className="mb-2">暂无已解析的比赛</p>
-                  <p className="text-xs">请先解析 .dem 文件:</p>
-                  <a
-                    href="http://localhost:8000/docs"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-dota-accent hover:underline text-xs"
-                  >
-                    http://localhost:8000/docs
-                  </a>
-                </div>
-              ) : (
-                <select
-                  value={selectedMatch || ''}
-                  onChange={(e) => setSelectedMatch(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-dota-bg border border-gray-600 rounded text-white"
-                >
-                  {matches.map((match) => (
-                    <option key={match.match_id} value={match.match_id}>
-                      比赛 {match.match_id}
-                      {match.radiant_win !== undefined &&
-                        ` - ${match.radiant_win ? '天辉' : '夜魇'}胜`}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {matches.length > 0 && (
-                <button
-                  onClick={loadMatches}
-                  className="mt-2 w-full px-3 py-1 bg-dota-primary text-white rounded text-sm hover:bg-blue-800"
-                >
-                  刷新列表
-                </button>
-              )}
+            <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2">
+                <p className="text-slate-500">统计对象</p>
+                <p className="mt-1 font-semibold text-slate-100">{activeOverlayMeta.filterLabel}</p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2">
+                <p className="text-slate-500">当前聚焦</p>
+                <p className="mt-1 font-semibold text-slate-100">{heatmapFocusLabel}</p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2">
+                <p className="text-slate-500">样本量</p>
+                <p className="mt-1 font-semibold text-slate-100">
+                  {heatmapSummary ? formatHudValue(heatmapSummary.totalSamples) : '未启用'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2">
+                <p className="text-slate-500">时间范围</p>
+                <p className="mt-1 font-semibold text-slate-100">
+                  {formatGameClockTime(effectiveHeatmapRange.start)} 到 {formatGameClockTime(effectiveHeatmapRange.end)}
+                </p>
+              </div>
             </div>
 
-            <div className="card p-4">
-              <h3 className="text-lg font-medium mb-3">当前状态</h3>
-              <div className="text-sm text-gray-400 space-y-2">
-                <div className="flex justify-between">
-                  <span>时间基准来源:</span>
-                  <span className="text-white font-mono">{timeBasisSource}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>映射策略:</span>
-                  <span className="text-white font-mono">{timeBasisStrategy}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>偏移秒数:</span>
-                  <span className="text-white font-mono">{timeBasisOffsetSeconds.toFixed(2)}s</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>当前时间:</span>
-                  <span className="text-white font-mono">
-                    {currentGameClockLabel}
+            {heatmapType !== 'none' && (
+              <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-slate-500">{activeOverlayMeta.densityLabel}</p>
+                    <p className="mt-1 text-xs text-slate-300">蓝色稀疏，红色最密集</p>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-100">
+                    峰值 {heatmapSummary ? formatHudValue(heatmapSummary.maxDensity) : '-'}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>暂停状态:</span>
-                  <span className={`font-medium ${isPauseActive ? 'text-amber-300' : 'text-emerald-300'}`}>
-                    {isPauseActive ? '暂停中' : '进行中'}
-                  </span>
+                <div className="mt-2 h-2 rounded-full bg-[linear-gradient(90deg,#2563eb_0%,#06b6d4_35%,#fde047_70%,#ef4444_100%)]" />
+              </div>
+            )}
+
+            {showPaths && (
+              <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-2 text-[11px]">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold text-cyan-100">路径分析</p>
+                  <span className="text-cyan-200/80">压缩 {pathCompressionLabel}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>比赛时长:</span>
-                  <span className="text-white font-mono">
-                    {formatGameClockTime(Math.max(0, gameClockMapperRef.current.sourceToGameClock(timelineMaxTime)))}
-                  </span>
+                <p className="mt-1 text-cyan-50/85">
+                  当前展示 {pathFocusLabel} 在所选时间段内的完整移动轨迹。
+                </p>
+              </div>
+            )}
+
+            {isMapDeclutterActive && (
+              <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/8 px-2.5 py-2 text-[11px] text-amber-100">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold">分析视图净化中</p>
+                  <span className="text-amber-200/80">{mapFocusSourceLabel ?? activeOverlayMeta.title}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>已缓存 Tick:</span>
-                  <span className="text-white">{allTicksRef.current.length}</span>
+                <p className="mt-1 text-amber-50/90">
+                  {mapFocusHeroLabel
+                    ? `当前专注 ${mapFocusHeroLabel}，已隐藏英雄头像、眼位和死亡爆点，方便直接读主图层。`
+                    : '当前已隐藏英雄头像、眼位和死亡爆点，让热力图与路径层更清晰。'}
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {renderFloatingPanel(
+          'legend',
+          'text-slate-400',
+          <div className="space-y-2 text-[11px] text-slate-200">
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 rounded-full border border-white/80 bg-emerald-400" />
+              <span>英雄头像/圆点：当前仍存活的实时位置</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 rounded-full border border-emerald-300 bg-yellow-300" />
+              <span>假眼：当前仍存在的 Observer Ward</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 rotate-45 border border-rose-300 bg-indigo-300" />
+              <span>真眼：当前仍存在的 Sentry Ward</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 rounded-full bg-rose-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
+              <span>红色爆点：最近 5 秒的死亡位置</span>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2 text-slate-300">
+              热力图颜色仍然遵循同一条密度带：蓝色稀疏，红色最密集。
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-dota-bg px-4 py-4 lg:px-6">
+      <div className="mx-auto max-w-[1660px] space-y-3">
+        <div className="rounded-3xl border border-slate-800/90 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.92),_rgba(7,10,21,0.98))] p-2.5 shadow-[0_18px_42px_rgba(2,6,23,0.38)]">
+          <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-center">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <h1 className="text-lg font-bold text-dota-gold">录像主工作区</h1>
+                    {selectedMatch && (
+                      <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-[10px] font-mono text-slate-200">
+                        match_id {selectedMatch}
+                      </span>
+                    )}
+                    {selectedMatchRecord?.radiant_win !== undefined && (
+                      <span className={`rounded-full border px-2.5 py-0.5 text-[10px] ${
+                        selectedMatchRecord.radiant_win
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                          : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                      }`}>
+                        {selectedMatchRecord.radiant_win ? '天辉胜利' : '夜魇胜利'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>英雄数:</span>
-                  <span className="text-white">{heroPositions.length}</span>
+
+                <div className="flex flex-wrap gap-1.5 text-[10px]">
+                  {(replayEntryContext?.source === 'match_database' || replayEntryContext?.source === 'replay_library') && (
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 ${
+                        replayEntryContext?.source === 'match_database'
+                          ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
+                          : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                      }`}
+                    >
+                      {replayEntryContext?.source === 'match_database'
+                        ? `比赛数据库${replaySourceStatusText ? ` · ${replaySourceStatusText}` : ''}`
+                        : '本地回放库'}
+                    </span>
+                  )}
+                  {timeBasisSource === 'fallback' && (
+                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-amber-200">
+                      回退时间基准
+                    </span>
+                  )}
+                  {isReparseTaskActive && reparseTask && (
+                    <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-0.5 text-cyan-200">
+                      重新解析 {Math.round(reparseTask.progress ?? 0)}%
+                    </span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span>眼位数:</span>
-                  <span className="text-white">{wards.length}</span>
-                </div>
-                {heroPositions.length > 0 && (
-                  <div className="border-t border-gray-600 pt-2 mt-2">
-                    <p className="text-xs text-gray-500">
-                      天辉: {heroPositions.filter(h => h.team === 'radiant').length} |
-                      夜魇: {heroPositions.filter(h => h.team === 'dire').length}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      假眼: {wards.filter(w => w.type === 'observer').length} |
-                      真眼: {wards.filter(w => w.type === 'sentry').length}
+              </div>
+
+              {selectedMatchRecord && (
+                <div className="flex flex-wrap items-center gap-1.5 xl:max-w-[760px]">
+                  <div className="min-w-0 flex-1 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5">
+                    <p className="truncate text-[11px] font-semibold text-white">
+                      {selectedMatchRecord.radiant_team || '天辉'}
                     </p>
                   </div>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-800/80 bg-slate-950/70 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    VS
+                  </div>
+                  <div className="min-w-0 flex-1 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-1.5">
+                    <p className="truncate text-[11px] font-semibold text-white">
+                      {selectedMatchRecord.dire_team || '夜魇'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                {selectedReplayFileName && (
+                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
+                    replay {selectedReplayFileName}
+                  </span>
+                )}
+                {selectedMatchDetail?.parse_status && (
+                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
+                    解析 {selectedMatchDetail.parse_status}
+                  </span>
+                )}
+                {selectedMatchRecord?.parsed_at && (
+                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
+                    最近解析 {new Date(selectedMatchRecord.parsed_at).toLocaleDateString()}
+                  </span>
                 )}
               </div>
             </div>
 
-            {heroPositions.length > 0 && (
-              <div className="card p-4">
-                <h3 className="text-lg font-medium mb-3">英雄</h3>
-                <div className="space-y-1 text-xs">
-                  {heroPositions.map((hero) => (
-                    <div
-                      key={hero.hero_id}
-                      className={`flex justify-between items-center py-1 px-2 rounded ${hero.team === 'radiant' ? 'bg-green-900/30' : 'bg-red-900/30'
-                        }`}
+            <div className="w-full xl:max-w-[320px] xl:justify-self-end">
+              <div className="rounded-xl border border-slate-700/80 bg-slate-950/70 p-2">
+                {matches.length === 0 ? (
+                  <div className="text-xs text-slate-400">
+                    暂无已解析的比赛。
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedMatch || ''}
+                      onChange={(e) => {
+                        const nextMatchId = Number(e.target.value);
+                        selectedMatchRef.current = nextMatchId;
+                        preferredMatchIdRef.current = nextMatchId;
+                        setReplayContextWarning(null);
+                        setSelectedMatch(nextMatchId);
+                      }}
+                      className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-white focus:border-cyan-500 focus:outline-none"
                     >
-                      <span className="truncate" title={hero.hero_name}>
-                        {(() => {
-                          const heroData = getHeroByName(hero.hero_name || '');
-                          return heroData?.chineseName || hero.hero_name?.replace('npc_dota_hero_', '') || `英雄 ${hero.hero_id}`;
-                        })()}
-                      </span>
-                      <span className="text-gray-400">
-                        Lv.{hero.level}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                      {matches.map((match) => (
+                        <option key={match.match_id} value={match.match_id}>
+                          比赛 {match.match_id}
+                          {match.radiant_win !== undefined &&
+                            ` · ${match.radiant_win ? '天辉' : '夜魇'}胜`}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={loadMatches}
+                      className="shrink-0 rounded-full border border-cyan-500/50 bg-cyan-600/15 px-2.5 py-1 text-[10px] font-medium text-cyan-100 transition hover:bg-cyan-500/25"
+                    >
+                      刷新
+                    </button>
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
+
+          {replayContextWarning && (
+            <div className="mt-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              {replayContextWarning}
+            </div>
+          )}
+
+          {hasLegacyItemSlotWarning && (
+            <div className="mt-2 flex flex-wrap items-start justify-between gap-2 rounded-2xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">旧版物品槽解析</p>
+                <p className="mt-1 font-medium text-amber-50">
+                  当前录像很可能仍是旧版解析结果，背包/中立槽位可能不完全准确。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleReparseCurrentMatch()}
+                disabled={!selectedReplayPath || isReparseTaskActive}
+                className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+                  !selectedReplayPath || isReparseTaskActive
+                    ? 'cursor-not-allowed border-slate-700 bg-slate-900 text-slate-500'
+                    : 'border-amber-400/50 bg-amber-500/10 text-amber-100 hover:border-amber-300/70'
+                }`}
+              >
+                {isReparseTaskActive ? '重新解析中...' : '重新解析当前录像'}
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 rounded-2xl border border-red-700/70 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-3xl border border-slate-800/90 bg-gradient-to-b from-slate-900/95 via-slate-950/98 to-slate-950 p-3.5 shadow-[0_24px_60px_rgba(2,6,23,0.5)]">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">Map Workspace</p>
+                <span className="sr-only">地图视图</span>
+                <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-[11px] text-slate-300">
+                  HUD / 热力图 / 路径 / 时间轴
+                </span>
+                <button
+                  type="button"
+                  data-testid="toggle-map-workbench"
+                  onClick={() => setMapWorkbenchExpanded((current) => !current)}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+                    mapWorkbenchExpanded
+                      ? 'border-amber-500/45 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
+                      : 'border-cyan-500/55 bg-cyan-500/15 text-cyan-50 shadow-[0_10px_28px_rgba(34,211,238,0.18)] hover:border-cyan-300/70'
+                  }`}
+                >
+                  {mapWorkbenchExpanded ? '工作台已展开 · 点击收起' : '工作台已折叠 · 点击展开'}
+                </button>
+              </div>
+              <h2 className="mt-1 text-base font-semibold text-slate-100">
+                地图主工作台
+                <span className="sr-only">地图与 HUD 一体化分析</span>
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                默认只保留地图与 HUD 总览，需要调整热力图、路径或重解析时再展开控制台。
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span>蓝色稀疏</span>
+              <div className="h-2 w-24 rounded-full bg-[linear-gradient(90deg,#2563eb_0%,#06b6d4_35%,#fde047_70%,#ef4444_100%)]" />
+              <span>红色最密</span>
+            </div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+              热力图 {activeHeatmapLabel}
+            </span>
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+              时间范围 {activeRangeLabel}
+            </span>
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+              路径 {showPaths ? '开启' : '关闭'}
+            </span>
+            {selectedMatch && !mapWorkbenchExpanded && (
+              <span className="text-slate-500">
+                当前已折叠地图控制区，保持主地图优先。
+              </span>
             )}
           </div>
 
-          <div className="lg:col-span-3 space-y-4">
-            <div className="card p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium">地图视图</h2>
-                <div className="flex items-center gap-4">
-                  {timeBasisSource === 'fallback' && (
-                    <span className="px-2 py-1 rounded border border-amber-500/60 bg-amber-900/25 text-amber-300 text-xs">
-                      回退模式
+          <div className="mb-3 flex flex-wrap gap-2 text-xs">
+            {loading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">回放数据加载中...</span>}
+            {hudMetricsLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">HUD 同步中...</span>}
+            {heatmapLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">热力图加载中...</span>}
+            {pathLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">路径分析加载中...</span>}
+            {heatmapError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">{heatmapError}</span>}
+            {pathError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">{pathError}</span>}
+            {hudMetricsError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">{hudMetricsError}</span>}
+            {hudMetricsWarnings.map((warning) => (
+              <span
+                key={warning}
+                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200"
+              >
+                {warning}
+              </span>
+            ))}
+            {reparseFeedback && (
+              <span className={`rounded-full border px-3 py-1 ${
+                reparseFeedback.type === 'error'
+                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                  : reparseFeedback.type === 'success'
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                    : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100'
+              }`}>
+                {reparseFeedback.message}
+              </span>
+            )}
+            {reparseTask && !mapWorkbenchExpanded && (
+              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+                重新解析 {reparseTask.status} · {Math.round(reparseTask.progress ?? 0)}%
+              </span>
+            )}
+          </div>
+
+          {selectedMatch && mapWorkbenchExpanded && (
+            <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(280px,0.9fr)]">
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">热力图层</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      将位置采样、击杀或阵亡密度叠加到主地图，并明确当前统计口径。
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-[11px] text-slate-300">
+                    {activeOverlayMeta.title}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {([
+                    { key: 'none' as const, label: '关闭' },
+                    { key: 'movement' as const, label: '移动' },
+                    { key: 'kill' as const, label: '击杀' },
+                    { key: 'death' as const, label: '死亡' },
+                  ] as const).map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => setHeatmapType(option.key)}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                        heatmapType === option.key
+                          ? 'border-dota-gold/50 bg-dota-gold/15 text-dota-gold'
+                          : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  <select
+                    data-testid="heatmap-range-select"
+                    value={heatmapRangePreset}
+                    onChange={(event) => setHeatmapRangePreset(event.target.value as VisualizationRangePreset)}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    {visualizationRangeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        时间范围：{option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid="heatmap-hero-select"
+                    value={heatmapHeroFilter}
+                    onChange={(event) => setHeatmapHeroFilter(event.target.value)}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    <option value="all">全部英雄</option>
+                    {heatmapHeroOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        英雄：{option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={heatmapTeamFilter}
+                    onChange={(event) => setHeatmapTeamFilter(event.target.value as 'all' | 'radiant' | 'dire')}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    <option value="all">全部队伍</option>
+                    <option value="radiant">天辉</option>
+                    <option value="dire">夜魇</option>
+                  </select>
+                </div>
+
+                {heatmapRangePreset === 'custom' && (
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <label className="rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-200">
+                      <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-slate-500">开始时间</span>
+                      <input
+                        type="text"
+                        data-testid="heatmap-range-start"
+                        value={heatmapCustomRange.start}
+                        onChange={(event) => setHeatmapCustomRange((current) => ({ ...current, start: event.target.value }))}
+                        placeholder="-1:30"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                      />
+                    </label>
+                    <label className="rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-200">
+                      <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-slate-500">结束时间</span>
+                      <input
+                        type="text"
+                        data-testid="heatmap-range-end"
+                        value={heatmapCustomRange.end}
+                        onChange={(event) => setHeatmapCustomRange((current) => ({ ...current, end: event.target.value }))}
+                        placeholder="12:00"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                      />
+                    </label>
+                    <p className="md:col-span-2 text-xs text-slate-500">
+                      输入比赛时钟，例如 `0:00`、`12:30`、`-1:30`。不带冒号时按分钟处理，如 `18` 表示 18:00。
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 text-sm text-slate-300">
+                  <p className="font-medium text-slate-100">{activeOverlayMeta.description}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      统计对象：{activeOverlayMeta.filterLabel}
                     </span>
-                  )}
-                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showCalibration}
-                      onChange={(e) => setShowCalibration(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>显示校准标记</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showPaths}
-                      onChange={(e) => setShowPaths(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>移动轨迹</span>
-                  </label>
-                  {loading && (
-                    <span className="text-sm text-gray-400 animate-pulse">加载中...</span>
-                  )}
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      聚焦：{heatmapHeroFilter === 'all' ? getTeamPerspectiveLabel(heatmapTeamFilter === 'radiant' ? 2 : heatmapTeamFilter === 'dire' ? 3 : null) : heatmapHeroOptions.find((option) => option.value === heatmapHeroFilter)?.label ?? '单英雄'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="mx-auto w-full max-w-[900px]">
-                <div className="mb-4 rounded-lg border border-slate-700/80 bg-gradient-to-b from-slate-900/85 to-slate-950/75 px-3 py-3">
-                  <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-                    <div className="min-w-0">{renderTeamPortraitStrip(teamLineups.radiant, 'radiant')}</div>
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">路径与校准</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      轨迹线只压缩冗余点，不改变大轮廓，可按英雄和时间段查看。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaths((current) => !current)}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                      showPaths
+                        ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-200'
+                        : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                    }`}
+                  >
+                    {showPaths ? '路径分析已开启' : '开启路径分析'}
+                  </button>
+                </div>
 
-                    <div className="mx-auto">
-                      <div className="relative overflow-hidden rounded-xl border border-slate-400/25 bg-gradient-to-b from-slate-700/55 to-slate-900/80 px-4 py-2 shadow-[0_0_0_1px_rgba(148,163,184,0.14),0_8px_24px_rgba(2,6,23,0.5)]">
-                        <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-white/10" />
-                        <p className="text-center text-[10px] uppercase tracking-[0.22em] text-slate-300/75">
-                          游戏时间
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  <select
+                    data-testid="path-hero-select"
+                    value={pathHeroFilter}
+                    onChange={(event) => setPathHeroFilter(event.target.value)}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    <option value="all">路径：全部英雄</option>
+                    {pathHeroOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        路径：{option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid="path-range-select"
+                    value={pathRangePreset}
+                    onChange={(event) => setPathRangePreset(event.target.value as VisualizationRangePreset)}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    {visualizationRangeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        路径范围：{option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={pathSimplify}
+                      onChange={(event) => setPathSimplify(event.target.checked)}
+                      className="rounded"
+                    />
+                    简化轨迹
+                  </label>
+                  <select
+                    value={pathEpsilon}
+                    onChange={(event) => setPathEpsilon(Number(event.target.value))}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    {[50, 100, 200].map((value) => (
+                      <option key={value} value={value}>
+                        压缩强度 epsilon {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {pathRangePreset === 'custom' && (
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <label className="rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-200">
+                      <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-slate-500">路径开始</span>
+                      <input
+                        type="text"
+                        data-testid="path-range-start"
+                        value={pathCustomRange.start}
+                        onChange={(event) => setPathCustomRange((current) => ({ ...current, start: event.target.value }))}
+                        placeholder="-1:30"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                      />
+                    </label>
+                    <label className="rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-200">
+                      <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-slate-500">路径结束</span>
+                      <input
+                        type="text"
+                        data-testid="path-range-end"
+                        value={pathCustomRange.end}
+                        onChange={(event) => setPathCustomRange((current) => ({ ...current, end: event.target.value }))}
+                        placeholder="12:00"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      路径对象：{pathFocusLabel}
+                    </span>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      压缩率：{pathCompressionLabel}
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-[11px] text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={showCalibration}
+                      onChange={(event) => setShowCalibration(event.target.checked)}
+                      className="rounded"
+                    />
+                    调试校准
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">状态与提醒</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      在这里执行刷新、重新解析，并检查当前加载状态。
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRefreshCurrentMatch}
+                      disabled={!selectedMatch || loading}
+                      className={`rounded-full border px-3 py-1 text-[11px] transition ${
+                        !selectedMatch || loading
+                          ? 'cursor-not-allowed border-slate-700 bg-slate-950/75 text-slate-500'
+                          : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                      }`}
+                    >
+                      刷新当前比赛
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleReparseCurrentMatch()}
+                      disabled={!selectedReplayPath || isReparseTaskActive}
+                      className={`rounded-full border px-3 py-1 text-[11px] transition ${
+                        !selectedReplayPath || isReparseTaskActive
+                          ? 'cursor-not-allowed border-slate-700 bg-slate-950/75 text-slate-500'
+                          : 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100 hover:border-cyan-400/65'
+                      }`}
+                    >
+                      {isReparseTaskActive ? '重新解析中...' : '重新解析当前录像'}
+                    </button>
+                  </div>
+                </div>
+
+                <label className="mt-3 flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-3 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    data-testid="toggle-map-declutter"
+                    checked={cleanMapForHeroFocus}
+                    onChange={(event) => setCleanMapForHeroFocus(event.target.checked)}
+                    className="mt-1 rounded"
+                  />
+                  <span>
+                    <span className="block font-medium text-slate-100">分析图层开启时自动净化地图</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-400">
+                      自动隐藏英雄头像、眼位和死亡爆点，让热区和轨迹成为主视图。
+                    </span>
+                  </span>
+                </label>
+
+                {reparseTask && (
+                  <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+                      <span>重新解析任务 {reparseTask.task_id.slice(0, 8)}</span>
+                      <span className="font-mono text-slate-100">
+                        {reparseTask.status} · {Math.round(reparseTask.progress ?? 0)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-950">
+                      <div
+                        className="h-full rounded-full bg-cyan-400 transition-[width] duration-300"
+                        style={{ width: `${Math.max(4, Math.min(100, Math.round(reparseTask.progress ?? 0)))}%` }}
+                      />
+                    </div>
+                    {selectedReplayPath && (
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        目标文件：{selectedReplayPath}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div
+            className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-[248px_minmax(0,1fr)_248px]"
+            data-testid="hud-metrics-panel"
+          >
+            <div className="order-2">
+              {renderHudLane('radiant')}
+            </div>
+
+            <div className="order-1 xl:col-span-2 2xl:col-span-1 2xl:order-2 space-y-4">
+              <div className="rounded-3xl border border-slate-800/80 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.48),_rgba(2,6,23,0.96))] p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">主地图</p>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                      {selectedMatch ? `比赛 ${selectedMatch} 分析视图` : '等待选择比赛'}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-400">{activeOverlayMeta.description}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-cyan-50">
+                        比赛时钟 {currentGameClockLabel}
+                      </span>
+                      <span
+                        className={`rounded-full border px-3 py-1.5 ${
+                          isPauseActive
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
+                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
+                        }`}
+                      >
+                        {isPauseActive ? '处于暂停区间' : '比赛进行中'}
+                      </span>
+                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        比赛时长 {matchDurationClockLabel}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        热力图 {activeHeatmapLabel}
+                      </span>
+                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        时间范围 {activeRangeLabel}
+                      </span>
+                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        路径 {showPaths ? '开启' : '关闭'}
+                      </span>
+                    </div>
+
+                    {floatingOverlayEnabled && (
+                      <div className="flex flex-wrap items-center justify-end gap-2 text-[11px]">
+                        <span className="text-slate-500">地图浮窗</span>
+                        <button
+                          type="button"
+                          data-testid="focus-map-overlays"
+                          onClick={anyMapOverlayOpen ? hideAllMapOverlays : restoreDefaultMapOverlays}
+                          className={`rounded-full border px-3 py-1.5 transition ${
+                            anyMapOverlayOpen
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
+                              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/60'
+                          }`}
+                        >
+                          {anyMapOverlayOpen ? '专注地图' : '恢复默认浮窗'}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="toggle-map-overlay-insight"
+                          aria-pressed={mapOverlayPanels.insight.open}
+                          onClick={() => toggleMapOverlayOpen('insight')}
+                          className={`rounded-full border px-3 py-1.5 transition ${
+                            mapOverlayPanels.insight.open
+                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                              : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                          }`}
+                        >
+                          {mapOverlayPanels.insight.open ? '隐藏说明' : '显示说明'}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="toggle-map-overlay-legend"
+                          aria-pressed={mapOverlayPanels.legend.open}
+                          onClick={() => toggleMapOverlayOpen('legend')}
+                          className={`rounded-full border px-3 py-1.5 transition ${
+                            mapOverlayPanels.legend.open
+                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                              : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                          }`}
+                        >
+                          {mapOverlayPanels.legend.open ? '隐藏图例' : '显示图例'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetMapOverlayPositions}
+                          className="rounded-full border border-slate-700 bg-slate-950/75 px-3 py-1.5 text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+                        >
+                          重置位置
+                        </button>
+                        <span className="text-slate-500/80">Esc 也可快速清空浮窗</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedMatch ? (
+                  <>
+                    {isMapDeclutterActive && (
+                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-200/80">分析视图净化</p>
+                          <p className="mt-1 font-medium text-amber-50">
+                            {mapFocusHeroLabel
+                              ? `${mapFocusSourceLabel} · ${mapFocusHeroLabel}`
+                              : `${showPaths ? '路径分析' : activeOverlayMeta.title} · 已清理干扰元素`}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-amber-100/80">
+                            主地图已临时隐藏英雄头像、眼位和死亡爆点，只保留当前分析图层需要的内容。
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCleanMapForHeroFocus(false)}
+                          className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 transition hover:border-amber-300/60"
+                        >
+                          恢复全部图层
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex justify-center">
+                      <div
+                        ref={mapOverlayContainerRef}
+                        data-testid="map-overlay-container"
+                        className="relative"
+                      >
+                        <MapViewer
+                          key={`${showCalibration ? 'calibration' : 'normal'}-${mapViewportSize}`}
+                          width={mapViewportSize}
+                          height={mapViewportSize}
+                          heroPositions={visibleHeroPositions}
+                          wards={visibleWards}
+                          killMarkers={visibleKillMarkers}
+                          currentGameTime={currentDisplayGameTime}
+                          showCalibrationMarkers={showCalibration}
+                          heatmapGrid={heatmapGrid}
+                          heatmapBounds={heatmapBounds}
+                          pathOverlays={pathOverlays}
+                          showPaths={showPaths}
+                        />
+                        {renderMapIntegratedOverlay()}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">比赛时长</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">{matchDurationClockLabel}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">当前图层</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-100">{activeOverlayMeta.title}</p>
+                        <p className="mt-1 text-xs text-slate-400">{heatmapFocusLabel}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">热力样本</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">
+                          {heatmapSummary ? formatHudValue(heatmapSummary.totalSamples) : '--'}
                         </p>
-                        <p className="text-center font-mono text-lg font-semibold tracking-[0.1em] text-slate-100 tabular-nums">
-                          {currentGameClockLabel}
+                        <p className="mt-1 text-xs text-slate-400">{activeOverlayMeta.densityLabel}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">路径压缩</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">{pathCompressionLabel}</p>
+                        <p className="mt-1 text-xs text-slate-400">{showPaths ? pathFocusLabel : '当前未开启路径'}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">偏移秒数</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">
+                          {timeBasisOffsetSeconds.toFixed(2)}s
                         </p>
                       </div>
                     </div>
 
-                    <div className="min-w-0">{renderTeamPortraitStrip(teamLineups.dire, 'dire')}</div>
-                  </div>
-                </div>
+                    <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/75 p-3 text-sm text-slate-300 md:hidden">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">看图指南</p>
+                      <p className="mt-2">{activeOverlayMeta.description}</p>
+                      <p className="mt-2 text-xs text-slate-400">
+                        蓝色代表稀疏，红色代表最密集；路径线表示所选时间段内的完整移动轨迹。
+                      </p>
+                    </div>
 
-                {selectedMatch && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs text-gray-400 mr-1">热力图:</span>
-                    {([
-                      { key: 'none' as const, label: '关闭' },
-                      { key: 'movement' as const, label: '移动' },
-                      { key: 'kill' as const, label: '击杀' },
-                      { key: 'death' as const, label: '死亡' },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.key}
-                        onClick={() => setHeatmapType(opt.key)}
-                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${heatmapType === opt.key
-                            ? 'bg-dota-gold/20 text-dota-gold border border-dota-gold/50'
-                            : 'bg-gray-800/80 text-gray-400 border border-gray-700/60 hover:bg-gray-700/80 hover:text-gray-200'
-                          }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950/75">
+                      <Timeline
+                        currentTime={currentTime}
+                        minTime={timelineMinTime}
+                        maxTime={timelineMaxTime}
+                        onTimeChange={handleTimeChange}
+                        isLoading={loading}
+                        disabled={!selectedMatch || matches.length === 0}
+                        formatTime={formatTimeDisplay}
+                        showTimeDisplay={false}
+                        pauseSegments={gameClockMapperRef.current.pauseIntervals}
+                        isPausedAtTime={(time) => gameClockMapperRef.current.isPausedAtSourceTime(time)}
+                      />
+                    </div>
 
-                {selectedMatch ? (
-                  <div className="flex justify-center">
-                    <MapViewer
-                      key={showCalibration ? 'calibration' : 'normal'}
-                      width={900}
-                      height={900}
-                      heroPositions={heroPositions}
-                      wards={wards}
-                      killMarkers={activeKillMarkers}
-                      currentGameTime={currentDisplayGameTime}
-                      showCalibrationMarkers={showCalibration}
-                      heatmapGrid={heatmapGrid}
-                      heatmapBounds={heatmapBounds}
-                      showPaths={showPaths}
-                    />
-                  </div>
+                    <div className="mt-5 overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950/75">
+                      <AdvantageChart
+                        matchId={selectedMatch}
+                        currentGameTime={currentDisplayGameTime}
+                      />
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex items-center justify-center h-96 bg-dota-bg rounded">
-                    <p className="text-gray-400">选择一场比赛以查看地图</p>
+                  <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-950/65">
+                    <p className="text-sm text-slate-400">选择一场比赛后，主地图、HUD 和时间轴会在这里联动。</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {selectedMatch && (
-              <Timeline
-                currentTime={currentTime}
-                minTime={timelineMinTime}
-                maxTime={timelineMaxTime}
-                onTimeChange={handleTimeChange}
-                isLoading={loading}
-                disabled={!selectedMatch || matches.length === 0}
-                formatTime={formatTimeDisplay}
-                showTimeDisplay={false}
-                pauseSegments={gameClockMapperRef.current.pauseIntervals}
-                isPausedAtTime={(time) => gameClockMapperRef.current.isPausedAtSourceTime(time)}
-              />
-            )}
-
-            {selectedMatch && (
-              <AdvantageChart
-                matchId={selectedMatch}
-                currentGameTime={currentDisplayGameTime}
-              />
-            )}
-
-            <div className="card p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="text-lg font-medium">HUD 指标</h3>
-                {hudMetricsLoading && (
-                  <span className="text-xs text-gray-400">加载中...</span>
-                )}
-              </div>
-
-              {hudMetricsError && (
-                <p className="mb-3 rounded border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-sm text-amber-200">
-                  {hudMetricsError}
-                </p>
-              )}
-
-              {!hudMetricsError && !hudMetricsLoading && selectedMatch && hudMetrics.length === 0 && (
-                <p className="text-sm text-gray-400">当前时间没有 HUD 指标数据。</p>
-              )}
-
-              {!selectedMatch && (
-                <p className="text-sm text-gray-400">请先选择比赛以查看 HUD 指标。</p>
-              )}
-
-              {selectedMatch && hudMetrics.length > 0 && (
-                <div className="overflow-x-auto" data-testid="hud-metrics-panel">
-                  <table className="min-w-full border-collapse text-xs text-gray-200">
-                    <thead>
-                      <tr className="border-b border-slate-700 text-left text-[11px] uppercase tracking-[0.08em] text-slate-400">
-                        <th className="py-2 pr-3">英雄</th>
-                        <th className="py-2 pr-3">阵营</th>
-                        <th className="py-2 pr-3">等级</th>
-                        <th className="py-2 pr-3">K/D/A</th>
-                        <th className="py-2 pr-3">NW</th>
-                        <th className="py-2 pr-3">GPM</th>
-                        <th className="py-2 pr-3">XPM</th>
-                        <th className="py-2 pr-0">装备数</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hudMetrics.map((hero, index) => {
-                        const teamLabel = getHudTeamLabel(hero.team);
-                        const itemCount = Array.isArray(hero.items) ? hero.items.length : 0;
-                        return (
-                          <tr
-                            key={`${hero.hero}-${hero.team}-${index}`}
-                            className="border-b border-slate-800/80 last:border-b-0"
-                          >
-                            <td className="py-2 pr-3 text-slate-100">{getHudHeroLabel(hero.hero)}</td>
-                            <td className="py-2 pr-3">
-                              <span className={teamLabel === '天辉' ? 'text-emerald-300' : teamLabel === '夜魇' ? 'text-rose-300' : 'text-slate-300'}>
-                                {teamLabel}
-                              </span>
-                            </td>
-                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.level)}</td>
-                            <td className="py-2 pr-3 font-mono">{`${formatHudValue(hero.kills)}/${formatHudValue(hero.deaths)}/${formatHudValue(hero.assists)}`}</td>
-                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.net_worth)}</td>
-                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.gpm)}</td>
-                            <td className="py-2 pr-3 font-mono">{formatHudValue(hero.xpm)}</td>
-                            <td className="py-2 pr-0 font-mono text-slate-300">{itemCount}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <div className="order-3">
+              {renderHudLane('dire')}
             </div>
           </div>
         </div>
 
-        <div className="mt-6 bg-dota-primary/20 border border-dota-primary p-4 rounded">
-          <h3 className="font-medium mb-2">使用说明</h3>
-          <ol className="list-decimal list-inside text-sm text-gray-300 space-y-1">
-            <li>使用 API 解析 .dem 文件 (访问 http://localhost:8000/docs)</li>
-            <li>从下拉列表选择已解析的比赛</li>
-            <li>使用时间轴控制回放：空格键播放/暂停，方向键快进/快退</li>
-            <li>点击进度条可跳转到任意时间点</li>
-            <li>调整播放速度：0.5x ~ 8x</li>
-          </ol>
-          <div className="mt-3 text-xs text-gray-500">
-            <p>快捷键: 空格(播放) | ← →(±5秒) | ↑ ↓(速度) | Home/End(开始/结束)</p>
-          </div>
+        <div className="rounded-2xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
+          快捷键：空格播放/暂停，← → 调整时间，↑ ↓ 调整速度，Home/End 跳到开头或结尾。热力图和路径分析已经直接叠加到主地图，不需要在页面下方额外找模块。
         </div>
       </div>
     </div>

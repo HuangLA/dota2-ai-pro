@@ -25,7 +25,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from database.sqlite_db import init_database
-from routers import admin, health, library, matches, playback, remote, replays, visualization
+from routers import admin, assets, health, library, matches, playback, remote, replays, visualization
 from services.opendota_service import OpenDotaService, OpenDotaServiceError
 from services.opendota_sync_service import OpenDotaSyncService
 from storage.opendota_match_storage import OpenDotaMatchStorage
@@ -111,9 +111,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
+        "http://127.0.0.1:5173",  # Vite dev server (explicit IP host)
         "http://localhost:3000",  # Alternative dev server
+        "http://127.0.0.1:3000",  # Alternative dev server (explicit IP host)
         "app://.",                # Electron app
     ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -125,6 +128,7 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(remote.router, prefix="/api/v1/remote", tags=["Remote"])
 app.include_router(library.router, prefix="/api/v1/library", tags=["Library"])
 app.include_router(replays.router, prefix="/api/v1/replays", tags=["Replays"])
+app.include_router(assets.router, prefix="/api/v1/assets", tags=["Assets"])
 app.include_router(matches.router, prefix="/api/v1/matches", tags=["Matches"])
 app.include_router(playback.router, prefix="/api/v1/playback", tags=["Playback"])
 app.include_router(visualization.router, prefix="/api/v1/visualization", tags=["Visualization"])

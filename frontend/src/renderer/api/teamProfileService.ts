@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+import { buildApiUrl } from './apiBase';
 
 export interface TeamProfileMatchRecord {
   match_id: number;
@@ -35,7 +35,7 @@ class TeamProfileService {
     queryParams.append('offset', String(params.offset ?? 0));
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/admin/opendota/matches?${queryParams.toString()}`,
+      buildApiUrl(`/api/v1/admin/opendota/matches?${queryParams.toString()}`),
       {
         method: 'GET',
         headers: {

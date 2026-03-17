@@ -1,5 +1,7 @@
 """Match data endpoints."""
 
+import os
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -11,9 +13,20 @@ from utils.hero_mapping import get_hero_id
 
 router = APIRouter()
 
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_backend_path(env_key: str, default_relative: str) -> str:
+    configured = os.getenv(env_key, default_relative)
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        candidate = BACKEND_ROOT / candidate
+    return str(candidate)
+
+
 # Initialize storage
 match_storage = MatchStorage()
-parquet_storage = ParquetStorage("data/matches")
+parquet_storage = ParquetStorage(_resolve_backend_path("MATCHES_DIR", "data/matches"))
 
 
 def _resolve_duration_seconds(meta: Optional[dict], fallback_duration: int) -> int:
