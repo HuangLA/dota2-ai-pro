@@ -28,6 +28,7 @@ import backendAPI, {
   Match,
   MatchDetail,
   MatchHeatmapResponse,
+  MatchPlayer,
   MovementPathsResponse,
   PlaybackTimeBasis,
   TickData,
@@ -85,6 +86,12 @@ interface TeamHeroPortrait {
   heroName: string;
   portraitUrl: string;
   team: 'radiant' | 'dire';
+  displayName?: string | null;
+  displayType?: string | null;
+  proName?: string | null;
+  personaName?: string | null;
+  accountId?: number | null;
+  playerName?: string | null;
 }
 
 interface TeamLineups {
@@ -107,6 +114,7 @@ interface HudHeroStatus {
 
 interface HeatmapSummary {
   hero?: string | null;
+  heroes?: string[] | null;
   team?: number | null;
   totalSamples: number;
   maxDensity: number;
@@ -123,6 +131,14 @@ interface PathSummary {
     end: number;
   };
   simplification: MovementPathsResponse['data']['simplification'];
+}
+
+interface HeroSelectionOption {
+  value: string;
+  label: string;
+  portraitUrl: string;
+  team: 'radiant' | 'dire';
+  key: number;
 }
 
 interface LoadMatchDataOptions {
@@ -236,6 +252,153 @@ function getTeamPerspectiveLabel(team: number | null | undefined): string {
     return '夜魇';
   }
   return '全部队伍';
+}
+
+function normalizeHeroLookupKey(heroName: string): string {
+  return String(heroName ?? '').replace('npc_dota_hero_', '').toLowerCase().replace(/_/g, '');
+}
+
+function normalizeTeamSide(team: string | number | null | undefined): 'radiant' | 'dire' | null {
+  if (team === 2 || team === '2' || String(team ?? '').toLowerCase() === 'radiant') {
+    return 'radiant';
+  }
+  if (team === 3 || team === '3' || String(team ?? '').toLowerCase() === 'dire') {
+    return 'dire';
+  }
+  return null;
+}
+
+function getTeamHeroKey(team: 'radiant' | 'dire', heroName: string): string {
+  return `${team}:${normalizeHeroLookupKey(heroName)}`;
+}
+
+function getWinnerTeam(
+  winnerTeam: string | number | null | undefined,
+  radiantWin: boolean | null | undefined
+): 'radiant' | 'dire' | null {
+  const normalizedWinner = normalizeTeamSide(winnerTeam);
+  if (normalizedWinner) {
+    return normalizedWinner;
+  }
+  if (typeof radiantWin === 'boolean') {
+    return radiantWin ? 'radiant' : 'dire';
+  }
+  return null;
+}
+
+function buildMatchPlayerLookup(players: MatchPlayer[]): Map<string, MatchPlayer> {
+  const playerLookup = new Map<string, MatchPlayer>();
+
+  for (const player of players) {
+    const team = normalizeTeamSide(player.team);
+    if (!team || !player.hero_name) {
+      continue;
+    }
+
+    playerLookup.set(getTeamHeroKey(team, player.hero_name), player);
+  }
+
+  return playerLookup;
+}
+
+function dedupeHeroSelections(selectedHeroes: string[]): string[] {
+  return Array.from(
+    new Set(
+      selectedHeroes
+        .map((hero) => String(hero ?? '').trim())
+        .filter((hero) => hero.length > 0)
+    )
+  );
+}
+
+function formatSelectedHeroesLabel(
+  selectedHeroes: string[],
+  heroOptions: HeroSelectionOption[],
+  allLabel: string
+): string {
+  if (selectedHeroes.length === 0) {
+    return allLabel;
+  }
+
+  const labels = selectedHeroes
+    .map((heroName) => heroOptions.find((option) => option.value === heroName)?.label)
+    .filter((label): label is string => Boolean(label));
+
+  if (labels.length === 0) {
+    return allLabel;
+  }
+
+  if (labels.length <= 2) {
+    return labels.join('、');
+  }
+
+  return `${labels.slice(0, 2).join('、')} +${labels.length - 2}`;
+}
+
+function getPreferredPlayerDisplayName(
+  hero: Pick<TeamHeroPortrait, 'displayName' | 'proName' | 'personaName' | 'playerName' | 'accountId'>,
+  isProfessionalMatch: boolean
+): string | null {
+  if (isProfessionalMatch) {
+    return (
+      hero.displayName?.trim() ||
+      hero.proName?.trim() ||
+      hero.playerName?.trim() ||
+      (typeof hero.accountId === 'number' ? String(hero.accountId) : null)
+    );
+  }
+
+  return (
+    hero.displayName?.trim() ||
+    hero.personaName?.trim() ||
+    hero.playerName?.trim() ||
+    (typeof hero.accountId === 'number' ? String(hero.accountId) : null)
+  );
+}
+
+function isNumericDisplayName(value: string | null | undefined): boolean {
+  return Boolean(value?.trim() && /^\d+$/.test(value.trim()));
+}
+
+function getPlayerDisplayTypeLabel(displayType: string | null | undefined, isProfessionalMatch: boolean): string {
+  const normalizedDisplayType = displayType?.trim().toLowerCase();
+
+  if (normalizedDisplayType === 'pro_name') {
+    return '职业名';
+  }
+  if (normalizedDisplayType === 'persona_name') {
+    return '玩家昵称';
+  }
+
+  return isProfessionalMatch ? '职业标识' : '玩家标识';
+}
+
+function getPlayerDisplayMeta(
+  hero: Pick<TeamHeroPortrait, 'displayType' | 'accountId'>,
+  isProfessionalMatch: boolean,
+  playerDisplayName: string | null
+): string | null {
+  const normalizedPlayerDisplayName = playerDisplayName?.trim() || null;
+  const normalizedDisplayType = hero.displayType?.trim().toLowerCase();
+
+  if (
+    normalizedPlayerDisplayName &&
+    isNumericDisplayName(normalizedPlayerDisplayName) &&
+    (normalizedDisplayType === 'pro_name' || normalizedDisplayType === 'persona_name')
+  ) {
+    return `玩家 ID ${normalizedPlayerDisplayName}`;
+  }
+
+  const metaParts: string[] = [getPlayerDisplayTypeLabel(hero.displayType, isProfessionalMatch)];
+
+  if (typeof hero.accountId === 'number') {
+    const accountIdText = `玩家 ID ${hero.accountId}`;
+    if (normalizedPlayerDisplayName !== String(hero.accountId)) {
+      metaParts.push(accountIdText);
+    }
+  }
+
+  return metaParts.join(' · ');
 }
 
 function ItemIcon({ itemName, className = 'h-full w-full' }: { itemName: string; className?: string }) {
@@ -557,6 +720,73 @@ function ItemSlot({
   );
 }
 
+function HeroMultiSelect({
+  options,
+  selectedHeroes,
+  onToggleHero,
+  onClear,
+  dataTestIdPrefix,
+  allLabel,
+}: {
+  options: HeroSelectionOption[];
+  selectedHeroes: string[];
+  onToggleHero: (heroName: string) => void;
+  onClear: () => void;
+  dataTestIdPrefix: string;
+  allLabel: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">英雄筛选</p>
+        <button
+          type="button"
+          data-testid={`${dataTestIdPrefix}-hero-clear`}
+          aria-pressed={selectedHeroes.length === 0}
+          onClick={onClear}
+          className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+            selectedHeroes.length === 0
+              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+              : 'border-slate-700 bg-slate-950/80 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+          }`}
+        >
+          {allLabel}
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        {options.map((option) => {
+          const selected = selectedHeroes.includes(option.value);
+          const teamAccentClass =
+            option.team === 'radiant'
+              ? selected
+                ? 'border-emerald-400/55 bg-emerald-500/12 text-emerald-50'
+                : 'border-emerald-500/20 bg-slate-950/75 text-slate-200 hover:border-emerald-400/40'
+              : selected
+                ? 'border-rose-400/55 bg-rose-500/12 text-rose-50'
+                : 'border-rose-500/20 bg-slate-950/75 text-slate-200 hover:border-rose-400/40';
+
+          return (
+            <button
+              key={`${dataTestIdPrefix}-${option.value}`}
+              type="button"
+              data-testid={`${dataTestIdPrefix}-hero-${normalizeHeroLookupKey(option.value)}`}
+              aria-pressed={selected}
+              onClick={() => onToggleHero(option.value)}
+              className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[11px] transition ${teamAccentClass}`}
+            >
+              <span className="h-6 w-6 overflow-hidden rounded-full border border-slate-700/80 bg-slate-950/95">
+                <img src={option.portraitUrl} alt={option.label} className="h-full w-full object-contain" />
+              </span>
+              <span className="max-w-[84px] truncate">{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function extractHudItemSlots(items: Array<string | null | undefined>): HudItemSlots {
   const normalizedItems = items.map((item) => {
     if (typeof item !== 'string') {
@@ -770,13 +1000,14 @@ function toPathOverlays(
     }));
 }
 
-function extractTeamLineups(ticks: TickData[]): TeamLineups {
+function extractTeamLineups(ticks: TickData[], players: MatchPlayer[] = []): TeamLineups {
   const radiantByHandle = new Map<number, TeamHeroPortrait>();
   const direByHandle = new Map<number, TeamHeroPortrait>();
+  const playerLookup = buildMatchPlayerLookup(players);
 
   for (const tick of ticks) {
     for (const hero of tick.heroes) {
-      const team = hero.team === 2 ? 'radiant' : hero.team === 3 ? 'dire' : null;
+      const team = normalizeTeamSide(hero.team);
       if (!team) {
         continue;
       }
@@ -787,11 +1018,18 @@ function extractTeamLineups(ticks: TickData[]): TeamLineups {
       }
 
       const heroData = getHeroByName(hero.hero);
+      const player = playerLookup.get(getTeamHeroKey(team, hero.hero));
       targetMap.set(hero.handle, {
         key: hero.handle,
         heroName: hero.hero,
         portraitUrl: heroData ? getHeroPortraitUrl(heroData.id) : DEFAULT_HERO_PORTRAIT_URL,
         team,
+        displayName: player?.display_name ?? null,
+        displayType: player?.display_type ?? null,
+        proName: player?.pro_name ?? null,
+        personaName: player?.persona_name ?? null,
+        accountId: player?.account_id ?? null,
+        playerName: player?.player_name ?? null,
       });
     }
 
@@ -978,7 +1216,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const [heatmapType, setHeatmapType] = useState<'none' | 'movement' | 'kill' | 'death'>('none');
   const [heatmapRangePreset, setHeatmapRangePreset] = useState<VisualizationRangePreset>('full');
   const [heatmapCustomRange, setHeatmapCustomRange] = useState<CustomVisualizationRange>({ start: '-1:30', end: '10:00' });
-  const [heatmapHeroFilter, setHeatmapHeroFilter] = useState<string>('all');
+  const [heatmapHeroFilter, setHeatmapHeroFilter] = useState<string[]>([]);
   const [heatmapTeamFilter, setHeatmapTeamFilter] = useState<'all' | 'radiant' | 'dire'>('all');
   const [heatmapGrid, setHeatmapGrid] = useState<number[][] | null>(null);
   const [heatmapBounds, setHeatmapBounds] = useState<HeatmapBounds | null>(null);
@@ -988,7 +1226,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const [pathOverlays, setPathOverlays] = useState<PathOverlay[] | null>(null);
   const [pathRangePreset, setPathRangePreset] = useState<VisualizationRangePreset>('full');
   const [pathCustomRange, setPathCustomRange] = useState<CustomVisualizationRange>({ start: '-1:30', end: '10:00' });
-  const [pathHeroFilter, setPathHeroFilter] = useState<string>('all');
+  const [pathHeroFilter, setPathHeroFilter] = useState<string[]>([]);
   const [pathSimplify, setPathSimplify] = useState(true);
   const [pathEpsilon, setPathEpsilon] = useState(100);
   const [pathSummary, setPathSummary] = useState<PathSummary | null>(null);
@@ -1022,6 +1260,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const pendingHudSourceTimeRef = useRef<number | null>(null);
   const lastHudRequestAtRef = useRef(0);
   const hudRequestSequenceRef = useRef(0);
+  const hasHudMetricsDataRef = useRef(false);
   const mapOverlayContainerRef = useRef<HTMLDivElement | null>(null);
   const mapOverlayPanelRefs = useRef<Record<MapOverlayPanelKey, HTMLDivElement | null>>({
     insight: null,
@@ -1103,32 +1342,49 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     hudRequestAbortControllerRef.current = requestController;
     const requestSequence = ++hudRequestSequenceRef.current;
 
-    setHudMetricsLoading(true);
-    setHudMetricsError(null);
-    setHudMetricsWarnings([]);
-
-    const response = await backendAPI.getHudMetrics(selectedMatch, {
-      gameTime,
-      signal: requestController.signal,
-    });
-
-    if (requestController.signal.aborted || requestSequence !== hudRequestSequenceRef.current) {
-      return;
+    const shouldShowHudMetricsLoading = !hasHudMetricsDataRef.current;
+    if (shouldShowHudMetricsLoading) {
+      setHudMetricsLoading(true);
     }
 
-    if (!response || !Array.isArray(response.heroes)) {
+    try {
+      const response = await backendAPI.getHudMetrics(selectedMatch, {
+        gameTime,
+        signal: requestController.signal,
+      });
+
+      if (requestController.signal.aborted || requestSequence !== hudRequestSequenceRef.current) {
+        return;
+      }
+
+      if (!response || !Array.isArray(response.heroes)) {
+        setHudMetricsError('HUD 指标请求失败，不影响主回放。');
+        return;
+      }
+
+      hasHudMetricsDataRef.current = true;
+      setHudMetrics(response.heroes.slice(0, HUD_VISIBLE_ROW_COUNT));
+      setHudMetricsError(null);
+      setHudMetricsWarnings([
+        ...(Array.isArray(response.warnings) ? response.warnings : []),
+        ...(typeof response.message === 'string' && response.message.trim() ? [response.message.trim()] : []),
+      ].filter((warning, index, array) => array.indexOf(warning) === index));
+    } catch (error) {
+      if (requestController.signal.aborted || requestSequence !== hudRequestSequenceRef.current) {
+        return;
+      }
+
       setHudMetricsError('HUD 指标请求失败，不影响主回放。');
-      setHudMetricsLoading(false);
-      return;
+      console.error('Failed to fetch HUD metrics:', error);
+    } finally {
+      if (
+        shouldShowHudMetricsLoading &&
+        !requestController.signal.aborted &&
+        requestSequence === hudRequestSequenceRef.current
+      ) {
+        setHudMetricsLoading(false);
+      }
     }
-
-    setHudMetrics(response.heroes.slice(0, HUD_VISIBLE_ROW_COUNT));
-    setHudMetricsError(null);
-    setHudMetricsWarnings([
-      ...(Array.isArray(response.warnings) ? response.warnings : []),
-      ...(typeof response.message === 'string' && response.message.trim() ? [response.message.trim()] : []),
-    ].filter((warning, index, array) => array.indexOf(warning) === index));
-    setHudMetricsLoading(false);
   }, [selectedMatch]);
 
   const scheduleHudMetricsFetch = useCallback((sourceTime: number) => {
@@ -1244,6 +1500,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     setHudMetricsError(null);
     setHudMetricsWarnings([]);
     setHudMetricsLoading(false);
+    hasHudMetricsDataRef.current = false;
     clearPendingHudRequest();
     allTicksRef.current = [];
     allWardsRef.current = null;
@@ -1251,9 +1508,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     killMarkersRef.current = [];
     if (!preserveAnalysisState) {
       setHeatmapType('none');
-      setHeatmapHeroFilter('all');
+      setHeatmapHeroFilter([]);
       setHeatmapTeamFilter('all');
-      setPathHeroFilter('all');
+      setPathHeroFilter([]);
       setHeatmapGrid(null);
       setHeatmapBounds(null);
       setHeatmapSummary(null);
@@ -1261,7 +1518,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     }
 
     try {
-      const matchDetail = await backendAPI.getMatchDetail(matchId);
+      const [matchDetail, matchPlayers] = await Promise.all([
+        backendAPI.getMatchDetail(matchId),
+        backendAPI.getMatchPlayers(matchId),
+      ]);
       setSelectedMatchDetail(matchDetail);
       const duration = matchDetail?.duration || DEFAULT_DURATION;
 
@@ -1274,7 +1534,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
       if (fullData?.ticks) {
         allTicksRef.current = fullData.ticks;
-        setTeamLineups(extractTeamLineups(fullData.ticks));
+        setTeamLineups(extractTeamLineups(fullData.ticks, matchPlayers));
         console.log(`[RealMatchViewer] 已加载 ${fullData.ticks.length} 个 tick`);
       }
 
@@ -1690,6 +1950,33 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   }, [teamLineups, updateDisplayForTime]);
 
   useEffect(() => {
+    const availableHeroes = new Set(
+      [...teamLineups.radiant, ...teamLineups.dire].map((hero) => hero.heroName)
+    );
+
+    setHeatmapHeroFilter((current) => current.filter((hero) => availableHeroes.has(hero)));
+    setPathHeroFilter((current) => current.filter((hero) => availableHeroes.has(hero)));
+  }, [teamLineups]);
+
+  const toggleHeatmapHeroFilter = useCallback((heroName: string) => {
+    setHeatmapHeroFilter((current) => {
+      if (current.includes(heroName)) {
+        return current.filter((hero) => hero !== heroName);
+      }
+      return [...current, heroName];
+    });
+  }, []);
+
+  const togglePathHeroFilter = useCallback((heroName: string) => {
+    setPathHeroFilter((current) => {
+      if (current.includes(heroName)) {
+        return current.filter((hero) => hero !== heroName);
+      }
+      return [...current, heroName];
+    });
+  }, []);
+
+  useEffect(() => {
     if (!selectedMatch) {
       return;
     }
@@ -1743,7 +2030,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       .getMatchHeatmap(selectedMatch, {
         heatmapType,
         gridSize: DEFAULT_HEATMAP_GRID_SIZE,
-        hero: heatmapHeroFilter === 'all' ? undefined : heatmapHeroFilter,
+        heroes: heatmapHeroFilter.length > 0 ? dedupeHeroSelections(heatmapHeroFilter) : undefined,
         team: heatmapTeamFilter === 'radiant' ? 2 : heatmapTeamFilter === 'dire' ? 3 : undefined,
         startTime,
         endTime,
@@ -1771,6 +2058,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
         setHeatmapBounds(response.data.map_bounds);
         setHeatmapSummary({
           hero: response.data.hero,
+          heroes: response.data.heroes ?? null,
           team: response.data.team,
           totalSamples: response.data.total_samples,
           maxDensity: response.data.max_density,
@@ -1834,7 +2122,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
     backendAPI
       .getMovementPaths(selectedMatch, {
-        hero: pathHeroFilter === 'all' ? undefined : pathHeroFilter,
+        heroes: pathHeroFilter.length > 0 ? dedupeHeroSelections(pathHeroFilter) : undefined,
         startTime,
         endTime,
         simplify: pathSimplify,
@@ -1951,6 +2239,28 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   })();
   const floatingOverlayEnabled = viewportWidth >= 1024;
 
+  const radiantTeamName =
+    selectedMatchDetail?.radiant_team_name ||
+    selectedMatchRecord?.radiant_team_name ||
+    selectedMatchDetail?.radiant_team ||
+    selectedMatchRecord?.radiant_team ||
+    '天辉';
+  const direTeamName =
+    selectedMatchDetail?.dire_team_name ||
+    selectedMatchRecord?.dire_team_name ||
+    selectedMatchDetail?.dire_team ||
+    selectedMatchRecord?.dire_team ||
+    '夜魇';
+  const winnerTeam = getWinnerTeam(
+    selectedMatchDetail?.winner_team ?? selectedMatchRecord?.winner_team,
+    selectedMatchDetail?.radiant_win ?? selectedMatchRecord?.radiant_win
+  );
+  const winnerLabel = winnerTeam === 'radiant' ? radiantTeamName : winnerTeam === 'dire' ? direTeamName : null;
+  const isProfessionalMatch = Boolean(
+    selectedMatchDetail?.is_professional ?? selectedMatchRecord?.is_professional
+  );
+  const matchSourceLabel = selectedMatchDetail?.source ?? selectedMatchRecord?.source ?? null;
+
   useEffect(() => {
     const defaultPanels = createDefaultMapOverlayPanels(mapViewportSize);
 
@@ -2025,14 +2335,11 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     return Math.round(value).toLocaleString();
   };
 
-  const normalizeHeroLookupKey = (heroName: string): string =>
-    heroName.replace('npc_dota_hero_', '').toLowerCase().replace(/_/g, '');
-
   const hudMetricsByTeamHeroKey = (() => {
     const metricsMap = new Map<string, HudHeroMetric>();
     for (const metric of hudMetrics) {
       const teamKey = getHudTeamLabel(metric.team) === '天辉' ? 'radiant' : 'dire';
-      metricsMap.set(`${teamKey}:${normalizeHeroLookupKey(metric.hero)}`, metric);
+      metricsMap.set(getTeamHeroKey(teamKey, metric.hero), metric);
     }
     return metricsMap;
   })();
@@ -2044,20 +2351,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     }));
   }, []);
 
-  const setHudLaneExpanded = useCallback(
-    (team: 'radiant' | 'dire', expanded: boolean) => {
-      const heroes = team === 'radiant' ? teamLineups.radiant : teamLineups.dire;
-      setExpandedHudHeroes((current) => {
-        const next = { ...current };
-        for (const hero of heroes) {
-          next[hero.key] = expanded;
-        }
-        return next;
-      });
-    },
-    [teamLineups]
-  );
-
   const renderHudLane = (team: 'radiant' | 'dire') => {
     const teamLabel = team === 'radiant' ? '天辉 HUD' : '夜魇 HUD';
     const accentClass =
@@ -2068,34 +2361,49 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     const healthBarClass = team === 'radiant' ? 'bg-emerald-400/95' : 'bg-rose-400/95';
     const laneHeroes = team === 'radiant' ? teamLineups.radiant : teamLineups.dire;
     const slots = Array.from({ length: TEAM_HERO_COUNT }, (_, index) => laneHeroes[index] ?? null);
-    const expandedCount = laneHeroes.filter((hero) => hero && expandedHudHeroes[hero.key]).length;
-    const allExpanded = laneHeroes.length > 0 && expandedCount === laneHeroes.length;
+    const visibleHeroKeys = slots.map((hero) => hero?.key).filter((heroKey): heroKey is number => typeof heroKey === 'number');
+    const allVisibleHeroesExpanded =
+      visibleHeroKeys.length > 0 && visibleHeroKeys.every((heroKey) => Boolean(expandedHudHeroes[heroKey]));
+
+    const toggleAllVisibleHeroesExpanded = () => {
+      if (visibleHeroKeys.length === 0) {
+        return;
+      }
+
+      setExpandedHudHeroes((current) => {
+        const next = { ...current };
+        const shouldExpand = !visibleHeroKeys.every((heroKey) => Boolean(current[heroKey]));
+
+        for (const heroKey of visibleHeroKeys) {
+          next[heroKey] = shouldExpand;
+        }
+
+        return next;
+      });
+    };
 
     return (
       <div className={`rounded-2xl border p-2.5 shadow-[0_18px_48px_rgba(2,6,23,0.32)] ${accentClass}`}>
-        <div className="mb-2.5 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className={`text-[11px] font-semibold uppercase tracking-[0.24em] ${accentTextClass}`}>
+        <div className="mb-2 flex items-start gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 px-2.5 py-1.5">
+          <div className="min-w-0 flex-1">
+            <p className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.24em] ${accentTextClass}`}>
               {teamLabel}
             </p>
-            <p className="mt-0.5 text-[11px] text-slate-500">
-              默认折叠细节，优先总览 5 名英雄
+            <p className="mt-0.5 min-w-0 whitespace-normal text-[10px] leading-snug text-slate-400">
+              先看英雄名、玩家和 KDA，悬停看提示，点击卡片展开细节。
             </p>
           </div>
-          <div className="shrink-0">
-            <div className="inline-flex items-center rounded-full border border-slate-800/80 bg-slate-950/75 p-1 shadow-[0_10px_24px_rgba(2,6,23,0.18)]">
-              <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-medium text-slate-400">
-                已展开 {expandedCount}/{laneHeroes.length || TEAM_HERO_COUNT}
-              </span>
-              <button
-                type="button"
-                onClick={() => setHudLaneExpanded(team, !allExpanded)}
-                className="rounded-full px-2.5 py-1 text-[10px] font-medium text-slate-300 transition hover:bg-slate-900/85 hover:text-slate-50"
-              >
-                {allExpanded ? '收起细节' : '展开细节'}
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            data-testid={`toggle-hud-lane-${team}`}
+            onClick={toggleAllVisibleHeroesExpanded}
+            disabled={visibleHeroKeys.length === 0}
+            aria-label={allVisibleHeroesExpanded ? '全部收起' : '全部展开'}
+            title={allVisibleHeroesExpanded ? '收起本行所有英雄卡' : '展开本行所有英雄卡'}
+            className="shrink-0 rounded-full border border-slate-700/80 bg-slate-950/90 px-2.5 py-1 text-[10px] font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-600"
+          >
+            {allVisibleHeroesExpanded ? '全部收起' : '全部展开'}
+          </button>
         </div>
 
         <div className="space-y-2" data-testid={team === 'radiant' ? 'hud-radiant' : 'hud-dire'}>
@@ -2110,10 +2418,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             }
 
             const metric = hudMetricsByTeamHeroKey.get(
-              `${team}:${normalizeHeroLookupKey(hero.heroName)}`
+              getTeamHeroKey(team, hero.heroName)
             );
             const heroStatus = hudHeroStatus[hero.key];
             const heroLabel = getHeroLabel(hero.heroName, hero.key);
+            const playerDisplayName = getPreferredPlayerDisplayName(hero, isProfessionalMatch);
+            const playerDisplayMeta = getPlayerDisplayMeta(hero, isProfessionalMatch, playerDisplayName);
             const isDead = heroStatus ? !heroStatus.isAlive : false;
             const healthRatio = clamp(heroStatus?.hpRatio ?? (isDead ? 0 : 1), 0, 1);
             const healthPercent = Math.round(healthRatio * 100);
@@ -2121,18 +2431,35 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             const healthMax = Math.max(0, Math.round(heroStatus?.maxHp ?? 0));
             const itemSlots = extractHudItemSlots(Array.isArray(metric?.items) ? metric.items : []);
             const heroExpanded = Boolean(expandedHudHeroes[hero.key]);
+            const isHighlighted = highlightedHudHeroKeys.has(getTeamHeroKey(team, hero.heroName));
             const respawnLabel = isDead && typeof heroStatus?.respawnRemainingSeconds === 'number'
               ? `${heroStatus.respawnRemainingSeconds}s 后复活`
               : `${healthCurrent}/${healthMax} HP`;
+            const cardStateClass = heroExpanded
+              ? 'border-cyan-500/45 bg-slate-950/96 shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_18px_36px_rgba(8,15,34,0.26)]'
+              : 'border-slate-700/70 bg-slate-950/85 hover:border-slate-500/80 hover:bg-slate-900/90';
 
             return (
-              <div
+              <button
                 key={hero.key}
-                className={`rounded-xl border border-slate-700/70 bg-slate-950/85 ${
+                type="button"
+                data-testid={`hud-hero-card-${team}-${hero.key}`}
+                data-highlighted={isHighlighted ? 'true' : 'false'}
+                aria-expanded={heroExpanded}
+                aria-label={`${heroLabel}${playerDisplayName ? ` ${playerDisplayName}` : ''}，${heroExpanded ? '收起详情' : '展开详情'}`}
+                title={`${heroLabel}${playerDisplayName ? ` / ${playerDisplayName}` : ''} · 点击${heroExpanded ? '收起' : '展开'}详情`}
+                onClick={() => toggleHudHeroExpanded(hero.key)}
+                className={`group relative w-full rounded-xl border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 ${
                   heroExpanded ? 'p-2' : 'p-1.5'
+                } ${cardStateClass} ${
+                  isHighlighted
+                    ? team === 'radiant'
+                      ? 'shadow-[0_0_0_1px_rgba(74,222,128,0.16),0_20px_40px_rgba(5,150,105,0.18)]'
+                      : 'shadow-[0_0_0_1px_rgba(251,113,133,0.16),0_20px_40px_rgba(190,24,93,0.2)]'
+                  : ''
                 }`}
               >
-                <div className={`flex ${heroExpanded ? 'gap-2.5' : 'items-center gap-2'}`}>
+                <div className={`flex ${heroExpanded ? 'gap-2.5 pr-2' : 'items-center gap-2 pr-2'}`}>
                   <div className="relative shrink-0">
                     <div className={`overflow-hidden rounded-lg border bg-slate-950/95 ${
                       heroExpanded ? 'h-12 w-12' : 'h-10 w-10'
@@ -2151,40 +2478,56 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-[13px] font-semibold text-slate-100">{heroLabel}</p>
-                        <p className={`text-[10px] ${isDead ? 'text-amber-300' : 'text-slate-400'}`}>
+                        <p className="truncate text-[13px] font-semibold text-slate-50">{heroLabel}</p>
+                        {playerDisplayName && (
+                          <p
+                            data-testid={`hud-player-display-${team}-${hero.key}`}
+                            className={`mt-0.5 truncate text-[11px] font-semibold leading-tight transition-[color,filter] duration-200 ${
+                              isHighlighted
+                                ? 'text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.55)]'
+                                : 'text-amber-200 drop-shadow-[0_0_7px_rgba(251,191,36,0.3)]'
+                            }`}
+                            title={playerDisplayName}
+                          >
+                            {playerDisplayName}
+                          </p>
+                        )}
+                        <p className={`text-[10px] font-medium ${isDead ? 'text-amber-300' : 'text-slate-400'}`}>
                           {respawnLabel}
                         </p>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <div className="text-right">
-                          <p className="font-mono text-[11px] font-semibold text-slate-100">
-                            {metric ? `${formatHudValue(metric.kills)}/${formatHudValue(metric.deaths)}/${formatHudValue(metric.assists)}` : '-/-/-'}
-                          </p>
-                          <p className="text-[9px] uppercase tracking-[0.18em] text-slate-500">KDA</p>
-                        </div>
-                        <button
-                          type="button"
-                          data-testid={`toggle-hud-hero-${team}-${hero.key}`}
-                          aria-expanded={heroExpanded}
-                          onClick={() => toggleHudHeroExpanded(hero.key)}
-                          className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition ${
-                            heroExpanded
-                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
-                              : 'border-slate-700/80 bg-slate-900/85 text-slate-300 hover:border-slate-500 hover:text-slate-100'
-                          }`}
-                        >
-                          {heroExpanded ? '收起' : '展开'}
-                        </button>
+                      <div className="shrink-0 text-right">
+                        <p className="font-mono text-[11px] font-semibold text-slate-100">
+                          {metric ? `${formatHudValue(metric.kills)}/${formatHudValue(metric.deaths)}/${formatHudValue(metric.assists)}` : '-/-/-'}
+                        </p>
+                        <p className="text-[9px] uppercase tracking-[0.18em] text-slate-500">KDA</p>
                       </div>
                     </div>
 
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90">
+                    <div
+                      data-testid={`hud-hero-health-${team}-${hero.key}`}
+                      className="mt-1.5 h-1.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90"
+                    >
                       <div
                         className={`h-full transition-[width,opacity] duration-200 ${healthBarClass} ${isDead ? 'opacity-60' : ''}`}
                         style={{ width: `${healthPercent}%` }}
                       />
                     </div>
+
+                    {playerDisplayMeta && (
+                      <div className="mt-1.5">
+                        <span
+                          data-testid={`hud-player-meta-${team}-${hero.key}`}
+                          className={`rounded-full border px-2 py-0.5 text-[9px] font-medium transition-[background-color,border-color,color,box-shadow] duration-200 ${
+                            isHighlighted
+                              ? 'border-cyan-100/80 bg-cyan-400/30 text-white ring-1 ring-cyan-300/35 shadow-[0_0_20px_rgba(34,211,238,0.28)]'
+                              : 'border-amber-200/65 bg-amber-300/18 text-amber-50 ring-1 ring-amber-200/20 shadow-[0_0_14px_rgba(251,191,36,0.16)]'
+                          }`}
+                        >
+                          {playerDisplayMeta}
+                        </span>
+                      </div>
+                    )}
 
                     {heroExpanded && (
                       <>
@@ -2262,7 +2605,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     )}
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -2466,15 +2809,22 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       ? `${heatmapCustomRange.start} 到 ${heatmapCustomRange.end}`
       : visualizationRangeOptions.find((option) => option.value === heatmapRangePreset)?.label ?? '整场';
 
-  const pathHeroOptions = [...teamLineups.radiant, ...teamLineups.dire].map((hero) => ({
+  const pathHeroOptions: HeroSelectionOption[] = [...teamLineups.radiant, ...teamLineups.dire].map((hero) => ({
     value: hero.heroName,
     label: getHeroLabel(hero.heroName, hero.key),
+    portraitUrl: hero.portraitUrl,
+    team: hero.team,
+    key: hero.key,
   }));
 
   const heatmapHeroOptions = pathHeroOptions;
   const activeOverlayMeta = OVERLAY_MODE_META[heatmapType];
-  const heatmapFocusLabel = heatmapHeroFilter !== 'all'
-    ? heatmapHeroOptions.find((option) => option.value === heatmapHeroFilter)?.label ?? '单英雄'
+  const effectiveHeatmapHeroes =
+    Array.isArray(heatmapSummary?.heroes) && heatmapSummary?.heroes.length > 0
+      ? dedupeHeroSelections(heatmapSummary.heroes)
+      : dedupeHeroSelections(heatmapHeroFilter);
+  const heatmapFocusLabel = effectiveHeatmapHeroes.length > 0
+    ? formatSelectedHeroesLabel(effectiveHeatmapHeroes, heatmapHeroOptions, '全部英雄')
     : getTeamPerspectiveLabel(
       heatmapSummary?.team ??
       (heatmapTeamFilter === 'radiant' ? 2 : heatmapTeamFilter === 'dire' ? 3 : null)
@@ -2483,22 +2833,31 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     start: timelineMinTime,
     end: timelineMaxTime,
   };
+  const effectivePathHeroes = dedupeHeroSelections(pathHeroFilter);
   const pathFocusLabel =
-    pathHeroFilter === 'all'
-      ? `${pathSummary?.heroCount ?? 0} 名英雄`
-      : pathHeroOptions.find((option) => option.value === pathHeroFilter)?.label ?? '单英雄';
+    effectivePathHeroes.length > 0
+      ? formatSelectedHeroesLabel(effectivePathHeroes, pathHeroOptions, `${pathSummary?.heroCount ?? 0} 名英雄`)
+      : `${pathSummary?.heroCount ?? 0} 名英雄`;
   const pathCompressionLabel = pathSummary?.simplification.enabled
     ? `${Math.round((pathSummary.simplification.reduction_ratio ?? 0) * 100)}%`
     : '未压缩';
-  const activeHeatmapHeroName =
-    heatmapType !== 'none' && heatmapHeroFilter !== 'all' ? heatmapHeroFilter : null;
-  const activePathHeroName =
-    showPaths && pathHeroFilter !== 'all' ? pathHeroFilter : null;
-  const mapFocusHeroName = activePathHeroName ?? activeHeatmapHeroName;
-  const mapFocusHeroLabel = mapFocusHeroName
-    ? pathHeroOptions.find((option) => option.value === mapFocusHeroName)?.label ?? '单英雄'
+  const activeHeatmapHeroes = heatmapType !== 'none' ? effectiveHeatmapHeroes : [];
+  const activePathHeroes = showPaths ? effectivePathHeroes : [];
+  const highlightedHudHeroKeys = new Set(
+    [...activeHeatmapHeroes, ...activePathHeroes].map((heroName) => {
+      const option = pathHeroOptions.find((item) => item.value === heroName);
+      return option ? getTeamHeroKey(option.team, option.value) : heroName;
+    })
+  );
+  const mapFocusHeroLabel = highlightedHudHeroKeys.size > 0
+    ? formatSelectedHeroesLabel(
+        Array.from(new Set([...activePathHeroes, ...activeHeatmapHeroes])),
+        pathHeroOptions,
+        '全部英雄'
+      )
     : null;
-  const mapFocusSourceLabel = activePathHeroName ? '路径分析' : activeHeatmapHeroName ? '热力图' : null;
+  const mapFocusSourceLabel =
+    activePathHeroes.length > 0 ? '路径分析' : activeHeatmapHeroes.length > 0 ? '热力图' : null;
   const isAnalysisOverlayActive = heatmapType !== 'none' || showPaths;
   const isMapDeclutterActive = cleanMapForHeroFocus && isAnalysisOverlayActive;
   const visibleHeroPositions = isMapDeclutterActive ? [] : heroPositions;
@@ -2673,7 +3032,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     <div className="min-h-screen bg-dota-bg px-4 py-4 lg:px-6">
       <div className="mx-auto max-w-[1660px] space-y-3">
         <div className="rounded-3xl border border-slate-800/90 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.92),_rgba(7,10,21,0.98))] p-2.5 shadow-[0_18px_42px_rgba(2,6,23,0.38)]">
-          <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-center">
+          <div
+            data-testid="replay-viewer-header"
+            className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:items-center"
+          >
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -2684,13 +3046,16 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                         match_id {selectedMatch}
                       </span>
                     )}
-                    {selectedMatchRecord?.radiant_win !== undefined && (
-                      <span className={`rounded-full border px-2.5 py-0.5 text-[10px] ${
-                        selectedMatchRecord.radiant_win
-                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                          : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                      }`}>
-                        {selectedMatchRecord.radiant_win ? '天辉胜利' : '夜魇胜利'}
+                    {winnerLabel && (
+                      <span
+                        data-testid="match-winner-badge"
+                        className={`rounded-full border px-2.5 py-0.5 text-[10px] ${
+                          winnerTeam === 'radiant'
+                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                            : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                        }`}
+                      >
+                        胜者 {winnerLabel}
                       </span>
                     )}
                   </div>
@@ -2699,7 +3064,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 <div className="flex flex-wrap gap-1.5 text-[10px]">
                   {(replayEntryContext?.source === 'match_database' || replayEntryContext?.source === 'replay_library') && (
                     <span
-                      className={`rounded-full border px-2.5 py-0.5 ${
+                      className={`rounded-full border px-2 py-0.5 ${
                         replayEntryContext?.source === 'match_database'
                           ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
                           : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
@@ -2711,32 +3076,51 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     </span>
                   )}
                   {timeBasisSource === 'fallback' && (
-                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-amber-200">
+                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-200">
                       回退时间基准
                     </span>
                   )}
+                  {matchSourceLabel && (
+                    <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2 py-0.5 text-slate-300">
+                      {isProfessionalMatch ? '职业比赛' : '路人比赛'} · {matchSourceLabel}
+                    </span>
+                  )}
                   {isReparseTaskActive && reparseTask && (
-                    <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-0.5 text-cyan-200">
+                    <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">
                       重新解析 {Math.round(reparseTask.progress ?? 0)}%
                     </span>
                   )}
                 </div>
               </div>
 
-              {selectedMatchRecord && (
-                <div className="flex flex-wrap items-center gap-1.5 xl:max-w-[760px]">
-                  <div className="min-w-0 flex-1 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5">
-                    <p className="truncate text-[11px] font-semibold text-white">
-                      {selectedMatchRecord.radiant_team || '天辉'}
+              {selectedMatch && (
+                <div className="flex flex-wrap items-center gap-1.5 2xl:max-w-[760px]">
+                  <div className={`min-w-0 flex-1 rounded-xl border px-3 py-1.5 ${
+                    winnerTeam === 'radiant'
+                      ? 'border-emerald-400/45 bg-emerald-500/14'
+                      : 'border-emerald-500/25 bg-emerald-500/10'
+                  }`}>
+                    <p data-testid="match-radiant-name" className="truncate text-[11px] font-semibold text-white">
+                      {radiantTeamName}
                     </p>
+                    {winnerTeam === 'radiant' && (
+                      <p className="mt-0.5 text-[10px] text-emerald-100/85">胜方</p>
+                    )}
                   </div>
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-800/80 bg-slate-950/70 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                     VS
                   </div>
-                  <div className="min-w-0 flex-1 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-1.5">
-                    <p className="truncate text-[11px] font-semibold text-white">
-                      {selectedMatchRecord.dire_team || '夜魇'}
+                  <div className={`min-w-0 flex-1 rounded-xl border px-3 py-1.5 ${
+                    winnerTeam === 'dire'
+                      ? 'border-rose-400/45 bg-rose-500/14'
+                      : 'border-rose-500/25 bg-rose-500/10'
+                  }`}>
+                    <p data-testid="match-dire-name" className="truncate text-[11px] font-semibold text-white">
+                      {direTeamName}
                     </p>
+                    {winnerTeam === 'dire' && (
+                      <p className="mt-0.5 text-[10px] text-rose-100/85">胜方</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -2752,15 +3136,21 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     解析 {selectedMatchDetail.parse_status}
                   </span>
                 )}
-                {selectedMatchRecord?.parsed_at && (
+                {(selectedMatchDetail?.parsed_at ?? selectedMatchRecord?.parsed_at) && (
                   <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
-                    最近解析 {new Date(selectedMatchRecord.parsed_at).toLocaleDateString()}
+                    最近解析{' '}
+                    {new Date(
+                      selectedMatchDetail?.parsed_at ?? selectedMatchRecord?.parsed_at ?? ''
+                    ).toLocaleDateString()}
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="w-full xl:max-w-[320px] xl:justify-self-end">
+            <div
+              data-testid="replay-viewer-header-selection"
+              className="w-full 2xl:max-w-[320px] 2xl:justify-self-end"
+            >
               <div className="rounded-xl border border-slate-700/80 bg-slate-950/70 p-2">
                 {matches.length === 0 ? (
                   <div className="text-xs text-slate-400">
@@ -2779,13 +3169,16 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       }}
                       className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-white focus:border-cyan-500 focus:outline-none"
                     >
-                      {matches.map((match) => (
-                        <option key={match.match_id} value={match.match_id}>
-                          比赛 {match.match_id}
-                          {match.radiant_win !== undefined &&
-                            ` · ${match.radiant_win ? '天辉' : '夜魇'}胜`}
-                        </option>
-                      ))}
+                      {matches.map((match) => {
+                        const optionRadiantName = match.radiant_team_name || match.radiant_team || '天辉';
+                        const optionDireName = match.dire_team_name || match.dire_team || '夜魇';
+
+                        return (
+                          <option key={match.match_id} value={match.match_id}>
+                            {optionRadiantName} vs {optionDireName} · {match.match_id}
+                          </option>
+                        );
+                      })}
                     </select>
                     <button
                       onClick={loadMatches}
@@ -2872,14 +3265,14 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             </div>
           </div>
 
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
               热力图 {activeHeatmapLabel}
             </span>
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
               时间范围 {activeRangeLabel}
             </span>
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
               路径 {showPaths ? '开启' : '关闭'}
             </span>
             {selectedMatch && !mapWorkbenchExpanded && (
@@ -2889,24 +3282,24 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             )}
           </div>
 
-          <div className="mb-3 flex flex-wrap gap-2 text-xs">
-            {loading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">回放数据加载中...</span>}
-            {hudMetricsLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">HUD 同步中...</span>}
-            {heatmapLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">热力图加载中...</span>}
-            {pathLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">路径分析加载中...</span>}
-            {heatmapError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">{heatmapError}</span>}
-            {pathError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">{pathError}</span>}
-            {hudMetricsError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">{hudMetricsError}</span>}
+          <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
+            {loading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-100">回放数据加载中...</span>}
+            {hudMetricsLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-100">HUD 同步中...</span>}
+            {heatmapLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-100">热力图加载中...</span>}
+            {pathLoading && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-100">路径分析加载中...</span>}
+            {heatmapError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-amber-200">{heatmapError}</span>}
+            {pathError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-amber-200">{pathError}</span>}
+            {hudMetricsError && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-amber-200">{hudMetricsError}</span>}
             {hudMetricsWarnings.map((warning) => (
               <span
                 key={warning}
-                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200"
+                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-amber-200"
               >
                 {warning}
               </span>
             ))}
             {reparseFeedback && (
-              <span className={`rounded-full border px-3 py-1 ${
+              <span className={`rounded-full border px-2.5 py-1 ${
                 reparseFeedback.type === 'error'
                   ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
                   : reparseFeedback.type === 'success'
@@ -2917,7 +3310,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               </span>
             )}
             {reparseTask && !mapWorkbenchExpanded && (
-              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-slate-300">
+              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
                 重新解析 {reparseTask.status} · {Math.round(reparseTask.progress ?? 0)}%
               </span>
             )}
@@ -2959,7 +3352,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   ))}
                 </div>
 
-                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
                   <select
                     data-testid="heatmap-range-select"
                     value={heatmapRangePreset}
@@ -2973,19 +3366,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     ))}
                   </select>
                   <select
-                    data-testid="heatmap-hero-select"
-                    value={heatmapHeroFilter}
-                    onChange={(event) => setHeatmapHeroFilter(event.target.value)}
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
-                  >
-                    <option value="all">全部英雄</option>
-                    {heatmapHeroOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        英雄：{option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select
                     value={heatmapTeamFilter}
                     onChange={(event) => setHeatmapTeamFilter(event.target.value as 'all' | 'radiant' | 'dire')}
                     className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
@@ -2994,6 +3374,17 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     <option value="radiant">天辉</option>
                     <option value="dire">夜魇</option>
                   </select>
+                </div>
+
+                <div className="mt-3">
+                  <HeroMultiSelect
+                    options={heatmapHeroOptions}
+                    selectedHeroes={heatmapHeroFilter}
+                    onToggleHero={toggleHeatmapHeroFilter}
+                    onClear={() => setHeatmapHeroFilter([])}
+                    dataTestIdPrefix="heatmap"
+                    allLabel="全部英雄"
+                  />
                 </div>
 
                 {heatmapRangePreset === 'custom' && (
@@ -3033,7 +3424,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       统计对象：{activeOverlayMeta.filterLabel}
                     </span>
                     <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
-                      聚焦：{heatmapHeroFilter === 'all' ? getTeamPerspectiveLabel(heatmapTeamFilter === 'radiant' ? 2 : heatmapTeamFilter === 'dire' ? 3 : null) : heatmapHeroOptions.find((option) => option.value === heatmapHeroFilter)?.label ?? '单英雄'}
+                      聚焦：{heatmapFocusLabel}
                     </span>
                   </div>
                 </div>
@@ -3061,19 +3452,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 </div>
 
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
-                  <select
-                    data-testid="path-hero-select"
-                    value={pathHeroFilter}
-                    onChange={(event) => setPathHeroFilter(event.target.value)}
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
-                  >
-                    <option value="all">路径：全部英雄</option>
-                    {pathHeroOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        路径：{option.label}
-                      </option>
-                    ))}
-                  </select>
                   <select
                     data-testid="path-range-select"
                     value={pathRangePreset}
@@ -3106,6 +3484,17 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="mt-3">
+                  <HeroMultiSelect
+                    options={pathHeroOptions}
+                    selectedHeroes={pathHeroFilter}
+                    onToggleHero={togglePathHeroFilter}
+                    onClear={() => setPathHeroFilter([])}
+                    dataTestIdPrefix="path"
+                    allLabel="路径：全部英雄"
+                  />
                 </div>
 
                 {pathRangePreset === 'custom' && (
@@ -3251,85 +3640,103 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     </h3>
                     <p className="mt-1 text-xs text-slate-400">{activeOverlayMeta.description}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-cyan-50">
-                        比赛时钟 {currentGameClockLabel}
+                  <div className="flex max-w-full flex-col items-end gap-2">
+                    <div
+                      data-testid="map-status-strip"
+                      className="flex max-w-full flex-wrap justify-end gap-2 text-[11px]"
+                    >
+                      <span className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-cyan-50">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/80">时钟</span>
+                        <span className="font-mono">{currentGameClockLabel}</span>
                       </span>
                       <span
-                        className={`rounded-full border px-3 py-1.5 ${
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 ${
                           isPauseActive
                             ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
                             : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
                         }`}
                       >
-                        {isPauseActive ? '处于暂停区间' : '比赛进行中'}
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-current/70">状态</span>
+                        <span>{isPauseActive ? '暂停区间' : '进行中'}</span>
                       </span>
-                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
-                        比赛时长 {matchDurationClockLabel}
+                      <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">时长</span>
+                        <span className="font-mono text-slate-100">{matchDurationClockLabel}</span>
                       </span>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
-                        热力图 {activeHeatmapLabel}
+
+                    <div
+                      data-testid="map-view-strip"
+                      className="flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-2xl border border-slate-800/80 bg-slate-950/65 px-2 py-1.5 text-[11px]"
+                    >
+                      <span className="px-1 text-slate-500">主视图</span>
+                      <span className="rounded-xl bg-slate-900/85 px-2.5 py-1 text-slate-100">
+                        {activeOverlayMeta.title}
                       </span>
-                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
-                        时间范围 {activeRangeLabel}
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        热力 {activeHeatmapLabel}
                       </span>
-                      <span className="rounded-full border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        范围 {activeRangeLabel}
+                      </span>
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
                         路径 {showPaths ? '开启' : '关闭'}
                       </span>
                     </div>
 
                     {floatingOverlayEnabled && (
-                      <div className="flex flex-wrap items-center justify-end gap-2 text-[11px]">
-                        <span className="text-slate-500">地图浮窗</span>
-                        <button
-                          type="button"
-                          data-testid="focus-map-overlays"
-                          onClick={anyMapOverlayOpen ? hideAllMapOverlays : restoreDefaultMapOverlays}
-                          className={`rounded-full border px-3 py-1.5 transition ${
-                            anyMapOverlayOpen
-                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
-                              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/60'
-                          }`}
+                      <div className="flex max-w-full flex-col items-end gap-1">
+                        <div
+                          data-testid="map-overlay-toolbar"
+                          className="flex max-w-full flex-wrap items-center justify-end gap-1.5 text-[11px]"
                         >
-                          {anyMapOverlayOpen ? '专注地图' : '恢复默认浮窗'}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="toggle-map-overlay-insight"
-                          aria-pressed={mapOverlayPanels.insight.open}
-                          onClick={() => toggleMapOverlayOpen('insight')}
-                          className={`rounded-full border px-3 py-1.5 transition ${
-                            mapOverlayPanels.insight.open
-                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
-                              : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
-                          }`}
-                        >
-                          {mapOverlayPanels.insight.open ? '隐藏说明' : '显示说明'}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="toggle-map-overlay-legend"
-                          aria-pressed={mapOverlayPanels.legend.open}
-                          onClick={() => toggleMapOverlayOpen('legend')}
-                          className={`rounded-full border px-3 py-1.5 transition ${
-                            mapOverlayPanels.legend.open
-                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
-                              : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
-                          }`}
-                        >
-                          {mapOverlayPanels.legend.open ? '隐藏图例' : '显示图例'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={resetMapOverlayPositions}
-                          className="rounded-full border border-slate-700 bg-slate-950/75 px-3 py-1.5 text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
-                        >
-                          重置位置
-                        </button>
-                        <span className="text-slate-500/80">Esc 也可快速清空浮窗</span>
+                          <button
+                            type="button"
+                            data-testid="focus-map-overlays"
+                            onClick={anyMapOverlayOpen ? hideAllMapOverlays : restoreDefaultMapOverlays}
+                            className={`rounded-xl border px-3 py-1.5 transition ${
+                              anyMapOverlayOpen
+                                ? 'border-amber-500/40 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
+                                : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/60'
+                            }`}
+                          >
+                            {anyMapOverlayOpen ? '专注地图' : '恢复默认浮窗'}
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="toggle-map-overlay-insight"
+                            aria-pressed={mapOverlayPanels.insight.open}
+                            onClick={() => toggleMapOverlayOpen('insight')}
+                            className={`rounded-xl border px-3 py-1.5 transition ${
+                              mapOverlayPanels.insight.open
+                                ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                                : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                            }`}
+                          >
+                            {mapOverlayPanels.insight.open ? '隐藏说明' : '显示说明'}
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="toggle-map-overlay-legend"
+                            aria-pressed={mapOverlayPanels.legend.open}
+                            onClick={() => toggleMapOverlayOpen('legend')}
+                            className={`rounded-xl border px-3 py-1.5 transition ${
+                              mapOverlayPanels.legend.open
+                                ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                                : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                            }`}
+                          >
+                            {mapOverlayPanels.legend.open ? '隐藏图例' : '显示图例'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resetMapOverlayPositions}
+                            className="rounded-xl border border-slate-700 bg-slate-950/75 px-3 py-1.5 text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+                          >
+                            重置位置
+                          </button>
+                        </div>
+                        <span className="text-[10px] text-slate-500/80">Esc 可快速清空浮窗</span>
                       </div>
                     )}
                   </div>
@@ -3384,34 +3791,27 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">比赛时长</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">{matchDurationClockLabel}</p>
-                      </div>
-                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">当前图层</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-100">{activeOverlayMeta.title}</p>
-                        <p className="mt-1 text-xs text-slate-400">{heatmapFocusLabel}</p>
-                      </div>
-                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">热力样本</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">
+                    <div
+                      data-testid="map-analysis-strip"
+                      className="mt-3 rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
+                        <span className="text-slate-500">图层</span>
+                        <span className="font-medium text-slate-100">{activeOverlayMeta.title}</span>
+                        <span className="text-slate-500">聚焦</span>
+                        <span className="truncate text-slate-300">{heatmapFocusLabel}</span>
+                        <span className="text-slate-500">样本</span>
+                        <span className="font-mono text-slate-100">
                           {heatmapSummary ? formatHudValue(heatmapSummary.totalSamples) : '--'}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-400">{activeOverlayMeta.densityLabel}</p>
+                        </span>
+                        <span className="text-slate-500">路径</span>
+                        <span className="text-slate-300">{showPaths ? pathCompressionLabel : '关闭'}</span>
+                        <span className="text-slate-500">偏移</span>
+                        <span className="font-mono text-slate-100">{timeBasisOffsetSeconds.toFixed(2)}s</span>
                       </div>
-                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">路径压缩</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">{pathCompressionLabel}</p>
-                        <p className="mt-1 text-xs text-slate-400">{showPaths ? pathFocusLabel : '当前未开启路径'}</p>
-                      </div>
-                      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">偏移秒数</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-slate-100">
-                          {timeBasisOffsetSeconds.toFixed(2)}s
-                        </p>
-                      </div>
+                      <p className="mt-1.5 text-xs text-slate-400">
+                        {showPaths ? pathFocusLabel : activeOverlayMeta.densityLabel}
+                      </p>
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/75 p-3 text-sm text-slate-300 md:hidden">

@@ -207,6 +207,51 @@ def test_list_recent_matches_filters_by_league_and_time_range() -> None:
     assert page[0]["match_id"] == 502
 
 
+def test_upsert_match_detail_persists_player_identity_rows() -> None:
+    storage = OpenDotaMatchStorage()
+
+    inserted, updated = storage.upsert_match_detail(
+        {
+            "match_id": 650,
+            "start_time": 1700000650,
+            "duration": 2400,
+            "radiant_team_name": "Team Liquid",
+            "dire_team_name": "Team Falcons",
+            "leagueid": 15475,
+            "source": "pro",
+            "players": [
+                {
+                    "account_id": 10001,
+                    "player_slot": 0,
+                    "hero_id": 2,
+                    "isRadiant": True,
+                    "personaname": "miCKe",
+                    "name": "miCKe",
+                },
+                {
+                    "account_id": 10002,
+                    "player_slot": 128,
+                    "hero_id": 26,
+                    "isRadiant": False,
+                    "personaname": "skiter",
+                    "name": "skiter",
+                },
+            ],
+        }
+    )
+
+    assert (inserted, updated) == (1, 0)
+
+    rows = storage.get_match_player_identities(650)
+    assert len(rows) == 2
+    assert rows[0]["account_id"] == 10001
+    assert rows[0]["team"] == 2
+    assert rows[0]["persona_name"] == "miCKe"
+    assert rows[0]["pro_name"] == "miCKe"
+    assert rows[1]["account_id"] == 10002
+    assert rows[1]["team"] == 3
+
+
 def test_upsert_recent_matches_persists_name_fields_and_tracks_name_updates() -> None:
     storage = OpenDotaMatchStorage()
     inserted, updated = storage.upsert_recent_matches(
@@ -290,6 +335,80 @@ def test_upsert_match_detail_extracts_nested_team_and_league_names() -> None:
     assert row["radiant_team_name"] == "Team Liquid"
     assert row["dire_team_name"] == "Team Falcons"
     assert row["league_name"] == "DreamLeague Season 26"
+
+
+def test_upsert_match_detail_persists_and_updates_player_identities() -> None:
+    storage = OpenDotaMatchStorage()
+
+    storage.upsert_match_detail(
+        {
+            "match_id": 703,
+            "start_time": 1700000703,
+            "duration": 2200,
+            "source": "pro",
+            "players": [
+                {
+                    "player_slot": 0,
+                    "account_id": 101,
+                    "hero_id": 2,
+                    "isRadiant": True,
+                    "personaname": "Radiant Pub",
+                    "name": "Radiant Pro",
+                },
+                {
+                    "player_slot": 128,
+                    "account_id": 202,
+                    "hero_id": 26,
+                    "isRadiant": False,
+                    "personaname": "Dire Pub",
+                    "name": "Dire Pro",
+                },
+            ],
+        }
+    )
+
+    storage.upsert_match_detail(
+        {
+            "match_id": 703,
+            "start_time": 1700000703,
+            "duration": 2200,
+            "source": "pro",
+            "players": [
+                {
+                    "player_slot": 0,
+                    "account_id": 101,
+                    "hero_id": 2,
+                    "isRadiant": True,
+                    "personaname": "Radiant Pub Updated",
+                    "name": "Radiant Pro",
+                },
+                {
+                    "player_slot": 128,
+                    "account_id": 202,
+                    "hero_id": 26,
+                    "isRadiant": False,
+                    "personaname": "Dire Pub",
+                    "name": "Dire Pro",
+                },
+            ],
+        }
+    )
+
+    identities = storage.get_match_player_identities(703)
+    assert len(identities) == 2
+    assert identities[0]["player_slot"] == 0
+    assert identities[0]["team"] == 2
+    assert identities[0]["account_id"] == 101
+    assert identities[0]["persona_name"] == "Radiant Pub Updated"
+    assert identities[0]["pro_name"] == "Radiant Pro"
+    assert identities[1]["player_slot"] == 5
+    assert identities[1]["team"] == 3
+    assert identities[1]["account_id"] == 202
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) AS cnt FROM opendota_match_players WHERE match_id = 703")
+    assert cursor.fetchone()["cnt"] == 2
 
 
 def test_upsert_recent_matches_tracks_source_and_icon_urls() -> None:

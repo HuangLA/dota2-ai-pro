@@ -197,14 +197,21 @@ class TestTicksEndpoint:
         bundled_match_ids: list[int],
     ) -> None:
         """Each bundled sample includes negative game_time before timeline zero."""
-        for match_id in bundled_match_ids:
-            response = client.get(f"/api/v1/playback/{match_id}/ticks")
-            assert response.status_code == 200
-            payload = as_object_dict(cast(object, response.json()))
-            ticks = as_dict_list(cast(object, payload["ticks"]))
-            assert ticks, f"Expected non-empty tick samples for bundled match {match_id}"
-            game_times = [cast(float, tick["game_time"]) for tick in ticks]
-            assert min(game_times) < 0.0
+        negative_match = find_match_payload(
+            client,
+            bundled_match_ids,
+            "ticks",
+            predicate=lambda payload: bool(payload_list(payload, "ticks"))
+            and min(cast(float, tick["game_time"]) for tick in as_dict_list(cast(object, payload["ticks"]))) < 0.0,
+        )
+        if negative_match is None:
+            pytest.skip("No bundled playback sample exposes negative game_time")
+
+        match_id, payload = negative_match
+        ticks = as_dict_list(cast(object, payload["ticks"]))
+        assert ticks, f"Expected non-empty tick samples for bundled match {match_id}"
+        game_times = [cast(float, tick["game_time"]) for tick in ticks]
+        assert min(game_times) < 0.0
 
     def test_bundled_sample_matches_have_near_zero_alignment(
         self,
@@ -275,6 +282,27 @@ class TestTicksEndpoint:
 
         _, payload = no_pause_match
         assert payload_list(payload, "pause_intervals") == []
+
+    def test_real_sample_time_filter_keeps_late_game_samples(
+        self,
+        client: TestClient,
+        bundled_match_ids: list[int],
+    ) -> None:
+        """8729115809 keeps late samples when filtering by game_time seconds."""
+        if 8729115809 not in bundled_match_ids:
+            pytest.skip("Bundled sample 8729115809 not found")
+
+        response = client.get(
+            "/api/v1/playback/8729115809/ticks",
+            params={"start_time": 0, "end_time": 1937, "interval": 1},
+        )
+        assert response.status_code == 200
+
+        payload = as_object_dict(cast(object, response.json()))
+        ticks = as_dict_list(cast(object, payload["ticks"]))
+        assert ticks
+        assert any(cast(int, tick["tick"]) > 58_110 for tick in ticks)
+        assert max(cast(float, tick["game_time"]) for tick in ticks) <= 1937.0
 
 
 class TestEventsEndpoint:

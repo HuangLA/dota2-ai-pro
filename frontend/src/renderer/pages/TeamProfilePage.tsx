@@ -1861,7 +1861,7 @@ export function TeamProfilePage({
               <p className="workspace-panel-description">先确定战队和样本范围，再决定是按联赛筛选、按下载状态过滤，还是直接跳去准备回放。</p>
             </div>
 
-            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
+            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_minmax(120px,auto)]">
               <div>
                 <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
                 <input
@@ -1885,7 +1885,7 @@ export function TeamProfilePage({
               <div className="flex items-end">
                 <button
                   type="submit"
-                  className="rounded-2xl bg-dota-primary px-5 py-2.5 font-medium text-white hover:bg-blue-700"
+                  className="workspace-action-button w-full bg-dota-primary text-white hover:bg-blue-700 md:w-auto"
                 >
                   查询
                 </button>
@@ -1951,14 +1951,15 @@ export function TeamProfilePage({
                 <p className="workspace-panel-description">把常用视角固定成预设，或者把当前状态保存成快照，方便回到某个分析上下文。</p>
               </div>
 
-              <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="mb-4 workspace-action-row">
                 <button
                   type="button"
                   aria-label="预设 全部比赛"
+                  title="全部比赛"
                   onClick={() => {
                     void applyPreset('all_matches');
                   }}
-                  className={`rounded-2xl border px-3 py-2 text-sm ${activePresetKey === 'all_matches'
+                  className={`workspace-chip-button ${activePresetKey === 'all_matches'
                     ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
                     : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
                     }`}
@@ -1968,10 +1969,11 @@ export function TeamProfilePage({
                 <button
                   type="button"
                   aria-label="预设 仅有下载状态"
+                  title="仅有下载状态"
                   onClick={() => {
                     void applyPreset('with_download_status');
                   }}
-                  className={`rounded-2xl border px-3 py-2 text-sm ${activePresetKey === 'with_download_status'
+                  className={`workspace-chip-button ${activePresetKey === 'with_download_status'
                     ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
                     : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
                     }`}
@@ -1981,10 +1983,11 @@ export function TeamProfilePage({
                 <button
                   type="button"
                   aria-label="预设 最近 20 场"
+                  title="最近 20 场"
                   onClick={() => {
                     void applyPreset('latest_20');
                   }}
-                  className={`rounded-2xl border px-3 py-2 text-sm ${activePresetKey === 'latest_20'
+                  className={`workspace-chip-button ${activePresetKey === 'latest_20'
                     ? 'border-cyan-400 bg-cyan-900/30 text-cyan-100'
                     : 'border-gray-600 bg-dota-bg text-gray-200 hover:border-gray-500'
                     }`}
@@ -2125,57 +2128,62 @@ export function TeamProfilePage({
                 <p className="workspace-panel-description">围绕“当前筛选 + 当前展开”这一批比赛执行准备、跳转和导出动作。</p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="workspace-action-row">
                 <button
                   type="button"
                   aria-label="在比赛数据库打开当前可见项"
+                  title="在比赛数据库打开当前可见项"
                   onClick={handleOpenVisibleInMatchDatabase}
                   disabled={isVisibleBatchActionRunning || currentTeamId === null}
-                  className="rounded-2xl border border-cyan-700/60 bg-cyan-900/20 px-3 py-2 text-sm text-cyan-200 hover:border-cyan-500/60 hover:text-cyan-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  className="workspace-chip-button border border-cyan-700/60 bg-cyan-900/20 text-cyan-200 hover:border-cyan-500/60 hover:text-cyan-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
-                  在比赛数据库打开当前可见项
+                  打开当前可见项
                 </button>
                 <button
                   type="button"
                   aria-label="准备当前可见比赛"
+                  title="准备当前可见比赛"
                   onClick={() => {
                     void handlePrepareVisibleMatches();
                   }}
                   disabled={isVisibleBatchActionRunning || visibleMatches.length === 0}
-                  className="rounded-2xl border border-emerald-700/60 bg-emerald-900/20 px-3 py-2 text-sm text-emerald-200 hover:border-emerald-500/60 hover:text-emerald-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  className="workspace-chip-button border border-emerald-700/60 bg-emerald-900/20 text-emerald-200 hover:border-emerald-500/60 hover:text-emerald-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
-                  {isPreparingVisibleMatches ? '正在准备当前可见比赛...' : '准备当前可见比赛'}
+                  {isPreparingVisibleMatches ? '正在准备可见比赛...' : '准备当前可见项'}
                 </button>
                 <button
                   type="button"
                   aria-label="准备并打开首场回放（可见）"
+                  title="准备并打开首场回放（可见）"
                   onClick={() => {
                     void handlePrepareAndOpenFirstVisibleReplay();
                   }}
                   disabled={isVisibleBatchActionRunning || visibleMatches.length === 0}
-                  className="rounded-2xl border border-fuchsia-700/60 bg-fuchsia-900/20 px-3 py-2 text-sm text-fuchsia-200 hover:border-fuchsia-500/60 hover:text-fuchsia-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  className="workspace-chip-button border border-fuchsia-700/60 bg-fuchsia-900/20 text-fuchsia-200 hover:border-fuchsia-500/60 hover:text-fuchsia-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
                   {isPreparingAndOpeningVisibleReplay
-                    ? '正在准备可见比赛并打开回放...'
-                    : '准备并打开首场回放（可见）'}
+                    ? '正在准备并打开回放...'
+                    : '准备并打开首场回放'}
                 </button>
                 <button
                   type="button"
                   aria-label="导出可见比赛（.txt）"
+                  title="导出可见比赛（.txt）"
                   onClick={handleExportVisibleMatches}
                   disabled={visibleMatches.length === 0 || isVisibleBatchActionRunning}
-                  className="rounded-2xl border border-orange-700/60 bg-orange-900/20 px-3 py-2 text-sm text-orange-200 hover:border-orange-500/60 hover:text-orange-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  className="workspace-chip-button border border-orange-700/60 bg-orange-900/20 text-orange-200 hover:border-orange-500/60 hover:text-orange-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
                   导出可见比赛（.txt）
                 </button>
                 <button
                   type="button"
                   aria-label="复制可见比赛 ID"
+                  title="复制可见比赛 ID"
                   onClick={() => {
                     void handleCopyVisibleMatchIds();
                   }}
                   disabled={visibleMatches.length === 0 || isVisibleBatchActionRunning}
-                  className="rounded-2xl border border-indigo-700/60 bg-indigo-900/20 px-3 py-2 text-sm text-indigo-200 hover:border-indigo-500/60 hover:text-indigo-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
+                  className="workspace-chip-button border border-indigo-700/60 bg-indigo-900/20 text-indigo-200 hover:border-indigo-500/60 hover:text-indigo-100 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500"
                 >
                   复制可见比赛 ID
                 </button>

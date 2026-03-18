@@ -2,7 +2,7 @@
 
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import OpenDotaLivePage from './OpenDotaLivePage';
 import { remoteService } from '../api/remoteService';
 
@@ -39,6 +39,33 @@ describe('OpenDotaLivePage', () => {
         })
       );
     });
+  });
+
+  it('renders grouped responsive filter cards for live match search', async () => {
+    vi.spyOn(remoteService, 'getRemoteMatches').mockResolvedValue({
+      status: 'ok',
+      total: 0,
+      limit: 20,
+      offset: 0,
+      matches: [],
+    });
+
+    render(<OpenDotaLivePage />);
+    await screen.findByText('未找到实时比赛。');
+
+    expect(screen.getByTestId('live-filter-form').className).toContain('xl:grid-cols-2');
+    expect(screen.getByTestId('live-source-filter-group').className).toContain('xl:col-span-2');
+    expect(screen.getByTestId('live-source-filter-group').className).toContain('2xl:col-span-1');
+    expect(screen.getByTestId('live-filter-actions').className).toContain('xl:col-span-2');
+    expect(screen.getByTestId('live-filter-actions').className).toContain('2xl:col-span-1');
+    expect(screen.getByTestId('live-filter-button-row').className).toContain('workspace-action-row');
+    expect(screen.getByTestId('live-batch-button-row').className).toContain('workspace-action-row');
+    expect(screen.getByTestId('live-filter-button-row').className).not.toContain('2xl:grid-cols-1');
+    expect(screen.getByTestId('live-batch-button-row').className).not.toContain('2xl:grid-cols-1');
+    expect(within(screen.getByTestId('live-source-filter-group')).getByText('来源')).toBeTruthy();
+    expect(screen.getByLabelText('match_id')).toBeTruthy();
+    expect(screen.getByLabelText('leagueid')).toBeTruthy();
+    expect(within(screen.getByTestId('live-filter-actions')).getByText('动作')).toBeTruthy();
   });
 
   it('calls ingest API for single row action', async () => {

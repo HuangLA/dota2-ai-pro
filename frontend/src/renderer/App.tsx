@@ -125,27 +125,34 @@ function App() {
       <Route
         path="/match"
         element={
-          <div className="w-full h-screen relative">
-            <button
-              onClick={handleBackFromReplayViewer}
-              aria-label="← 返回"
-              className="absolute left-5 top-5 z-[9999] flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,41,59,0.72))] px-4 py-3 text-left text-white shadow-[0_20px_40px_rgba(2,6,23,0.4)] backdrop-blur-xl transition hover:border-cyan-400/40 hover:bg-[linear-gradient(135deg,rgba(8,47,73,0.88),rgba(15,23,42,0.92))]"
-            >
-              <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 p-2 text-cyan-200">
-                <ArrowLeft className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  <LayoutDashboard className="h-3.5 w-3.5" />
-                  Workspace
+          <div data-testid="replay-viewer-shell" className="flex h-screen flex-col bg-dota-bg">
+            <div data-testid="replay-viewer-topbar" className="flex flex-none items-center px-4 pt-4 lg:px-6">
+              <button
+                onClick={handleBackFromReplayViewer}
+                aria-label="← 返回"
+                title="返回工作台"
+                data-testid="return-to-workspace-button"
+                className="flex max-w-[15rem] items-center gap-2 rounded-2xl border border-slate-700/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,41,59,0.72))] px-3 py-2.5 text-left text-white shadow-[0_18px_34px_rgba(2,6,23,0.34)] backdrop-blur-xl transition hover:border-cyan-400/40 hover:bg-[linear-gradient(135deg,rgba(8,47,73,0.88),rgba(15,23,42,0.92))] 2xl:gap-3 2xl:px-4 2xl:py-3 2xl:shadow-[0_20px_40px_rgba(2,6,23,0.4)] 2xl:max-w-none"
+              >
+                <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 p-2 text-cyan-200">
+                  <ArrowLeft className="h-4 w-4" />
                 </div>
-                <p className="mt-1 text-sm font-semibold text-white">返回工作台</p>
-              </div>
-            </button>
-            <RealMatchViewer
-              initialMatchId={currentMatchId}
-              replayEntryContext={replayEntryContext}
-            />
+                <div data-testid="replay-back-button-label" className="hidden 2xl:block">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    Workspace
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-white">返回工作台</p>
+                </div>
+                <span className="sr-only">返回工作台</span>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <RealMatchViewer
+                initialMatchId={currentMatchId}
+                replayEntryContext={replayEntryContext}
+              />
+            </div>
           </div>
         }
       />

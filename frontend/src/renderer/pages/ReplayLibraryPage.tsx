@@ -346,7 +346,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
               setAppliedFilters(filters);
               setFeedback(null);
             }}
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
           >
             <input
               aria-label="team_id"
@@ -369,24 +369,26 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
               placeholder="leagueid（OpenDota 搜索）"
               className="workspace-input focus:border-emerald-500"
             />
-            <button
-              type="submit"
-              className="rounded border border-emerald-500/60 bg-emerald-700 px-4 py-2 font-medium text-white transition hover:bg-emerald-600"
-            >
-              查询
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFilters(DEFAULT_FILTERS);
-                setAppliedFilters(DEFAULT_FILTERS);
-                setOffset(0);
-                setFeedback(null);
-              }}
-              className="rounded border border-slate-500/60 bg-slate-700 px-4 py-2 font-medium text-white transition hover:bg-slate-600"
-            >
-              清空
-            </button>
+            <div className="workspace-action-row md:col-span-2 xl:col-span-3">
+              <button
+                type="submit"
+                className="workspace-action-button min-w-[112px] border border-emerald-500/60 bg-emerald-700 text-white transition hover:bg-emerald-600"
+              >
+                查询
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters(DEFAULT_FILTERS);
+                  setAppliedFilters(DEFAULT_FILTERS);
+                  setOffset(0);
+                  setFeedback(null);
+                }}
+                className="workspace-action-button min-w-[112px] border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600"
+              >
+                清空
+              </button>
+            </div>
           </form>
         </div>
 

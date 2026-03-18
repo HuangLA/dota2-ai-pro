@@ -198,6 +198,8 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
             dire_team_id INTEGER,
             leagueid INTEGER,
             source TEXT NOT NULL DEFAULT 'pro' CHECK(source IN ('pro','public')),
+            is_professional INTEGER NOT NULL DEFAULT 0 CHECK(is_professional IN (0, 1)),
+            radiant_win INTEGER CHECK(radiant_win IN (0, 1)),
             radiant_team_name TEXT,
             dire_team_name TEXT,
             league_name TEXT,
@@ -211,6 +213,23 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
             last_synced_at INTEGER NOT NULL
         )
     """)
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS opendota_match_players (
+            match_id INTEGER NOT NULL,
+            player_slot INTEGER NOT NULL,
+            account_id INTEGER,
+            hero_id INTEGER,
+            team_id INTEGER CHECK(team_id IN (2, 3)),
+            persona_name TEXT,
+            pro_name TEXT,
+            last_synced_at INTEGER NOT NULL,
+            PRIMARY KEY (match_id, player_slot),
+            FOREIGN KEY (match_id) REFERENCES opendota_matches(match_id) ON DELETE CASCADE
+        )
+        """
+    )
 
     # OpenDota teams reference table
     cursor.execute("""
@@ -259,6 +278,7 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
 
     _ensure_opendota_match_columns(cursor)
     _ensure_opendota_reference_columns(cursor)
+    _ensure_opendota_match_player_columns(cursor)
     _ensure_replay_download_task_columns(cursor)
     
     # Create indexes
@@ -274,6 +294,12 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
         "CREATE INDEX IF NOT EXISTS idx_opendota_matches_start_time ON opendota_matches(start_time DESC)"
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_matches_source ON opendota_matches(source)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_opendota_match_players_match_id ON opendota_match_players(match_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_opendota_match_players_account_id ON opendota_match_players(account_id)"
+    )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_teams_name ON opendota_teams(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_leagues_name ON opendota_leagues(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_replay_download_tasks_status ON replay_download_tasks(status)")
@@ -387,6 +413,14 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
     if "league_name" not in columns:
         cursor.execute("ALTER TABLE opendota_matches ADD COLUMN league_name TEXT")
 
+    if "is_professional" not in columns:
+        cursor.execute(
+            "ALTER TABLE opendota_matches ADD COLUMN is_professional INTEGER NOT NULL DEFAULT 0"
+        )
+
+    if "radiant_win" not in columns:
+        cursor.execute("ALTER TABLE opendota_matches ADD COLUMN radiant_win INTEGER")
+
     if "radiant_logo_url" not in columns:
         cursor.execute("ALTER TABLE opendota_matches ADD COLUMN radiant_logo_url TEXT")
 
@@ -434,6 +468,8 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
                 dire_team_id INTEGER,
                 leagueid INTEGER,
                 source TEXT NOT NULL DEFAULT 'pro' CHECK(source IN ('pro','public')),
+                is_professional INTEGER NOT NULL DEFAULT 0 CHECK(is_professional IN (0, 1)),
+                radiant_win INTEGER CHECK(radiant_win IN (0, 1)),
                 radiant_team_name TEXT,
                 dire_team_name TEXT,
                 league_name TEXT,
@@ -461,6 +497,8 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
                 dire_team_id,
                 leagueid,
                 source,
+                is_professional,
+                radiant_win,
                 radiant_team_name,
                 dire_team_name,
                 league_name,
@@ -487,6 +525,11 @@ def _ensure_opendota_match_columns(cursor: sqlite3.Cursor) -> None:
                     WHEN source IN ('pro', 'public') THEN source
                     ELSE 'pro'
                 END,
+                CASE
+                    WHEN source = 'pro' THEN 1
+                    ELSE COALESCE(is_professional, 0)
+                END,
+                radiant_win,
                 radiant_team_name,
                 dire_team_name,
                 league_name,
@@ -533,3 +576,59 @@ def _ensure_opendota_reference_columns(cursor: sqlite3.Cursor) -> None:
 
     if "banner_url" not in league_columns:
         cursor.execute("ALTER TABLE opendota_leagues ADD COLUMN banner_url TEXT")
+
+
+def _ensure_opendota_match_player_columns(cursor: sqlite3.Cursor) -> None:
+    """Ensure opendota_match_players exists with the expected identity columns."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS opendota_match_players (
+            match_id INTEGER NOT NULL,
+            player_slot INTEGER NOT NULL,
+            account_id INTEGER,
+            hero_id INTEGER,
+            team_id INTEGER CHECK(team_id IN (2, 3)),
+            persona_name TEXT,
+            pro_name TEXT,
+            last_synced_at INTEGER NOT NULL,
+            PRIMARY KEY (match_id, player_slot),
+            FOREIGN KEY (match_id) REFERENCES opendota_matches(match_id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    cursor.execute("PRAGMA table_info(opendota_match_players)")
+    columns = {str(row["name"]) for row in cursor.fetchall()}
+
+    if "player_slot" not in columns:
+        cursor.execute("ALTER TABLE opendota_match_players ADD COLUMN player_slot INTEGER")
+    if "account_id" not in columns:
+        cursor.execute("ALTER TABLE opendota_match_players ADD COLUMN account_id INTEGER")
+    if "hero_id" not in columns:
+        cursor.execute("ALTER TABLE opendota_match_players ADD COLUMN hero_id INTEGER")
+    if "team_id" not in columns:
+        cursor.execute("ALTER TABLE opendota_match_players ADD COLUMN team_id INTEGER")
+        if "team" in columns:
+            cursor.execute(
+                "UPDATE opendota_match_players SET team_id = team WHERE team_id IS NULL"
+            )
+        if "is_radiant" in columns:
+            cursor.execute(
+                """
+                UPDATE opendota_match_players
+                SET team_id = CASE
+                    WHEN is_radiant = 1 THEN 2
+                    WHEN is_radiant = 0 THEN 3
+                    ELSE team_id
+                END
+                WHERE team_id IS NULL
+                """
+            )
+    if "persona_name" not in columns:
+        cursor.execute("ALTER TABLE opendota_match_players ADD COLUMN persona_name TEXT")
+    if "pro_name" not in columns:
+        cursor.execute("ALTER TABLE opendota_match_players ADD COLUMN pro_name TEXT")
+    if "last_synced_at" not in columns:
+        cursor.execute(
+            "ALTER TABLE opendota_match_players ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))"
+        )

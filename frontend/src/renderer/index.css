@@ -51,22 +51,22 @@
   }
 
   .workspace-page {
-    @apply min-h-full p-5 text-white;
+    @apply min-h-full p-4 text-white lg:p-5;
   }
 
   .workspace-stack {
-    @apply mx-auto flex max-w-[1440px] flex-col gap-5;
+    @apply mx-auto flex max-w-[1480px] flex-col gap-4 lg:gap-5;
   }
 
   .workspace-header {
-    @apply rounded-[28px] border border-slate-800/80 p-5 shadow-[0_24px_60px_rgba(2,6,23,0.36)];
+    @apply rounded-[24px] border border-slate-800/80 p-4 shadow-[0_24px_60px_rgba(2,6,23,0.36)] lg:rounded-[28px] lg:p-5;
     background:
       radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 32%),
       linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.96));
   }
 
   .workspace-header-row {
-    @apply flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between;
+    @apply flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between;
   }
 
   .workspace-eyebrow {
@@ -74,7 +74,7 @@
   }
 
   .workspace-title {
-    @apply mt-2 text-[30px] font-semibold tracking-tight text-white;
+    @apply mt-2 text-[25px] font-semibold tracking-tight text-white sm:text-[28px] lg:text-[30px];
   }
 
   .workspace-description {
@@ -82,11 +82,11 @@
   }
 
   .workspace-kpi-grid {
-    @apply grid gap-3 sm:grid-cols-3;
+    @apply grid gap-3 md:grid-cols-3;
   }
 
   .workspace-kpi {
-    @apply rounded-2xl border border-slate-800/80 bg-slate-950/55 px-4 py-3;
+    @apply rounded-2xl border border-slate-800/80 bg-slate-950/55 px-3.5 py-3 lg:px-4;
   }
 
   .workspace-kpi-label {
@@ -102,7 +102,7 @@
   }
 
   .workspace-pill-row {
-    @apply mt-4 flex flex-wrap gap-2 text-xs;
+    @apply mt-4 flex flex-wrap gap-2 text-[11px] sm:text-xs;
   }
 
   .workspace-pill {
@@ -110,7 +110,7 @@
   }
 
   .workspace-panel {
-    @apply rounded-[24px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.88))] p-5 shadow-[0_18px_40px_rgba(2,6,23,0.28)];
+    @apply rounded-[22px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.88))] p-4 shadow-[0_18px_40px_rgba(2,6,23,0.28)] lg:rounded-[24px] lg:p-5;
   }
 
   .workspace-split-grid {
@@ -134,11 +134,11 @@
   }
 
   .workspace-table-shell {
-    @apply overflow-hidden rounded-[24px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(2,6,23,0.9))] shadow-[0_18px_40px_rgba(2,6,23,0.28)];
+    @apply overflow-hidden rounded-[22px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.68),rgba(2,6,23,0.9))] shadow-[0_18px_40px_rgba(2,6,23,0.28)] lg:rounded-[24px];
   }
 
   .workspace-input {
-    @apply w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none;
+    @apply h-[46px] w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none;
   }
 
   .workspace-select {
@@ -146,11 +146,31 @@
   }
 
   .workspace-checkpanel {
-    @apply flex h-[46px] items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3;
+    @apply flex min-h-[46px] items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3;
+  }
+
+  .workspace-field-label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500;
+  }
+
+  .workspace-field-hint {
+    @apply mt-2 text-xs leading-5 text-slate-500;
+  }
+
+  .workspace-action-row {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .workspace-action-button {
+    @apply inline-flex min-h-[46px] items-center justify-center whitespace-nowrap rounded-2xl px-4 py-2 text-sm font-medium;
+  }
+
+  .workspace-chip-button {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-2xl px-3 py-2 text-sm;
   }
 
   .workspace-subtle-button {
-    @apply rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500 hover:text-white;
+    @apply inline-flex min-h-[46px] items-center justify-center whitespace-nowrap rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500 hover:text-white;
   }
 
   /* Glassmorphism panel */

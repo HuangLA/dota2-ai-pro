@@ -796,10 +796,10 @@ export function MatchDatabasePage({
                   <span className="text-sm text-gray-200">仅显示职业联赛</span>
                 </label>
               </div>
-              <div className="flex flex-wrap gap-2 xl:col-span-6">
+              <div className="workspace-action-row xl:col-span-6">
                 <button
                   type="submit"
-                  className="rounded bg-dota-primary px-5 py-2 font-medium text-white transition-colors hover:bg-blue-600"
+                  className="workspace-action-button min-w-[112px] bg-dota-primary text-white transition-colors hover:bg-blue-600"
                 >
                   查询
                 </button>
@@ -815,14 +815,14 @@ export function MatchDatabasePage({
                     }
                     void fetchMatches();
                   }}
-                  className="rounded bg-cyan-700 px-5 py-2 text-white transition-colors hover:bg-cyan-600"
+                  className="workspace-action-button min-w-[136px] bg-cyan-700 text-white transition-colors hover:bg-cyan-600"
                 >
                   刷新当前页
                 </button>
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="rounded bg-gray-600 px-5 py-2 text-white transition-colors hover:bg-gray-500"
+                  className="workspace-action-button min-w-[112px] bg-gray-600 text-white transition-colors hover:bg-gray-500"
                 >
                   清空
                 </button>
@@ -844,14 +844,14 @@ export function MatchDatabasePage({
                 </span>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 workspace-action-row">
                 <button
                   type="button"
                   onClick={() => {
                     void handleBatchAction();
                   }}
                   disabled={batchActionsDisabled || activeBatchMode !== null}
-                  className="rounded bg-emerald-700 px-5 py-2 text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="workspace-action-button min-w-[160px] bg-emerald-700 text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {activeBatchMode === 'prepare_and_execute' ? '正在批量下载（勾选项）...' : '批量下载（勾选项）'}
                 </button>
@@ -859,7 +859,7 @@ export function MatchDatabasePage({
                   type="button"
                   onClick={() => setSelectedMatchIds([])}
                   disabled={selectedMatchCount === 0}
-                  className="rounded border border-slate-600 px-4 py-2 text-white transition-colors hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="workspace-action-button min-w-[120px] border border-slate-600 text-white transition-colors hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   清空勾选
                 </button>

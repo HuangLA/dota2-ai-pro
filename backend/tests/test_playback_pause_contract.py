@@ -73,7 +73,7 @@ async def test_no_pause_regression_returns_empty_pause_intervals(monkeypatch: py
 
     monkeypatch.setattr(playback, "parquet_storage", _FakeParquetStorage(metadata, positions, wards))
 
-    response = await playback.get_ticks(match_id=1, start_time=0, end_time=None, hero=None, team=None, interval=1)
+    response = await playback.get_ticks(match_id=1, start_time=-90, end_time=None, hero=None, team=None, interval=1)
     advantage_response = await playback.get_advantage(match_id=1, start_time=None, end_time=None)
 
     assert response["pause_intervals"] == []
@@ -109,7 +109,7 @@ async def test_pause_intervals_inferred_for_ticks_and_wards(monkeypatch: pytest.
 
     monkeypatch.setattr(playback, "parquet_storage", _FakeParquetStorage(metadata, positions, wards))
 
-    ticks_response = await playback.get_ticks(match_id=1, start_time=0, end_time=None, hero=None, team=None, interval=1)
+    ticks_response = await playback.get_ticks(match_id=1, start_time=-90, end_time=None, hero=None, team=None, interval=1)
     wards_response = await playback.get_wards(match_id=1, start_tick=None, end_tick=None, team=None, ward_type=None)
     advantage_response = await playback.get_advantage(match_id=1, start_time=None, end_time=None)
 
@@ -125,7 +125,7 @@ async def test_pause_intervals_inferred_for_ticks_and_wards(monkeypatch: pytest.
 
 
 @pytest.mark.asyncio
-async def test_time_filters_remain_tick_based_with_pause(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_time_filters_follow_game_time_with_pause(monkeypatch: pytest.MonkeyPatch) -> None:
     metadata = {
         "time_contract_version": "v1",
         "ticks_per_second": 30,
@@ -151,8 +151,9 @@ async def test_time_filters_remain_tick_based_with_pause(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(playback, "parquet_storage", _FakeParquetStorage(metadata, positions, wards))
 
-    ticks_response = await playback.get_ticks(match_id=1, start_time=2, end_time=3, hero=None, team=None, interval=1)
+    ticks_response = await playback.get_ticks(match_id=1, start_time=-89, end_time=-88, hero=None, team=None, interval=1)
     wards_response = await playback.get_wards(match_id=1, start_tick=90, end_tick=120, team=None, ward_type=None)
 
-    assert [tick["tick"] for tick in ticks_response["ticks"]] == [60, 90]
+    assert [tick["tick"] for tick in ticks_response["ticks"]] == [30, 60, 90, 120]
+    assert [tick["game_time"] for tick in ticks_response["ticks"]] == [-89.0, -89.0, -89.0, -88.0]
     assert [ward["tick"] for ward in wards_response["wards"]] == [90, 120]

@@ -32,6 +32,89 @@
 
 ## 当前进展摘要（2026-03-18）
 
+### 最新完成任务（2026-03-18）
+**✅ Replay HUD 玩家名默认态改为金色高亮**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将英雄名下方那一行玩家名默认态改为金色高亮，未选中时也能稳定识别；被热力图或路径分析选中后，会切换成更强的青色发光态，与默认态明确区分。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已补充玩家名默认金色态与选中青色态的双态断言，避免只高亮下方 meta chip 的回退。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `14 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay HUD 玩家 ID 默认态改为金色高亮**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将 HUD 英雄卡里的 `玩家 ID / 职业名` meta chip 默认态改为金色高亮，未选中时也能稳定识别；被热力图或路径分析选中后，仍会切换为更强的青色高亮效果，形成明确状态区分。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已新增默认金色态与选中青色态的双态回归断言，锁住视觉语义。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `14 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay HUD 玩家 ID 高亮补强**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已补强 HUD 英雄卡中 `玩家 ID / 职业名` meta chip 的选中态样式；当英雄被热力图或路径分析选中时，玩家 ID 现在会与选手名一起显著高亮，不再只是很轻的 cyan 边框。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已新增玩家 ID 高亮类名断言，锁住 meta chip 的高亮表达。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `14 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ 多页面动作按钮稳定化 + 中文标签防竖排**
+- `frontend/src/renderer/index.css` 新增 `workspace-action-row` / `workspace-action-button` / `workspace-chip-button`，并把 `workspace-subtle-button` 收口为 `inline-flex + whitespace-nowrap`，避免中文按钮在中等宽度下被挤成多行或看起来像竖排。
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已移除动作区和批量区里会在特定断点反向改成单列的按钮网格，改为统一动作行；查询/清空/批量入库等按钮补齐 `min-width` 与 `nowrap`，不再在 `2xl` 附近重新竖排。
+- `frontend/src/renderer/pages/ReplayLibraryPage.tsx` 与 `frontend/src/renderer/pages/MatchDatabasePage.tsx` 的筛选动作区已改成统一按钮行；`frontend/src/renderer/pages/TeamProfilePage.tsx` 的查询、预设和“当前可见动作”按钮也同步收口，并对超长文案做了适度缩短与 `title` 保留。
+- `frontend/src/renderer/pages/OpenDotaLivePage.test.tsx` 已补充“不再包含 `2xl:grid-cols-1` 按钮堆叠”的回归。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/ReplayLibraryPage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx --reporter=verbose` → `71 passed`；`cd frontend && npm run build` → 通过；本地 Playwright 宽度审计显示 `openDotaLive / replayLibrary / matchDatabase / teamProfile` 在 `1360 / 1512 / 1728` 宽度下仍无横向溢出。
+
+### 最新完成任务（2026-03-18）
+**✅ 桌面工作台多分辨率收口 + OpenDota 实时筛选区重排**
+- `frontend/src/renderer/components/DesktopLayout.tsx` 已收紧中等宽度下的工作台壳层：侧栏宽度、外边距、主区 header 间距与圆角都做了分级压缩，页面标题区延后到 `2xl` 才强制左右并排，减少 14 寸 MacBook 这类宽度下的横向拥挤。
+- `frontend/src/renderer/index.css` 的 `workspace-*` 共享 token 已同步调整：页面/卡片 padding、header 断点、KPI 网格、输入高度和表格外壳都更适合中等桌面宽度，避免每个页面单独补丁式修布局。
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 的“筛选实时比赛”区域已重排为统一高度的分组卡片：来源、比赛 ID、联赛 ID、动作四块对齐；批量入库区也同步压缩为更紧凑的摘要 + 动作布局，不再出现旧版 checkbox / input / button 基线错位。
+- `frontend/src/renderer/pages/OpenDotaLivePage.test.tsx` 已新增下载页响应式筛选结构回归。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/ReplayLibraryPage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx --reporter=verbose` → `73 passed`；`cd frontend && npm run build` → 通过；本地 Playwright 宽度审计显示 `openDotaLive / replayLibrary / matchDatabase / teamProfile` 在 `1360 / 1512 / 1728` 宽度下均无横向溢出。
+
+### 最新完成任务（2026-03-18）
+**✅ Replay 页头 14 寸断点收口 + 返回按钮脱离覆盖层**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已把顶部比赛选择区延后到 `2xl` 断点才左右分栏，14 寸 MacBook 宽度会优先走堆叠布局，避免右侧选择面板挤压左侧页头信息。
+- `frontend/src/renderer/App.tsx` 的“返回工作台”按钮不再使用绝对定位覆盖在回放内容上，而是移入独立的顶部栏正常占位；中等宽度下保持紧凑图标优先样式，`2xl` 才恢复完整文案密度。
+- `frontend/src/renderer/App.matchDatabaseNavigation.test.tsx` 已补充回放页壳层 / 顶栏 / 按钮不再为 `absolute` 的回归，确保后续不会回退成遮挡式布局。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/App.teamProfileNavigation.test.tsx --reporter=verbose` → `2 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay 页 HUD lane 头部按钮回归 + playerDisplayMeta 文案修正**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已恢复 lane 头部的“全部展开/收起”按钮，并保持头部为紧凑双行布局；说明文字不再 `truncate`，可完整展示。
+- 同页已移除英雄卡右上角箭头指示器，改由按钮 `title` / `aria-label` 提供 hover/focus 提示；选手名高亮色改得更醒目。
+- `playerDisplayMeta` 已统一修正：当 `persona/pro` 实际显示为数字账号 ID 时，文案统一为更准确的 `玩家 ID ...`。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已补回 lane 批量展开回归，并新增数字账号 ID 文案回归。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `13 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay 页 HUD lane 头部单行化 + 英雄卡整卡展开/收起**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已移除 HUD lane 头部的展开计数 tag，并把说明压成单行摘要，lane 头部更紧凑。
+- 同页单英雄展开按钮已删除，改为点击整张英雄卡切换展开/收起；展开态通过更明显但克制的边框/背景/指示器差异区分。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已更新为整卡点击回归，并补充 lane 头部去 tag、展开态样式与再次收起的断言。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `12 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay 页 HUD 动作行重排 + 选手名提亮**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 现已将单英雄“展开/收起”按钮移到血条下方的独立动作行，不再与英雄名、选手名和 KDA 争抢同一行宽度。
+- HUD 选手显示名与 meta chip 提高了对比度，展开按钮保持固定 pill 形态；lane 头部也改成更紧凑的摘要条，减少“全部展开”和说明文案的纵向占用。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 新增动作行与选手名样式回归，确认按钮仍稳定且位于独立操作区。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `11 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay 页 HUD 展开按钮稳定化 + 主地图信息条瘦身**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 现已将 HUD 英雄详情展开按钮固定为稳定的 pill 形态，补齐 `inline-flex` / `min-w` / `whitespace-nowrap` / `shrink-0`，避免展开前后在不同布局下出现圆按钮和长条按钮来回切换。
+- 同页主地图上方与下方的信息条已做最小重构：将密集的状态 chip 与统计卡压缩为更少的紧凑信息块，保留比赛时钟、图层、时间范围、路径、样本和偏移秒数等关键信息，同时让地图与时间轴获得更高优先级。
+- 新增 Vitest 回归用例，覆盖 HUD 展开按钮的稳定样式与切换前后 `aria-expanded` 行为。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `11 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Replay Workspace HUD 同步静默化，消除播放中 workbench 跳动**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 现已将 HUD 的“同步中”状态限制在首次空数据加载阶段，播放中的后续 HUD 刷新改为静默更新，避免 workbench 因状态反复进出而持续跳动。
+- 同步保留了首次 HUD 加载提示与错误提示；刷新过程中不再提前清空既有的 HUD 警告/错误展示，减少闪烁。
+- 新增 Vitest 回归用例 `keeps HUD refreshes quiet after the first load so the workbench does not keep jumping`，覆盖首次加载显示同步中、后续 scrub 刷新不再重新显示同步中的行为。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `10 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-18）
+**✅ Playback 时间轴改为按 `game_time` 截止，避免 8729115809 这类比赛提前结束**
+- `backend/routers/playback.py` 的 `GET /api/v1/playback/{match_id}/ticks` 现在优先按 `game_time` 过滤 `start_time/end_time`，仅在缺少 `game_time` 时回退到 tick 过滤。
+- `backend/tests/test_playback_pause_contract.py` 更新为 `game_time` 语义回归；`backend/tests/test_playback_e2e.py` 新增 `8729115809` 真实样本尾部回归，确认 `end_time=1937` 不再把后半段样本裁掉。
+- 本次验证：`cd backend && ./.venv/bin/python -m pytest tests/test_playback_pause_contract.py -q` → `3 passed`；`cd backend && ./.venv/bin/python -m pytest tests/test_playback_e2e.py -q` → `25 passed, 1 skipped`；`cd backend && ./.venv/bin/python -m pytest tests/test_timeline_regression.py -q` → `20 passed, 8 skipped`
+
 ### S-Next 执行看板（补充）
 | ID | 任务 | 状态 | 结果摘要 |
 |----|------|------|----------|
@@ -48,6 +131,40 @@
 - 后端: `./.venv/bin/python -m pytest -q` → `176 passed, 8 skipped`
 - 前端: `npx vitest run` → `98 passed`
 - 构建: `npm run build` → 通过
+
+### 本次增量验证（2026-03-18）
+- 后端: `cd backend && ./.venv/bin/python -m pytest tests/test_opendota_match_storage.py tests/test_match_routes_context.py tests/test_matches_routes_enrichment.py tests/test_matches_duration_source.py -q` → `26 passed`
+- 前端: `cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `9 passed`
+- 构建: `cd frontend && npm run build` → 通过
+- Parser/时长修复: `cd backend && ./.venv/bin/python -m pytest tests/test_clarity_parser_postgame_trim.py tests/test_match_storage_duration.py tests/test_matches_duration_source.py tests/test_match_routes_context.py tests/test_matches_routes_enrichment.py tests/test_opendota_match_storage.py -q` → `31 passed`
+- Java parser: `cd parsers && gradle shadowJar` → `BUILD SUCCESSFUL`
+
+### 最新完成任务（2026-03-18）
+**✅ 终场后统计裁剪 + 录像真实时长修复（样本 8729115809）**
+- 调查结论：`8729115809` 的 parser metadata 其实早就识别到了正确终场时长（约 `1936.6s`），真正的问题是 Java parser 在检测到胜负后仍继续写入 positions / economy 等样本，SQLite `matches.duration` 还额外取了 `total_ticks/30` 的更大值，导致回放页面时间轴、热力图和路径分析被拖到赛后阶段。
+- `parsers/src/main/java/SimpleDemoParser.java` 现已记录 `final_whistle_game_time` / `final_whistle_replay_time`，并在输出 `positions` / `economy` / `wards` / `kills` / `pause_intervals` 前裁掉终场后的样本。
+- `backend/parsers/clarity_parser.py` 新增 post-game safety trim，作为 parser pipeline 的第二层兜底；`backend/storage/parquet_storage.py` 会把终场字段持久化到 `meta.json`。
+- `backend/storage/match_storage.py` 与 `backend/routers/matches.py` 现改为在已识别胜负时优先采用终场时长，而不是继续信任 replay container 长度。
+- 已对样本 `8729115809.dem` 重新解析落盘：`data/matches/8729115809/meta.json` 现包含 `final_whistle_game_time=1936.5665`、`final_whistle_replay_time=2963.2`；`positions/economy` 最大 `game_time` 已收敛到 `1936.3666`；SQLite `matches.duration` 已更新为 `1937`。
+- 本次相关验证已通过：后端 `31 passed`、Java parser 构建成功，并完成样本 `8729115809` 的真实重解析验证。
+
+### 最新完成任务（2026-03-18）
+**✅ Replay Workspace 英雄聚焦高亮 + 队伍名/胜方/玩家展示 ID**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 现已支持热力图与路径分析的多英雄选择；被选中的英雄会在左右 HUD 中按天辉/夜魇主题高亮，清空为“全部英雄”时不会全员高亮。
+- 顶部对阵区改为优先显示 `radiant_team_name` / `dire_team_name`，职业局展示战队名，路人局回退天辉/夜魇；同时统一显示胜方 badge 和双方胜者态。
+- HUD 英雄卡默认就会显示玩家识别信息：职业局优先显示 `pro_name/display_name`，路人局优先显示 `persona_name`，仍保留 parser metadata 作为最终回退。
+- `frontend/src/renderer/api/backend.ts` 已兼容新的 `/api/v1/matches/{match_id}/players` 返回结构，并同步放宽 `winner_team` / `parsed_at` 类型；旧版 `MatchListPage` 也已补齐新旧胜方格式兼容。
+- `backend/routers/matches.py`、`backend/storage/opendota_match_storage.py`、`backend/database/sqlite_db.py` 已打通 OpenDota players identity 缓存、比赛上下文 enrich，以及 `/api/v1/matches/{match_id}/players` 的职业/路人展示名策略。
+- 本次相关回归已通过：后端 `26 passed`、前端 HUD 场景 `9 passed`、前端构建通过。
+
+### 最新完成任务（2026-03-18）
+**✅ Matches API 比赛上下文增强 + OpenDota 玩家身份缓存**
+- `backend/database/sqlite_db.py` 新增 `opendota_match_players` 表，并为 `opendota_matches` 扩展 `is_professional` / `radiant_win` 字段与兼容迁移。
+- `backend/storage/opendota_match_storage.py` 现会在 `upsert_match_detail()` 时同步 upsert OpenDota players 身份信息，支持重复写入更新。
+- `backend/routers/matches.py` 已为 `/api/v1/matches`、`/api/v1/matches/{match_id}` 补齐 `radiant_team_name` / `dire_team_name` / `league_name` / `source` / `is_professional` / `radiant_win` enrich 字段。
+- `backend/routers/matches.py` 的 `/api/v1/matches/{match_id}/players` 已支持 `persona_name` / `pro_name` / `display_name` / `display_type`，并按职业/路人上下文选择展示名；若 OpenDota players 缓存缺失但 match 上下文已存在，会 best-effort 在线补抓 detail 后落库，失败则回退本地 parser metadata。
+- 新增后端测试覆盖 `upsert_match_detail()` 玩家身份落库、`matches` enrich 响应、玩家展示名 fallback 策略。
+- 增量验证结果：`cd backend && ./.venv/bin/python -m pytest tests/test_opendota_match_storage.py tests/test_match_routes_context.py tests/test_matches_routes_enrichment.py tests/test_matches_duration_source.py -q` → `26 passed`
 
 ### 最新完成任务（2026-03-18）
 **✅ Replay Workspace 桌面化重构 + 远端搜索/物品提示闭环**

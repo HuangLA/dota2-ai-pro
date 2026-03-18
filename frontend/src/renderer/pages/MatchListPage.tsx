@@ -8,7 +8,7 @@ interface MatchData {
   match_id: number;
   start_time?: number;
   duration?: number;
-  winner_team?: number;
+  winner_team?: number | string | null;
   winner_name?: string;
   radiant_score?: number;
   dire_score?: number;
@@ -19,7 +19,7 @@ interface MatchData {
   parse_status?: string;
   created_at?: number;
   updated_at?: number;
-  parsed_at?: string;
+  parsed_at?: string | null;
 }
 
 interface MatchListPageProps {
@@ -163,6 +163,19 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
     return `${diffDays} 天前`;
   };
 
+  const normalizeWinnerTeam = (winnerTeam: MatchData['winner_team']): number | null => {
+    if (winnerTeam === 2 || winnerTeam === 3) {
+      return winnerTeam;
+    }
+    if (winnerTeam === 'radiant') {
+      return 2;
+    }
+    if (winnerTeam === 'dire') {
+      return 3;
+    }
+    return null;
+  };
+
   return (
     <div className="workspace-page bg-dota-bg">
       <div className="workspace-stack">
@@ -302,47 +315,51 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                     </td>
                   </tr>
                 ) : (
-                  matches.map((match) => (
-                    <tr key={match.match_id} className="hover:bg-white/5 transition-colors border-b border-gray-800 last:border-0">
-                      <td className="px-6 py-4 font-mono text-dota-gold font-semibold">
-                        {match.match_id}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${match.winner_team === 2
-                            ? 'bg-green-900/40 text-green-400 border border-green-800'
-                            : match.winner_team === 3
-                              ? 'bg-red-900/40 text-red-400 border border-red-800'
-                              : 'bg-gray-700 text-gray-400'
-                            }`}
-                        >
-                          {match.winner_name || (match.winner_team === 2 ? '天辉' : match.winner_team === 3 ? '夜魇' : '未知')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-300">
-                        {formatDuration(match.duration || 0)}
-                      </td>
-                      <td className="px-6 py-4 text-gray-400 text-sm">
-                        {formatTimeAgo(match.parsed_at || match.created_at)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => onWatch(match.match_id)}
-                            className="text-blue-400 hover:text-blue-300 font-medium transition-colors text-sm px-4 py-1.5 rounded hover:bg-blue-900/30 border border-blue-700/50 hover:border-blue-500/50"
+                  matches.map((match) => {
+                    const winnerTeam = normalizeWinnerTeam(match.winner_team);
+
+                    return (
+                      <tr key={match.match_id} className="hover:bg-white/5 transition-colors border-b border-gray-800 last:border-0">
+                        <td className="px-6 py-4 font-mono text-dota-gold font-semibold">
+                          {match.match_id}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-bold uppercase ${winnerTeam === 2
+                              ? 'bg-green-900/40 text-green-400 border border-green-800'
+                              : winnerTeam === 3
+                                ? 'bg-red-900/40 text-red-400 border border-red-800'
+                                : 'bg-gray-700 text-gray-400'
+                              }`}
                           >
-                            观看
-                          </button>
-                          <button
-                            onClick={() => handleDelete(match.match_id)}
-                            className="text-red-400 hover:text-red-300 font-medium transition-colors text-sm px-4 py-1.5 rounded hover:bg-red-900/30 border border-red-700/50 hover:border-red-500/50"
-                          >
-                            删除
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {match.winner_name || (winnerTeam === 2 ? '天辉' : winnerTeam === 3 ? '夜魇' : '未知')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-300">
+                          {formatDuration(match.duration || 0)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-400 text-sm">
+                          {formatTimeAgo(match.parsed_at || match.created_at)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => onWatch(match.match_id)}
+                              className="text-blue-400 hover:text-blue-300 font-medium transition-colors text-sm px-4 py-1.5 rounded hover:bg-blue-900/30 border border-blue-700/50 hover:border-blue-500/50"
+                            >
+                              观看
+                            </button>
+                            <button
+                              onClick={() => handleDelete(match.match_id)}
+                              className="text-red-400 hover:text-red-300 font-medium transition-colors text-sm px-4 py-1.5 rounded hover:bg-red-900/30 border border-red-700/50 hover:border-red-500/50"
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

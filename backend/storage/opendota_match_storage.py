@@ -34,8 +34,8 @@ class OpenDotaMatchStorage:
                 int | None,
                 int | None,
                 str,
-                str | None,
-                str | None,
+                int,
+                int | None,
                 str | None,
                 str | None,
                 str | None,
@@ -65,6 +65,10 @@ class OpenDotaMatchStorage:
                 league = raw.get("league")
                 if isinstance(league, dict):
                     leagueid = self._as_int(league.get("leagueid") or league.get("league_id"))
+            is_professional = self._as_bool_flag(raw.get("is_professional"))
+            if is_professional is None:
+                is_professional = 1 if normalized_source == "pro" else 0
+            radiant_win = self._as_bool_flag(raw.get("radiant_win"))
             radiant_team_name = self._extract_name(
                 raw,
                 direct_keys=("radiant_team_name", "radiant_name"),
@@ -142,6 +146,8 @@ class OpenDotaMatchStorage:
                     dire_team_id,
                     leagueid,
                     normalized_source,
+                    is_professional,
+                    radiant_win,
                     radiant_team_name,
                     dire_team_name,
                     league_name,
@@ -174,6 +180,8 @@ class OpenDotaMatchStorage:
                 dire_team_id,
                 leagueid,
                 source,
+                is_professional,
+                radiant_win,
                 radiant_team_name,
                 dire_team_name,
                 league_name,
@@ -201,6 +209,8 @@ class OpenDotaMatchStorage:
                 int | None,
                 int | None,
                 str,
+                int,
+                int | None,
                 str | None,
                 str | None,
                 str | None,
@@ -223,6 +233,8 @@ class OpenDotaMatchStorage:
                 row["dire_team_id"],
                 row["leagueid"],
                 str(row["source"]),
+                int(row["is_professional"] or 0),
+                row["radiant_win"],
                 row["radiant_team_name"],
                 row["dire_team_name"],
                 row["league_name"],
@@ -257,14 +269,15 @@ class OpenDotaMatchStorage:
             """
             INSERT INTO opendota_matches (
                 match_id, start_time, duration, radiant_team_id,
-                dire_team_id, leagueid, source, radiant_team_name,
-                dire_team_name, league_name, radiant_icon_url,
+                dire_team_id, leagueid, source, is_professional,
+                radiant_win, radiant_team_name, dire_team_name,
+                league_name, radiant_icon_url,
                 dire_icon_url, radiant_logo_url, dire_logo_url,
                 league_icon_url, league_logo_url, league_image_url,
                 league_banner_url, radiant_logo_sponsor_url,
                 dire_logo_sponsor_url, last_synced_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(match_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 duration = excluded.duration,
@@ -272,6 +285,8 @@ class OpenDotaMatchStorage:
                 dire_team_id = excluded.dire_team_id,
                 leagueid = excluded.leagueid,
                 source = excluded.source,
+                is_professional = excluded.is_professional,
+                radiant_win = excluded.radiant_win,
                 radiant_team_name = excluded.radiant_team_name,
                 dire_team_name = excluded.dire_team_name,
                 league_name = excluded.league_name,
@@ -295,7 +310,61 @@ class OpenDotaMatchStorage:
     def upsert_match_detail(self, detail: dict[str, Any]) -> tuple[int, int]:
         """Upsert one match detail payload from OpenDota /matches/{id}."""
         source = self._as_text(detail.get("source")) or "pro"
-        return self.upsert_recent_matches([detail], source=source)
+        inserted, updated = self.upsert_recent_matches([detail], source=source)
+        self._upsert_match_players(detail)
+        return inserted, updated
+
+    def get_match(self, match_id: int) -> dict[str, Any] | None:
+        """Return one cached OpenDota match row if present."""
+        _, rows = self.list_recent_matches(
+            limit=1,
+            offset=0,
+            match_id=match_id,
+            include_pro=True,
+            include_public=True,
+        )
+        return rows[0] if rows else None
+
+    def get_match_player_identities(self, match_id: int) -> list[dict[str, Any]]:
+        """Return cached OpenDota player identities for a match."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+                match_id,
+                account_id,
+                player_slot,
+                hero_id,
+                team_id,
+                persona_name,
+                pro_name,
+                last_synced_at
+            FROM opendota_match_players
+            WHERE match_id = ?
+            ORDER BY
+                player_slot ASC,
+                hero_id ASC,
+                account_id ASC
+            """,
+            (match_id,),
+        )
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "match_id": int(row["match_id"]),
+                "account_id": row["account_id"],
+                "player_slot": row["player_slot"],
+                "hero_id": row["hero_id"],
+                "team": row["team_id"],
+                "team_id": row["team_id"],
+                "persona_name": row["persona_name"],
+                "pro_name": row["pro_name"],
+                "last_synced_at": int(row["last_synced_at"]),
+            }
+            for row in rows
+        ]
 
     def list_recent_matches(
         self,
@@ -398,6 +467,8 @@ class OpenDotaMatchStorage:
                 m.dire_team_id,
                 m.leagueid,
                 m.source,
+                m.is_professional,
+                m.radiant_win,
                 COALESCE(rt.name, m.radiant_team_name) AS radiant_team_name,
                 COALESCE(dt.name, m.dire_team_name) AS dire_team_name,
                 COALESCE(l.name, m.league_name) AS league_name,
@@ -466,6 +537,8 @@ class OpenDotaMatchStorage:
                 "dire_team_id": dire_team_id,
                 "leagueid": leagueid,
                 "source": row["source"],
+                "is_professional": bool(row["is_professional"]),
+                "radiant_win": bool(row["radiant_win"]) if row["radiant_win"] is not None else None,
                 "radiant_team_name": row["radiant_team_name"],
                 "dire_team_name": row["dire_team_name"],
                 "league_name": row["league_name"],
@@ -582,6 +655,93 @@ class OpenDotaMatchStorage:
             return cls._as_int(nested_value.get("team_id"))
 
         return None
+
+    def _upsert_match_players(self, detail: dict[str, Any]) -> None:
+        """Persist player identity rows from OpenDota match detail."""
+        match_id = self._as_int(detail.get("match_id"))
+        players = detail.get("players")
+        if match_id is None or not isinstance(players, list):
+            return
+
+        normalized_rows: list[tuple[Any, ...]] = []
+        synced_at = int(time.time())
+        for index, raw_player in enumerate(players):
+            if not isinstance(raw_player, dict):
+                continue
+
+            player_slot = self._normalize_player_slot(raw_player.get("player_slot"), index)
+
+            is_radiant = raw_player.get("isRadiant")
+            if isinstance(is_radiant, bool):
+                team_id = 2 if is_radiant else 3
+            else:
+                team_id = 2 if player_slot < 5 else 3
+
+            normalized_rows.append(
+                (
+                    match_id,
+                    player_slot,
+                    self._as_int(raw_player.get("account_id")),
+                    self._as_int(raw_player.get("hero_id")),
+                    team_id,
+                    self._as_text(raw_player.get("personaname") or raw_player.get("persona_name")),
+                    self._as_text(raw_player.get("name") or raw_player.get("pro_name")),
+                    synced_at,
+                )
+            )
+
+        if not normalized_rows:
+            return
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.executemany(
+            """
+            INSERT INTO opendota_match_players (
+                match_id,
+                player_slot,
+                account_id,
+                hero_id,
+                team_id,
+                persona_name,
+                pro_name,
+                last_synced_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(match_id, player_slot) DO UPDATE SET
+                account_id = excluded.account_id,
+                hero_id = excluded.hero_id,
+                team_id = excluded.team_id,
+                persona_name = excluded.persona_name,
+                pro_name = excluded.pro_name,
+                last_synced_at = excluded.last_synced_at
+            """,
+            normalized_rows,
+        )
+        conn.commit()
+
+    @staticmethod
+    def _as_bool_flag(value: object) -> int | None:
+        if isinstance(value, bool):
+            return 1 if value else 0
+        if isinstance(value, (int, float)) and value in {0, 1}:
+            return int(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes"}:
+                return 1
+            if normalized in {"0", "false", "no"}:
+                return 0
+        return None
+
+    @classmethod
+    def _normalize_player_slot(cls, raw_slot: object, fallback_index: int) -> int:
+        normalized_slot = cls._as_int(raw_slot)
+        if normalized_slot is None:
+            return fallback_index
+        if normalized_slot >= 128:
+            return normalized_slot - 128 + 5
+        return normalized_slot
 
     @classmethod
     def _nested_text(cls, payload: dict[str, Any], parent_key: str, child_key: str) -> str | None:

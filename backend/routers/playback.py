@@ -474,6 +474,29 @@ def has_non_null_game_time(df: pd.DataFrame) -> bool:
     return bool(not df.empty and "game_time" in df.columns and df["game_time"].notna().any())
 
 
+def filter_positions_by_time(
+    df: pd.DataFrame,
+    start_time: Optional[float],
+    end_time: Optional[float],
+) -> pd.DataFrame:
+    """Filter position samples by game_time when available, otherwise by replay tick."""
+    if df.empty:
+        return df
+
+    if has_non_null_game_time(df):
+        if start_time is not None:
+            df = df[df["game_time"] >= start_time]
+        if end_time is not None:
+            df = df[df["game_time"] <= end_time]
+        return df
+
+    if start_time is not None:
+        df = df[df["tick"] >= seconds_to_tick(start_time)]
+    if end_time is not None:
+        df = df[df["tick"] <= seconds_to_tick(end_time)]
+    return df
+
+
 def normalize_pause_intervals(raw_intervals: object) -> list[dict[str, float]]:
     """Normalize pause intervals from metadata into a stable list."""
     if not isinstance(raw_intervals, list):
@@ -701,21 +724,14 @@ async def get_ticks(
             status_code=404,
             detail=f"Match {match_id} not found or not parsed"
         )
-    
-    # Convert time to ticks (30 ticks per second baseline)
-    # Note: Our parser samples every 30 ticks = 1 second
-    start_tick = seconds_to_tick(start_time)
-    end_tick = seconds_to_tick(end_time) if end_time else None
-    
-    # Get positions from Parquet
+
     meta = parquet_storage.get_metadata(match_id)
     df = parquet_storage.get_positions(
         match_id,
-        start_tick=start_tick,
-        end_tick=end_tick,
         hero=hero,
         team=team
     )
+    df = filter_positions_by_time(df, float(start_time), float(end_time) if end_time is not None else None)
 
     fallback_wards_df: Optional[pd.DataFrame] = None
     has_game_time = has_non_null_game_time(df)

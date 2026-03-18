@@ -2,7 +2,7 @@
 
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import RealMatchViewer from './RealMatchViewer';
 import backendAPI from '../api/backend';
 import { replayService } from '../api/replayService';
@@ -31,7 +31,18 @@ vi.mock('../components/map/MapViewer', () => ({
 }));
 
 vi.mock('../components/timeline', () => ({
-  Timeline: () => <div data-testid="timeline">Mock Timeline</div>,
+  Timeline: ({
+    onTimeChange,
+  }: {
+    onTimeChange: (time: number) => void;
+  }) => (
+    <div data-testid="timeline">
+      Mock Timeline
+      <button type="button" data-testid="timeline-scrub" onClick={() => onTimeChange(60)}>
+        Scrub
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../components/charts/AdvantageChart', () => ({
@@ -89,6 +100,18 @@ const BASE_TICKS_RESPONSE = {
   total_samples: 1,
 };
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe('RealMatchViewer HUD metrics panel', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -97,20 +120,55 @@ describe('RealMatchViewer HUD metrics panel', () => {
     vi.spyOn(backendAPI, 'getMatchList').mockResolvedValue([
       {
         match_id: 8674716612,
+        radiant_team: 'Radiant',
+        dire_team: 'Dire',
+        radiant_team_name: 'Team Liquid',
+        dire_team_name: 'Team Spirit',
         duration: 2400,
+        winner_team: 'radiant',
+        radiant_win: true,
+        source: 'pro',
+        is_professional: true,
       },
     ]);
     vi.spyOn(backendAPI, 'getMatchDetail').mockResolvedValue({
       match_id: 8674716612,
       radiant_team: 'Radiant',
       dire_team: 'Dire',
+      radiant_team_name: 'Team Liquid',
+      dire_team_name: 'Team Spirit',
       radiant_win: true,
+      winner_team: 'radiant',
       duration: 2400,
       game_mode: 'captains_mode',
+      source: 'pro',
+      is_professional: true,
       parsed_at: '2026-02-18T00:00:00Z',
       replay_path: 'backend/data/replays/8674716612.dem',
       parse_status: 'completed',
     });
+    vi.spyOn(backendAPI, 'getMatchPlayers').mockResolvedValue([
+      {
+        hero_id: 2,
+        hero_name: 'npc_dota_hero_axe',
+        team: 'radiant',
+        display_name: 'Ame',
+        display_type: 'pro_name',
+        pro_name: 'Ame',
+        account_id: 111,
+        player_name: 'Ame',
+      },
+      {
+        hero_id: 25,
+        hero_name: 'npc_dota_hero_lina',
+        team: 'dire',
+        display_name: 'Somnus',
+        display_type: 'pro_name',
+        pro_name: 'Somnus',
+        account_id: 222,
+        player_name: 'Somnus',
+      },
+    ]);
     vi.spyOn(backendAPI, 'getHeroPositions').mockResolvedValue(BASE_TICKS_RESPONSE);
     vi.spyOn(backendAPI, 'getWards').mockResolvedValue({
       match_id: 8674716612,
@@ -216,45 +274,206 @@ describe('RealMatchViewer HUD metrics panel', () => {
     expect(await screen.findByTestId('hud-dire')).toBeTruthy();
     expect(await screen.findByText('天辉 HUD')).toBeTruthy();
     expect(await screen.findByText('夜魇 HUD')).toBeTruthy();
+    expect((await screen.findByTestId('match-radiant-name')).textContent).toBe('Team Liquid');
+    expect((await screen.findByTestId('match-dire-name')).textContent).toBe('Team Spirit');
+    expect((await screen.findByTestId('match-winner-badge')).textContent).toContain('胜者 Team Liquid');
+    expect(await screen.findByTestId('map-status-strip')).toBeTruthy();
+    expect(await screen.findByTestId('map-view-strip')).toBeTruthy();
+    expect(await screen.findByTestId('map-analysis-strip')).toBeTruthy();
     expect(await screen.findByText('斧王')).toBeTruthy();
+    expect((await screen.findByTestId('hud-player-display-radiant-1')).textContent).toContain('Ame');
+    expect((await screen.findByTestId('hud-player-display-radiant-1')).className).toContain('font-semibold');
+    expect((await screen.findByTestId('hud-player-display-radiant-1')).className).toContain('text-amber-200');
+    expect((await screen.findByTestId('hud-player-display-dire-6')).textContent).toContain('Somnus');
     expect(await screen.findByText('2/1/3')).toBeTruthy();
     fireEvent.click(await screen.findByTestId('toggle-map-workbench'));
     expect(await screen.findByText('热力图层')).toBeTruthy();
-    const axeToggle = await screen.findByTestId('toggle-hud-hero-radiant-1');
-    expect(axeToggle.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByAltText('Blink 图标')).toBeNull();
+  });
 
-    fireEvent.click(axeToggle);
-
-    expect(axeToggle.getAttribute('aria-expanded')).toBe('true');
-    expect((await screen.findAllByText('NW')).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText('GPM')).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText('XPM')).length).toBeGreaterThan(0);
-    expect(await screen.findByText('5,420')).toBeTruthy();
-    expect(await screen.findByAltText('Blink Dagger 图标')).toBeTruthy();
-    expect(await screen.findByAltText('Phase Boots 图标')).toBeTruthy();
-    const neutralItem = await screen.findByAltText('Titan Sliver 图标');
-    expect(neutralItem).toBeTruthy();
-    const neutralSlot = neutralItem.closest('[title="Titan Sliver"]') as HTMLElement | null;
-    expect(neutralSlot).toBeTruthy();
-
-    fireEvent.mouseOver(neutralSlot!);
-
-    await waitFor(() => {
-      expect(document.querySelector('[data-testid^="item-tooltip-"]')).toBeTruthy();
-    });
-    expect(await screen.findByText('泰坦碎片')).toBeTruthy();
-    expect(await screen.findByText('第 3 级中立物品')).toBeTruthy();
-    expect(document.querySelector('[data-testid^="item-tooltip-"]')?.parentElement).toBe(document.body);
-
-    fireEvent.mouseOut(neutralSlot!);
-    await waitFor(() => {
-      expect(document.querySelector('[data-testid^="item-tooltip-"]')).toBeNull();
+  it('keeps the replay viewer header stacked until 2xl so 14-inch widths do not squeeze the selection panel', async () => {
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+      ],
     });
 
-    await waitFor(() => {
-      expect(backendAPI.getHudMetrics).toHaveBeenCalledTimes(1);
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    expect(await screen.findByTestId('replay-viewer-header')).toBeTruthy();
+    expect(screen.getByTestId('replay-viewer-header').className).toContain('2xl:grid-cols-[minmax(0,1fr)_320px]');
+    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:max-w-[320px]');
+    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:justify-self-end');
+  });
+
+  it('lets users expand and collapse a HUD hero by clicking the full card', async () => {
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+      ],
     });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    const heroCard = await screen.findByTestId('hud-hero-card-radiant-1');
+    const healthBar = await screen.findByTestId('hud-hero-health-radiant-1');
+    expect(heroCard.className).toContain('border-slate-700/70');
+    expect(heroCard.className).toContain('bg-slate-950/85');
+    expect(heroCard.getAttribute('aria-expanded')).toBe('false');
+    expect(heroCard.contains(healthBar)).toBe(true);
+
+    fireEvent.click(heroCard);
+
+    expect(await screen.findByText('NW')).toBeTruthy();
+    expect(screen.getByTestId('hud-hero-card-radiant-1').className).toContain('border-cyan-500/45');
+    expect(screen.getByTestId('hud-hero-card-radiant-1').className).toContain('bg-slate-950/96');
+    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(screen.getByTestId('hud-hero-card-radiant-1'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('NW')).toBeNull();
+    });
+    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('keeps the HUD lane header compact, restores the lane expand toggle, and keeps player meta readable', async () => {
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+      ],
+    });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    expect((await screen.findAllByText('先看英雄名、玩家和 KDA，悬停看提示，点击卡片展开细节。')).length).toBe(2);
+    expect(screen.getAllByRole('button', { name: '全部展开' })).toHaveLength(2);
+    expect(screen.getByTestId('toggle-hud-lane-radiant').getAttribute('title')).toBe('展开本行所有英雄卡');
+    expect(screen.getByTestId('toggle-hud-lane-dire').getAttribute('title')).toBe('展开本行所有英雄卡');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').textContent).toBe('职业名 · 玩家 ID 111');
+
+    fireEvent.click(screen.getByTestId('toggle-hud-lane-radiant'));
+    expect(await screen.findByRole('button', { name: '全部收起' })).toBeTruthy();
+    expect(screen.getByTestId('toggle-hud-lane-dire').textContent).toBe('全部展开');
+    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(screen.getByTestId('toggle-hud-lane-radiant'));
+    expect(screen.getAllByRole('button', { name: '全部展开' })).toHaveLength(2);
+    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('false');
+
+    const playerDisplay = await screen.findByTestId('hud-player-display-radiant-1');
+    expect(playerDisplay.className).toContain('text-[11px]');
+    expect(playerDisplay.className).toContain('font-semibold');
+    expect(playerDisplay.className).toContain('text-amber-200');
+  });
+
+  it('uses account ID wording when persona or pro display names are numeric IDs', async () => {
+    vi.spyOn(backendAPI, 'getMatchPlayers').mockResolvedValue([
+      {
+        hero_id: 2,
+        hero_name: 'npc_dota_hero_axe',
+        team: 'radiant',
+        display_name: '123456',
+        display_type: 'pro_name',
+        pro_name: null,
+        persona_name: null,
+        account_id: 123456,
+        player_name: null,
+      },
+      {
+        hero_id: 25,
+        hero_name: 'npc_dota_hero_lina',
+        team: 'dire',
+        display_name: '654321',
+        display_type: 'persona_name',
+        pro_name: null,
+        persona_name: null,
+        account_id: 654321,
+        player_name: null,
+      },
+    ]);
+
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+        {
+          hero: 'npc_dota_hero_lina',
+          team: 'dire',
+          level: 8,
+          kills: 1,
+          deaths: 2,
+          assists: 4,
+          net_worth: 5300,
+          gpm: 410,
+          xpm: 500,
+          items: [],
+        },
+      ],
+    });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    expect((await screen.findByTestId('hud-player-meta-radiant-1')).textContent).toBe('玩家 ID 123456');
+    expect((await screen.findByTestId('hud-player-meta-dire-6')).textContent).toBe('玩家 ID 654321');
   });
 
   it('lets users close, reopen, and drag map overlay panels', async () => {
@@ -403,7 +622,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
 
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
-    fireEvent.click(await screen.findByTestId('toggle-hud-hero-radiant-1'));
+    fireEvent.click(await screen.findByTestId('hud-hero-card-radiant-1'));
     expect(await screen.findByAltText('Defiant Shell 图标')).toBeTruthy();
     expect(screen.queryByText('隐藏物品 ID')).toBeNull();
   });
@@ -449,7 +668,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
 
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
-    fireEvent.click(await screen.findByTestId('toggle-hud-hero-radiant-1'));
+    fireEvent.click(await screen.findByTestId('hud-hero-card-radiant-1'));
     expect(screen.queryByAltText('Town Portal Scroll 图标')).toBeNull();
     expect(screen.queryByText('隐藏物品 ID')).toBeNull();
   });
@@ -465,6 +684,123 @@ describe('RealMatchViewer HUD metrics panel', () => {
     expect(await screen.findByText('HUD 指标请求失败，不影响主回放。')).toBeTruthy();
   });
 
+  it('keeps HUD refreshes quiet after the first load so the workbench does not keep jumping', async () => {
+    try {
+      let now = 0;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+      const firstHudRequest = createDeferred<{
+        status: string;
+        match_id: number;
+        game_time: number;
+        tick: number;
+        heroes: Array<{
+          hero: string;
+          team: string;
+          level: number;
+          kills: number;
+          deaths: number;
+          assists: number;
+          net_worth: number;
+          gpm: number;
+          xpm: number;
+          items: Array<string | null>;
+        }>;
+      }>();
+      const secondHudRequest = createDeferred<{
+        status: string;
+        match_id: number;
+        game_time: number;
+        tick: number;
+        heroes: Array<{
+          hero: string;
+          team: string;
+          level: number;
+          kills: number;
+          deaths: number;
+          assists: number;
+          net_worth: number;
+          gpm: number;
+          xpm: number;
+          items: Array<string | null>;
+        }>;
+      }>();
+
+      const hudMetricsMock = vi.spyOn(backendAPI, 'getHudMetrics');
+      hudMetricsMock
+        .mockImplementationOnce(() => firstHudRequest.promise)
+        .mockImplementationOnce(() => secondHudRequest.promise);
+
+      render(<RealMatchViewer initialMatchId={8674716612} />);
+
+      expect(await screen.findByText('HUD 同步中...')).toBeTruthy();
+
+      await act(async () => {
+        firstHudRequest.resolve({
+          status: 'ok',
+          match_id: 8674716612,
+          game_time: -90,
+          tick: 100,
+          heroes: [
+            {
+              hero: 'npc_dota_hero_axe',
+              team: 'radiant',
+              level: 8,
+              kills: 2,
+              deaths: 1,
+              assists: 3,
+              net_worth: 5420,
+              gpm: 420,
+              xpm: 510,
+              items: [],
+            },
+          ],
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('HUD 同步中...')).toBeNull();
+      });
+
+      await act(async () => {
+        now = 1000;
+        fireEvent.click(screen.getByTestId('timeline-scrub'));
+      });
+
+      expect(hudMetricsMock).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('HUD 同步中...')).toBeNull();
+
+      await act(async () => {
+        secondHudRequest.resolve({
+          status: 'ok',
+          match_id: 8674716612,
+          game_time: -30,
+          tick: 200,
+          heroes: [
+            {
+              hero: 'npc_dota_hero_axe',
+              team: 'radiant',
+              level: 9,
+              kills: 3,
+              deaths: 1,
+              assists: 4,
+              net_worth: 6000,
+              gpm: 430,
+              xpm: 520,
+              items: [],
+            },
+          ],
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('hud-hero-card-radiant-1').textContent).toContain('Lv.9');
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('declutters the map when a single-hero heatmap is selected', async () => {
     vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
       status: 'ok',
@@ -478,6 +814,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
         match_id: 8674716612,
         heatmap_type: 'movement',
         hero: 'npc_dota_hero_axe',
+        heroes: ['npc_dota_hero_axe'],
         team: 2,
         time_range: {
           start: -90,
@@ -515,9 +852,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
     expect(await screen.findByTestId('heatmap-range-end')).toBeTruthy();
 
     fireEvent.click(await screen.findByRole('button', { name: '移动' }));
-    fireEvent.change(await screen.findByTestId('heatmap-hero-select'), {
-      target: { value: 'npc_dota_hero_axe' },
-    });
+    fireEvent.click(await screen.findByTestId('heatmap-hero-axe'));
 
     expect(await screen.findByText('分析视图净化')).toBeTruthy();
     await waitFor(() => {
@@ -530,6 +865,210 @@ describe('RealMatchViewer HUD metrics panel', () => {
     await waitFor(() => {
       expect(mapViewer.getAttribute('data-hero-count')).toBe('2');
       expect(mapViewer.getAttribute('data-ward-count')).toBe('1');
+    });
+  });
+
+  it('highlights HUD heroes when heatmap hero selection is active', async () => {
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+        {
+          hero: 'npc_dota_hero_lina',
+          team: 'dire',
+          level: 8,
+          kills: 1,
+          deaths: 2,
+          assists: 4,
+          net_worth: 5300,
+          gpm: 410,
+          xpm: 500,
+          items: [],
+        },
+      ],
+    });
+    const getMatchHeatmapSpy = vi.spyOn(backendAPI, 'getMatchHeatmap').mockResolvedValue({
+      data: {
+        match_id: 8674716612,
+        heatmap_type: 'movement',
+        hero: 'npc_dota_hero_axe',
+        heroes: ['npc_dota_hero_axe'],
+        team: 2,
+        time_range: {
+          start: -90,
+          end: 120,
+        },
+        grid_size: 64,
+        map_bounds: {
+          min_x: 7500,
+          max_x: 25500,
+          min_y: 7500,
+          max_y: 25500,
+        },
+        grid_data: [],
+        max_density: 0,
+        total_samples: 0,
+      },
+      meta: {
+        generation_time_ms: 12,
+      },
+    });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    expect((await screen.findByTestId('hud-player-display-radiant-1')).className).toContain('text-amber-200');
+    expect(screen.getByTestId('hud-player-display-radiant-1').className).toContain('drop-shadow-[0_0_7px_rgba(251,191,36,0.3)]');
+    expect((await screen.findByTestId('hud-player-meta-radiant-1')).className).toContain('border-amber-200/65');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('bg-amber-300/18');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('ring-amber-200/20');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('shadow-[0_0_14px_rgba(251,191,36,0.16)]');
+
+    fireEvent.click(await screen.findByTestId('toggle-map-workbench'));
+    fireEvent.click(await screen.findByRole('button', { name: '移动' }));
+    fireEvent.click(await screen.findByTestId('heatmap-hero-axe'));
+
+    await waitFor(() => {
+      expect(getMatchHeatmapSpy).toHaveBeenLastCalledWith(
+        8674716612,
+        expect.objectContaining({
+          heroes: ['npc_dota_hero_axe'],
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('data-highlighted')).toBe('true');
+      expect(screen.getByTestId('hud-hero-card-dire-6').getAttribute('data-highlighted')).toBe('false');
+    });
+    expect(screen.getByTestId('hud-player-display-radiant-1').className).toContain('text-cyan-100');
+    expect(screen.getByTestId('hud-player-display-radiant-1').className).toContain('drop-shadow-[0_0_10px_rgba(34,211,238,0.55)]');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('border-cyan-100/80');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('bg-cyan-400/30');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('ring-cyan-300/35');
+    expect(screen.getByTestId('hud-player-meta-radiant-1').className).toContain('shadow-[0_0_20px_rgba(34,211,238,0.28)]');
+  });
+
+  it('supports multi-hero path selection and highlights all selected HUD heroes', async () => {
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+        {
+          hero: 'npc_dota_hero_lina',
+          team: 'dire',
+          level: 8,
+          kills: 1,
+          deaths: 2,
+          assists: 4,
+          net_worth: 5300,
+          gpm: 410,
+          xpm: 500,
+          items: [],
+        },
+      ],
+    });
+    const getMovementPathsSpy = vi.spyOn(backendAPI, 'getMovementPaths').mockResolvedValue({
+      data: {
+        match_id: 8674716612,
+        time_range: {
+          start: -90,
+          end: 120,
+        },
+        hero_count: 2,
+        simplification: {
+          enabled: true,
+          epsilon: 100,
+          original_points: 12,
+          simplified_points: 8,
+          reduction_ratio: 0.33,
+        },
+        paths: [
+          {
+            hero: 'npc_dota_hero_axe',
+            team: 2,
+            team_name: 'radiant',
+            point_count: 2,
+            stats: {
+              total_distance: 100,
+              avg_speed: 300,
+              time_alive: 120,
+              time_dead: 0,
+              death_count: 0,
+            },
+            points: [
+              { time: -90, x: 10000, y: 12000, hp: 700, level: 1 },
+              { time: -80, x: 10100, y: 12100, hp: 700, level: 1 },
+            ],
+          },
+          {
+            hero: 'npc_dota_hero_lina',
+            team: 3,
+            team_name: 'dire',
+            point_count: 2,
+            stats: {
+              total_distance: 120,
+              avg_speed: 320,
+              time_alive: 120,
+              time_dead: 0,
+              death_count: 0,
+            },
+            points: [
+              { time: -90, x: 21000, y: 20500, hp: 680, level: 1 },
+              { time: -80, x: 21100, y: 20600, hp: 680, level: 1 },
+            ],
+          },
+        ],
+      },
+      meta: {
+        generation_time_ms: 10,
+      },
+    });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    fireEvent.click(await screen.findByTestId('toggle-map-workbench'));
+    fireEvent.click(await screen.findByRole('button', { name: '开启路径分析' }));
+    fireEvent.click(await screen.findByTestId('path-hero-axe'));
+    fireEvent.click(await screen.findByTestId('path-hero-lina'));
+
+    await waitFor(() => {
+      expect(getMovementPathsSpy).toHaveBeenLastCalledWith(
+        8674716612,
+        expect.objectContaining({
+          heroes: ['npc_dota_hero_axe', 'npc_dota_hero_lina'],
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('data-highlighted')).toBe('true');
+      expect(screen.getByTestId('hud-hero-card-dire-6').getAttribute('data-highlighted')).toBe('true');
     });
   });
 

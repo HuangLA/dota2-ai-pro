@@ -28,8 +28,9 @@ def _make_match(match_id: int, duration: int, parse_status: str = "completed") -
 @pytest.mark.parametrize(
     "meta,fallback,expected",
     [
+        ({"duration_seconds": 1800, "game_winner": 2}, 3500, 1800),
+        ({"duration_seconds": 1800.8, "final_whistle_game_time": 1800.2}, 3500, 1801),
         ({"duration_seconds": 1800}, 3500, 3500),
-        ({"duration_seconds": 1800.8}, 3500, 3500),
         ({"duration_seconds": 0}, 3500, 3500),
         ({"duration_seconds": -5}, 3500, 3500),
         ({"duration_seconds": "1800"}, 3500, 3500),
@@ -64,8 +65,13 @@ async def test_list_matches_prefers_parquet_duration_with_sqlite_fallback(monkey
                 return {"duration_seconds": None}
             return None
 
+    class FakeOpenDotaMatchStorage:
+        def list_recent_matches(self, **kwargs):
+            return 0, []
+
     monkeypatch.setattr(matches_router, "match_storage", FakeMatchStorage())
     monkeypatch.setattr(matches_router, "parquet_storage", FakeParquetStorage())
+    monkeypatch.setattr(matches_router, "opendota_match_storage", FakeOpenDotaMatchStorage())
 
     response = await matches_router.list_matches(limit=20, offset=0)
 

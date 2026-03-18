@@ -257,9 +257,9 @@ export default function DesktopLayout() {
     <div className="relative h-screen overflow-hidden bg-[#050816] text-slate-100">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.12),_transparent_28%),linear-gradient(180deg,#030712_0%,#050816_52%,#020617_100%)]" />
       <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:32px_32px]" />
-      <div className="relative flex h-full min-h-0 gap-4 p-4">
-        <aside className="flex min-h-0 w-[280px] shrink-0 flex-col overflow-hidden rounded-[30px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))] shadow-[0_32px_80px_rgba(2,6,23,0.5)] backdrop-blur-2xl">
-          <div className="border-b border-slate-800/80 px-5 py-5">
+      <div className="relative flex h-full min-h-0 gap-3 p-3 xl:gap-4 xl:p-4">
+        <aside className="flex min-h-0 w-[248px] shrink-0 flex-col overflow-hidden rounded-[26px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))] shadow-[0_32px_80px_rgba(2,6,23,0.5)] backdrop-blur-2xl xl:w-[280px] xl:rounded-[30px]">
+          <div className="border-b border-slate-800/80 px-4 py-4 xl:px-5 xl:py-5">
             <div className="mb-4 flex items-center gap-2">
               <span className="h-3 w-3 rounded-full bg-rose-400/80" />
               <span className="h-3 w-3 rounded-full bg-amber-300/80" />
@@ -277,7 +277,7 @@ export default function DesktopLayout() {
             </div>
           </div>
 
-          <div className="border-b border-slate-800/70 px-5 py-4">
+          <div className="border-b border-slate-800/70 px-4 py-3.5 xl:px-5 xl:py-4">
             <div className="grid gap-3">
               <div className="rounded-2xl border border-slate-800/80 bg-slate-950/50 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
@@ -309,12 +309,12 @@ export default function DesktopLayout() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5">
+          <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4 xl:space-y-6 xl:px-4 xl:py-5">
             <NavigationSection title="核心工作流" items={primaryNavigation} pathname={location.pathname} />
             <NavigationSection title="开发工具" items={devNavigation} pathname={location.pathname} compact />
           </div>
 
-          <div className="border-t border-slate-800/70 px-5 py-4">
+          <div className="border-t border-slate-800/70 px-4 py-3.5 xl:px-5 xl:py-4">
             <div className="rounded-2xl border border-slate-800/80 bg-slate-950/55 px-4 py-3">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-slate-500">
                 <Command className="h-3.5 w-3.5" />
@@ -327,23 +327,23 @@ export default function DesktopLayout() {
           </div>
         </aside>
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[34px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.82))] shadow-[0_36px_120px_rgba(2,6,23,0.6)] backdrop-blur-2xl">
-          <div className="border-b border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(15,23,42,0.56))] px-6 py-4">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[30px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.82))] shadow-[0_36px_120px_rgba(2,6,23,0.6)] backdrop-blur-2xl xl:rounded-[34px]">
+          <div className="border-b border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(15,23,42,0.56))] px-4 py-4 xl:px-6">
+            <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                   <span>Workspace</span>
                   <ChevronRight className="h-3.5 w-3.5" />
                   <span>{routeMeta.eyebrow}</span>
                 </div>
-                <div className="mt-2 flex flex-col gap-2 xl:flex-row xl:items-center xl:gap-4">
+                <div className="mt-2 flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:gap-4">
                   <h2 className="text-2xl font-semibold tracking-tight text-white">{routeMeta.title}</h2>
-                  <span className="hidden h-1.5 w-1.5 rounded-full bg-slate-700 xl:block" />
+                  <span className="hidden h-1.5 w-1.5 rounded-full bg-slate-700 2xl:block" />
                   <p className="max-w-2xl text-sm leading-6 text-slate-400">{routeMeta.description}</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+              <div className="flex flex-wrap items-center gap-2 2xl:justify-end">
                 <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-xs font-medium text-cyan-100">
                   {routeMeta.modeLabel}
                 </span>
@@ -372,7 +372,7 @@ export default function DesktopLayout() {
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 p-3">
+          <div className="min-h-0 flex-1 p-2.5 xl:p-3">
             <div
               data-testid="workspace-scroll-region"
               className="h-full min-h-0 overflow-y-auto rounded-[28px] border border-slate-900/70 bg-[linear-gradient(180deg,rgba(2,6,23,0.28),rgba(2,6,23,0.08))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"

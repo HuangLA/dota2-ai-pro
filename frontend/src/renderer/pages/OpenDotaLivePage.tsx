@@ -559,7 +559,7 @@ export function OpenDotaLivePage() {
                 自动同步远端比赛列表，并把下载、解析和可回放状态放到同一条流水线里。
               </p>
             </div>
-            <div className="workspace-kpi-grid xl:min-w-[420px]">
+            <div className="workspace-kpi-grid 2xl:min-w-[420px]">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">流水线进行中</p>
                 <p className="workspace-kpi-value">{activePipelineCount}</p>
@@ -591,53 +591,86 @@ export function OpenDotaLivePage() {
             <span className="workspace-pill">
               当前页 {matches.length} / 总数 {total}
             </span>
-            <button
-              onClick={() => {
-                void handleManualSync();
-              }}
-              disabled={syncing}
-              className="rounded-full border border-cyan-500/50 bg-cyan-600/15 px-3 py-1.5 text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {syncing ? '同步中...' : '立即同步远端列表'}
-            </button>
+              <button
+                onClick={() => {
+                  void handleManualSync();
+                }}
+                disabled={syncing}
+                className="inline-flex whitespace-nowrap rounded-full border border-cyan-500/50 bg-cyan-600/15 px-3 py-1.5 text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {syncing ? '同步中...' : '立即同步远端列表'}
+              </button>
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.24fr)_340px]">
+        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.24fr)_340px]">
           <div className="workspace-panel">
             <div className="workspace-panel-header">
               <h2 className="workspace-panel-title">筛选实时比赛</h2>
               <p className="workspace-panel-description">
-                比赛 ID 适合精确定位，联赛 ID 适合做赛事级别筛选。
+                先确定来源，再用比赛 ID 或联赛 ID 缩小远端候选集合。
               </p>
             </div>
-            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-              <label className="workspace-checkpanel">
-                <input
-                  aria-label="职业"
-                  type="checkbox"
-                  checked={filters.includePro}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, includePro: event.target.checked }))
-                  }
-                  className="h-4 w-4 accent-cyan-500"
-                />
-                <span className="text-sm text-slate-200">职业</span>
-              </label>
-              <label className="workspace-checkpanel">
-                <input
-                  aria-label="路人"
-                  type="checkbox"
-                  checked={filters.includePublic}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, includePublic: event.target.checked }))
-                  }
-                  className="h-4 w-4 accent-cyan-500"
-                />
-                <span className="text-sm text-slate-200">路人</span>
-              </label>
-              <div className="xl:col-span-2">
-                <label className="mb-1.5 block text-sm text-slate-400">比赛 ID</label>
+            <form
+              onSubmit={handleSearch}
+              data-testid="live-filter-form"
+              className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_220px]"
+            >
+              <fieldset
+                data-testid="live-source-filter-group"
+                className="rounded-[22px] border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(8,47,73,0.2),rgba(2,6,23,0.76))] p-3.5 xl:col-span-2 2xl:col-span-1"
+              >
+                <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200/75">
+                  来源
+                </legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <label
+                    className={`flex min-h-[54px] cursor-pointer items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition ${
+                      filters.includePro
+                        ? 'border-cyan-400/40 bg-cyan-500/10 text-white shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
+                        : 'border-slate-700/80 bg-slate-950/75 text-slate-200 hover:border-slate-500/80'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">职业</p>
+                      <p className="mt-1 text-xs text-slate-400">优先查看职业赛事与战队对局</p>
+                    </div>
+                    <input
+                      aria-label="职业"
+                      type="checkbox"
+                      checked={filters.includePro}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, includePro: event.target.checked }))
+                      }
+                      className="h-4 w-4 shrink-0 accent-cyan-500"
+                    />
+                  </label>
+                  <label
+                    className={`flex min-h-[54px] cursor-pointer items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition ${
+                      filters.includePublic
+                        ? 'border-cyan-400/40 bg-cyan-500/10 text-white shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
+                        : 'border-slate-700/80 bg-slate-950/75 text-slate-200 hover:border-slate-500/80'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">路人</p>
+                      <p className="mt-1 text-xs text-slate-400">补充公开匹配与普通对局样本</p>
+                    </div>
+                    <input
+                      aria-label="路人"
+                      type="checkbox"
+                      checked={filters.includePublic}
+                      onChange={(event) =>
+                        setFilters((current) => ({ ...current, includePublic: event.target.checked }))
+                      }
+                      className="h-4 w-4 shrink-0 accent-cyan-500"
+                    />
+                  </label>
+                </div>
+              </fieldset>
+
+              <div className="rounded-[22px] border border-slate-700/80 bg-slate-950/65 p-3.5">
+                <label className="workspace-field-label">比赛 ID</label>
                 <input
                   aria-label="match_id"
                   value={filters.matchId}
@@ -645,9 +678,11 @@ export function OpenDotaLivePage() {
                   placeholder="例如 8674716612"
                   className="workspace-input"
                 />
+                <p className="workspace-field-hint">适合精确定位单场比赛，快速复核下载链路。</p>
               </div>
-              <div className="xl:col-span-2">
-                <label className="mb-1.5 block text-sm text-slate-400">联赛 ID</label>
+
+              <div className="rounded-[22px] border border-slate-700/80 bg-slate-950/65 p-3.5">
+                <label className="workspace-field-label">联赛 ID</label>
                 <input
                   aria-label="leagueid"
                   value={filters.leagueId}
@@ -655,26 +690,35 @@ export function OpenDotaLivePage() {
                   placeholder="例如 15475"
                   className="workspace-input"
                 />
+                <p className="workspace-field-hint">更适合赛事级别收束，便于整批准备录像。</p>
               </div>
-              <div className="flex flex-wrap gap-2 xl:col-span-6">
-                <button
-                  type="submit"
-                  className="rounded border border-cyan-500/60 bg-cyan-700 px-4 py-2 font-medium text-white transition hover:bg-cyan-600"
-                >
-                  查询
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilters(DEFAULT_FILTERS);
-                    setAppliedFilters(DEFAULT_FILTERS);
-                    setOffset(0);
-                    setFeedback(null);
-                  }}
-                  className="rounded border border-slate-500/60 bg-slate-700 px-4 py-2 font-medium text-white transition hover:bg-slate-600"
-                >
-                  清空
-                </button>
+
+              <div
+                data-testid="live-filter-actions"
+                className="rounded-[22px] border border-slate-700/80 bg-slate-950/65 p-3.5 xl:col-span-2 2xl:col-span-1"
+              >
+                <p className="workspace-field-label">动作</p>
+                <div data-testid="live-filter-button-row" className="workspace-action-row">
+                  <button
+                    type="submit"
+                    className="workspace-action-button min-w-[112px] flex-1 border border-cyan-500/60 bg-cyan-700 text-white transition hover:bg-cyan-600 sm:flex-none"
+                  >
+                    查询
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters(DEFAULT_FILTERS);
+                      setAppliedFilters(DEFAULT_FILTERS);
+                      setOffset(0);
+                      setFeedback(null);
+                    }}
+                    className="workspace-action-button min-w-[112px] flex-1 border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600 sm:flex-none"
+                  >
+                    清空
+                  </button>
+                </div>
+                <p className="workspace-field-hint">至少保留一个来源；清空会同时重置当前已应用筛选。</p>
               </div>
             </form>
           </div>
@@ -687,27 +731,36 @@ export function OpenDotaLivePage() {
               </p>
             </div>
             <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">当前选择</p>
-              <p className="mt-2 text-2xl font-semibold text-white">{selectedMatchIds.length}</p>
-              <p className="mt-1 text-sm text-slate-400">
-                {selectedMatchIds.length === 0 ? '请先勾选要下载的比赛。' : '准备下载并入库选中比赛。'}
-              </p>
-              <button
-                onClick={() => {
-                  void handleIngest(selectedMatchIds);
-                }}
-                disabled={selectedMatchIds.length === 0 || batchLoading || actionMatchId !== null}
-                className="mt-4 w-full rounded border border-emerald-500/60 bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {batchLoading ? '批量入库中...' : '批量下载并入库'}
-              </button>
-              <button
-                onClick={() => setSelectedMatchIds([])}
-                disabled={selectedMatchIds.length === 0}
-                className="mt-2 w-full rounded border border-slate-600 px-4 py-2 text-sm text-white transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                清空勾选
-              </button>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between 2xl:flex-col 2xl:items-start">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">当前选择</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">{selectedMatchIds.length}</p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {selectedMatchIds.length === 0 ? '请先勾选要下载的比赛。' : '准备下载并入库选中比赛。'}
+                  </p>
+                </div>
+                <span className="rounded-full border border-slate-700/80 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-300">
+                  下载后会自动进入解析阶段
+                </span>
+              </div>
+              <div data-testid="live-batch-button-row" className="mt-4 workspace-action-row">
+                <button
+                  onClick={() => {
+                    void handleIngest(selectedMatchIds);
+                  }}
+                  disabled={selectedMatchIds.length === 0 || batchLoading || actionMatchId !== null}
+                  className="workspace-action-button min-w-[148px] flex-1 border border-emerald-500/60 bg-emerald-700 text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                >
+                  {batchLoading ? '批量入库中...' : '批量下载并入库'}
+                </button>
+                <button
+                  onClick={() => setSelectedMatchIds([])}
+                  disabled={selectedMatchIds.length === 0}
+                  className="workspace-action-button min-w-[120px] flex-1 border border-slate-600 text-white transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                >
+                  清空勾选
+                </button>
+              </div>
             </div>
           </div>
         </div>

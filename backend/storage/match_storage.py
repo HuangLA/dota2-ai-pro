@@ -4,6 +4,7 @@ Match metadata storage using SQLite.
 This module handles storing and retrieving match metadata in SQLite database.
 """
 
+import math
 import sqlite3
 import time
 from typing import Optional
@@ -12,6 +13,25 @@ from dataclasses import dataclass
 from database.sqlite_db import get_connection
 from parsers.models import ParseResult
 from utils.hero_mapping import get_hero_id
+
+
+def _resolve_saved_duration(result: ParseResult) -> int:
+    """Prefer parser final-whistle duration over raw replay container length."""
+    tick_duration = int(result.total_ticks / 30) if result.total_ticks else 0
+    meta_duration = (
+        int(math.ceil(result.metadata.duration_seconds))
+        if result.metadata.duration_seconds
+        else 0
+    )
+    has_terminal_signal = (
+        result.metadata.game_winner in (2, 3)
+        and meta_duration > 0
+    )
+
+    if has_terminal_signal:
+        return meta_duration
+
+    return max(tick_duration, meta_duration)
 
 
 @dataclass
@@ -86,13 +106,7 @@ class MatchStorage:
         now = int(time.time())
         meta = result.metadata
         
-        # Compute duration: prefer tick-based (total_ticks / 30) as it reflects
-        # actual replay length including pre-game. meta.duration_seconds can be
-        # wrong for some replays (e.g., match 8703862527 reports 1551s but replay
-        # source_time extends to ~3474s). Use the larger of the two.
-        tick_duration = int(result.total_ticks / 30) if result.total_ticks else 0
-        meta_duration = int(meta.duration_seconds) if meta.duration_seconds else 0
-        duration = max(tick_duration, meta_duration)
+        duration = _resolve_saved_duration(result)
 
         # Insert or update match
         cursor.execute("""

@@ -40,6 +40,7 @@ public class SimpleDemoParser {
     private static final int TEAM_SLOT_COUNT = 5;
     private static final int HERO_ITEM_SLOT_PROBE_COUNT = 25;
     private static final int INVALID_ENTITY_REFERENCE = 16777215;
+    private static final float FINAL_WHISTLE_EPSILON_SECONDS = 1e-3f;
     
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -177,6 +178,9 @@ public class SimpleDemoParser {
         }
         if (processor.hasFinalGameTime()) {
             metadata.put("final_whistle_game_time", processor.getFinalGameTime());
+            if (processor.hasFinalReplayTime()) {
+                metadata.put("final_whistle_replay_time", processor.getFinalReplayTime());
+            }
             metadata.put("final_whistle_source", processor.getFinalGameTimeSource());
         }
         if (processor.hasClockZeroTime()) {
@@ -264,8 +268,12 @@ public class SimpleDemoParser {
         private boolean hasFinalGameTime = false;
         private float finalGameStateTime = 0;
         private boolean hasFinalGameStateTime = false;
+        private float finalGameStateReplayTime = 0;
         private float finalWinnerTime = 0;
         private boolean hasFinalWinnerTime = false;
+        private float finalWinnerReplayTime = 0;
+        private float finalReplayTime = 0;
+        private boolean hasFinalReplayTime = false;
         private Integer lastWinnerState = null;
         private int lastGameState = 0;
         private String finalGameTimeSource = "";
@@ -304,6 +312,7 @@ public class SimpleDemoParser {
         private float pauseIntervalStartGameTime = 0;
         private float lastObservedReplayTime = 0;
         private Float previousTotalPausedSeconds = null;
+        private boolean postGameSamplesTrimmed = false;
         
         public DotaMatchProcessor(boolean minimalMode) {
             this.minimalMode = minimalMode;
@@ -441,6 +450,7 @@ public class SimpleDemoParser {
                 if (!hasFinalGameStateTime && lastGameState == 5 && gameState > 5) {
                     finalGameStateTime = gameTime;
                     hasFinalGameStateTime = true;
+                    finalGameStateReplayTime = replayTime;
                 }
                 lastGameState = gameState;
                 
@@ -459,6 +469,7 @@ public class SimpleDemoParser {
                             && (lastWinnerState == null || lastWinnerState <= 1)) {
                         finalWinnerTime = gameTime;
                         hasFinalWinnerTime = true;
+                        finalWinnerReplayTime = replayTime;
                     }
                     lastWinnerState = newWinner;
                 }
@@ -466,10 +477,14 @@ public class SimpleDemoParser {
                 if (hasFinalWinnerTime) {
                     finalGameTime = finalWinnerTime;
                     hasFinalGameTime = true;
+                    finalReplayTime = finalWinnerReplayTime;
+                    hasFinalReplayTime = true;
                     finalGameTimeSource = "winner_transition";
                 } else if (hasFinalGameStateTime) {
                     finalGameTime = finalGameStateTime;
                     hasFinalGameTime = true;
+                    finalReplayTime = finalGameStateReplayTime;
+                    hasFinalReplayTime = true;
                     finalGameTimeSource = "game_state_transition";
                 }
             } catch (Exception ex) {
@@ -1197,6 +1212,83 @@ public class SimpleDemoParser {
                 closePauseInterval(lastObservedReplayTime);
             }
         }
+
+        private boolean isPastFinalReplayTime(float replayTime) {
+            return hasFinalReplayTime && replayTime > finalReplayTime + FINAL_WHISTLE_EPSILON_SECONDS;
+        }
+
+        private float resolveSampleReplayTime(Map<String, Object> sample) {
+            Object tickObj = sample.get("tick");
+            int tick = tickObj instanceof Number ? ((Number) tickObj).intValue() : 0;
+            Float gameRulesTimeSnapshot = gameRulesTimeSnapshots.get(sample);
+            return getReplayTime(tick, gameRulesTimeSnapshot);
+        }
+
+        private void trimTimedSamples(List<Map<String, Object>> samples) {
+            if (!hasFinalReplayTime) {
+                return;
+            }
+            samples.removeIf(sample -> isPastFinalReplayTime(resolveSampleReplayTime(sample)));
+        }
+
+        private void trimKillEvents() {
+            if (!hasFinalReplayTime) {
+                return;
+            }
+            killEvents.removeIf(event -> {
+                Object replayTimeObj = event.get("time");
+                if (!(replayTimeObj instanceof Number)) {
+                    return false;
+                }
+                return isPastFinalReplayTime(((Number) replayTimeObj).floatValue());
+            });
+        }
+
+        private void trimPauseIntervals() {
+            if (!hasFinalReplayTime) {
+                return;
+            }
+
+            List<Map<String, Object>> trimmedIntervals = new ArrayList<>();
+            for (Map<String, Object> interval : pauseIntervals) {
+                Object startObj = interval.get("replay_start_time");
+                Object endObj = interval.get("replay_end_time");
+                if (!(startObj instanceof Number) || !(endObj instanceof Number)) {
+                    trimmedIntervals.add(interval);
+                    continue;
+                }
+
+                float start = ((Number) startObj).floatValue();
+                float end = ((Number) endObj).floatValue();
+                if (start >= finalReplayTime - FINAL_WHISTLE_EPSILON_SECONDS) {
+                    continue;
+                }
+                if (end > finalReplayTime) {
+                    end = finalReplayTime;
+                }
+                if (end - start <= FINAL_WHISTLE_EPSILON_SECONDS) {
+                    continue;
+                }
+
+                interval.put("replay_end_time", end);
+                interval.put("duration_seconds", end - start);
+                trimmedIntervals.add(interval);
+            }
+            pauseIntervals = trimmedIntervals;
+        }
+
+        private void trimPostGameSamples() {
+            if (postGameSamplesTrimmed || !hasFinalReplayTime) {
+                return;
+            }
+
+            trimTimedSamples(positionSamples);
+            trimTimedSamples(wardEvents);
+            trimTimedSamples(economySamples);
+            trimKillEvents();
+            trimPauseIntervals();
+            postGameSamplesTrimmed = true;
+        }
         
         // Getters
         public int getTotalTicks() { return totalTicks; }
@@ -1216,15 +1308,30 @@ public class SimpleDemoParser {
         public int getWinner() { return winner; }
         public float getFinalGameTime() { return finalGameTime; }
         public boolean hasFinalGameTime() { return hasFinalGameTime; }
+        public float getFinalReplayTime() { return finalReplayTime; }
+        public boolean hasFinalReplayTime() { return hasFinalReplayTime; }
         public String getFinalGameTimeSource() { return finalGameTimeSource; }
         public List<Map<String, Object>> getPauseIntervals() {
             finalizePauseIntervals();
+            trimPostGameSamples();
             return pauseIntervals;
         }
-        public List<Map<String, Object>> getPositionSamples() { return positionSamples; }
-        public List<Map<String, Object>> getKillEvents() { return killEvents; }
-        public List<Map<String, Object>> getWardEvents() { return wardEvents; }
-        public List<Map<String, Object>> getEconomySamples() { return economySamples; }
+        public List<Map<String, Object>> getPositionSamples() {
+            trimPostGameSamples();
+            return positionSamples;
+        }
+        public List<Map<String, Object>> getKillEvents() {
+            trimPostGameSamples();
+            return killEvents;
+        }
+        public List<Map<String, Object>> getWardEvents() {
+            trimPostGameSamples();
+            return wardEvents;
+        }
+        public List<Map<String, Object>> getEconomySamples() {
+            trimPostGameSamples();
+            return economySamples;
+        }
         public Map<Integer, String> getHeroMapping() { return heroMapping; }
     }
     

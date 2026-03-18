@@ -14,9 +14,16 @@ export interface Match {
   match_id: number;
   radiant_team?: string;
   dire_team?: string;
+  league_name?: string | null;
+  radiant_team_name?: string | null;
+  dire_team_name?: string | null;
   duration?: number;
   radiant_win?: boolean;
-  parsed_at?: string;
+  winner_team?: string | number | null;
+  winner_display_name?: string | null;
+  source?: string | null;
+  is_professional?: boolean | null;
+  parsed_at?: string | null;
   replay_path?: string | null;
   parse_status?: string;
   updated_at?: number;
@@ -133,13 +140,42 @@ export interface MatchDetail {
   match_id: number;
   radiant_team: string;
   dire_team: string;
+  league_name?: string | null;
+  radiant_team_name?: string | null;
+  dire_team_name?: string | null;
   radiant_win: boolean;
+  winner_team?: string | number | null;
+  winner_display_name?: string | null;
   duration: number;
   game_mode: string | number | null;
-  parsed_at: string;
+  source?: string | null;
+  is_professional?: boolean | null;
+  parsed_at?: string | null;
   replay_path?: string | null;
   parse_status?: string;
   updated_at?: number;
+}
+
+export interface MatchPlayer {
+  hero_id?: number | null;
+  hero_name: string;
+  team: 'radiant' | 'dire' | string | number;
+  team_id?: number | null;
+  player_slot?: number | null;
+  display_name?: string | null;
+  display_type?: string | null;
+  pro_name?: string | null;
+  persona_name?: string | null;
+  account_id?: number | null;
+  player_name?: string | null;
+}
+
+export interface MatchPlayersResponse {
+  match_id: number;
+  is_professional?: boolean;
+  players?: MatchPlayer[];
+  radiant?: MatchPlayer[];
+  dire?: MatchPlayer[];
 }
 
 export interface AdvantageData {
@@ -187,6 +223,7 @@ export interface MatchHeatmapResponse {
     match_id: number;
     heatmap_type: string;
     hero?: string | null;
+    heroes?: string[] | null;
     team?: number | null;
     time_range: {
       start: number;
@@ -509,6 +546,7 @@ class BackendAPI {
       heatmapType: 'movement' | 'kill' | 'death';
       gridSize?: number;
       hero?: string;
+      heroes?: string[];
       team?: number;
       startTime?: number;
       endTime?: number;
@@ -520,7 +558,13 @@ class BackendAPI {
       query.set('heatmap_type', params.heatmapType);
       query.set('grid_size', String(params.gridSize ?? 64));
 
-      if (params.hero) {
+      if (Array.isArray(params.heroes) && params.heroes.length > 0) {
+        params.heroes.forEach((hero) => {
+          if (hero) {
+            query.append('hero', hero);
+          }
+        });
+      } else if (params.hero) {
         query.set('hero', params.hero);
       }
       if (typeof params.team === 'number' && Number.isFinite(params.team)) {
@@ -563,6 +607,7 @@ class BackendAPI {
     matchId: number,
     params: {
       hero?: string;
+      heroes?: string[];
       team?: number;
       startTime?: number;
       endTime?: number;
@@ -574,7 +619,13 @@ class BackendAPI {
     try {
       const query = new URLSearchParams();
 
-      if (params.hero) {
+      if (Array.isArray(params.heroes) && params.heroes.length > 0) {
+        params.heroes.forEach((hero) => {
+          if (hero) {
+            query.append('hero', hero);
+          }
+        });
+      } else if (params.hero) {
         query.set('hero', params.hero);
       }
       if (typeof params.team === 'number' && Number.isFinite(params.team)) {
@@ -638,6 +689,39 @@ class BackendAPI {
       return data.matches || [];
     } catch (error) {
       console.error('Failed to fetch match list:', error);
+      return [];
+    }
+  }
+
+  async getMatchPlayers(matchId: number): Promise<MatchPlayer[]> {
+    try {
+      const response = await fetch(
+        buildApiUrl(`/api/v1/matches/${matchId}/players`),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: MatchPlayersResponse | MatchPlayer[] = await response.json();
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (Array.isArray(data.players)) {
+        return data.players;
+      }
+
+      const radiantPlayers = Array.isArray(data.radiant) ? data.radiant : [];
+      const direPlayers = Array.isArray(data.dire) ? data.dire : [];
+      return [...radiantPlayers, ...direPlayers];
+    } catch (error) {
+      console.error('Failed to fetch match players:', error);
       return [];
     }
   }

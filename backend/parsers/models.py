@@ -138,6 +138,9 @@ class MatchMetadata:
     game_winner: Optional[int] = None  # 2=Radiant, 3=Dire
     leagueid: Optional[int] = None
     duration_seconds: Optional[float] = None
+    final_whistle_game_time: Optional[float] = None
+    final_whistle_replay_time: Optional[float] = None
+    final_whistle_source: Optional[str] = None
     time_contract_version: Optional[str] = None
     game_start_time: Optional[float] = None
     clock_zero_source: Optional[str] = None

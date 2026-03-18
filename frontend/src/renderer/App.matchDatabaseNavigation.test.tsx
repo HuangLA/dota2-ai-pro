@@ -56,5 +56,12 @@ describe('App Match Database replay navigation', () => {
     expect(screen.getByTestId('viewer-source').textContent).toBe('match_database');
     expect(screen.getByTestId('viewer-status').textContent).toBe('prepared');
     expect(screen.getByRole('button', { name: '← 返回' })).toBeTruthy();
+    expect(screen.getByTestId('replay-viewer-shell').className).toContain('flex-col');
+    expect(screen.getByTestId('replay-viewer-topbar').className).toContain('flex-none');
+    expect(screen.getByTestId('return-to-workspace-button').className).toContain('max-w-[15rem]');
+    expect(screen.getByTestId('return-to-workspace-button').className).toContain('2xl:max-w-none');
+    expect(screen.getByTestId('return-to-workspace-button').className).not.toContain('absolute');
+    expect(screen.getByTestId('replay-back-button-label').className).toContain('hidden');
+    expect(screen.getByTestId('replay-back-button-label').className).toContain('2xl:block');
   });
 });

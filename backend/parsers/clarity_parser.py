@@ -73,6 +73,44 @@ def _coerce_string_list(value: object) -> Optional[list[Optional[str]]]:
     return result or None
 
 
+def _trim_postgame_result(result: ParseResult) -> ParseResult:
+    """Drop samples collected after the parser's detected final whistle."""
+    metadata = result.metadata
+    cutoff_game_time = metadata.final_whistle_game_time or metadata.duration_seconds
+    cutoff_replay_time = metadata.final_whistle_replay_time
+
+    if metadata.game_winner not in (2, 3):
+        return result
+    if not isinstance(cutoff_game_time, (int, float)) or cutoff_game_time <= 0:
+        return result
+
+    epsilon = 1e-6
+    result.positions = [
+        sample
+        for sample in result.positions
+        if sample.game_time is None or sample.game_time <= cutoff_game_time + epsilon
+    ]
+    result.wards = [
+        event
+        for event in result.wards
+        if event.game_time is None or event.game_time <= cutoff_game_time + epsilon
+    ]
+    result.economy = [
+        sample
+        for sample in result.economy
+        if sample.game_time <= cutoff_game_time + epsilon
+    ]
+
+    if isinstance(cutoff_replay_time, (int, float)) and cutoff_replay_time > 0:
+        result.kills = [
+            event
+            for event in result.kills
+            if event.time <= cutoff_replay_time + epsilon
+        ]
+
+    return result
+
+
 class ClarityParserError(Exception):
     """Exception raised when Clarity parser fails."""
     pass
@@ -262,6 +300,9 @@ class ClarityParser:
             game_winner=raw_meta.get("game_winner") or raw_meta.get("winner"),
             leagueid=raw_meta.get("leagueid"),
             duration_seconds=raw_meta.get("duration_seconds"),
+            final_whistle_game_time=raw_meta.get("final_whistle_game_time"),
+            final_whistle_replay_time=raw_meta.get("final_whistle_replay_time"),
+            final_whistle_source=raw_meta.get("final_whistle_source"),
             time_contract_version=raw_meta.get("time_contract_version"),
             game_start_time=raw_meta.get("game_start_time"),
             clock_zero_source=raw_meta.get("clock_zero_source"),
@@ -359,7 +400,7 @@ class ClarityParser:
             except ValueError:
                 pass
         
-        return ParseResult(
+        return _trim_postgame_result(ParseResult(
             success=True,
             parse_time_ms=data.get("parse_time_ms", 0),
             file_size_bytes=data.get("file_size_bytes", 0),
@@ -371,7 +412,7 @@ class ClarityParser:
             wards=wards,
             heroes=heroes,
             economy=economy,
-        )
+        ))
 
 
 # Convenience function for quick parsing
