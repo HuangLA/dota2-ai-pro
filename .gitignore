@@ -10,8 +10,11 @@ dist/
 build/
 out/
 bin/
+release/
+build_pyinstaller/
 *.exe
 *.dll
+*.class
 
 # IDEs
 .vscode/
@@ -37,9 +40,14 @@ backend/data/truesight.db
 backend/data/cache/
 backend/data/matches/
 backend/data/replays/
+backend/tmp_replays/
 
 # Large Files & Parsers Dependencies
 parsers/jdk17/
 parsers/gradle-8.5/
 *.zip
 .gradle/
+
+# Loose JARs (uber-jar in build/libs/ is the canonical artifact)
+parsers/*.jar
+!parsers/build/libs/*.jar
