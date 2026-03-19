@@ -8,7 +8,9 @@ It handles subprocess communication and converts JSON output to typed dataclasse
 import asyncio
 import json
 import locale
+import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -132,6 +134,41 @@ class ClarityParser:
     DEFAULT_JAVA_PATH = Path("/opt/homebrew/opt/openjdk@17/bin/java")
     DEFAULT_JAR_PATH = Path(__file__).parent.parent.parent / "parsers" / "build" / "libs" / "clarity-parser-1.0.0-uber.jar"
     
+    @staticmethod
+    def _resolve_java_path() -> Path:
+        """Resolve Java executable path, checking environment variables first."""
+        # 1. Check JAVA_HOME env var (set by Electron in packaged mode)
+        java_home = os.environ.get("JAVA_HOME")
+        if java_home:
+            java_exe = Path(java_home) / "bin" / ("java.exe" if sys.platform == "win32" else "java")
+            if java_exe.exists():
+                return java_exe
+        
+        # 2. Check for bundled JDK relative to project root
+        project_root = Path(__file__).parent.parent.parent
+        if sys.platform == "win32":
+            bundled = project_root / "parsers" / "jdk17" / "jdk-17.0.18+8" / "bin" / "java.exe"
+        else:
+            bundled = project_root / "parsers" / "jdk17" / "jdk-17.0.18+8" / "bin" / "java"
+        if bundled.exists():
+            return bundled
+        
+        # 3. Fallback to default
+        return ClarityParser.DEFAULT_JAVA_PATH
+    
+    @staticmethod
+    def _resolve_jar_path() -> Path:
+        """Resolve parser JAR path, checking environment variables first."""
+        # 1. Check PARSER_JAR_PATH env var (set by Electron in packaged mode)
+        jar_env = os.environ.get("PARSER_JAR_PATH")
+        if jar_env:
+            jar_path = Path(jar_env)
+            if jar_path.exists():
+                return jar_path
+        
+        # 2. Default
+        return ClarityParser.DEFAULT_JAR_PATH
+    
     def __init__(
         self, 
         java_path: Optional[Path] = None,
@@ -146,8 +183,8 @@ class ClarityParser:
             jar_path: Path to Clarity uber JAR. Defaults to built JAR.
             timeout: Timeout in seconds for parsing. Default 120s.
         """
-        self.java_path = java_path or self.DEFAULT_JAVA_PATH
-        self.jar_path = jar_path or self.DEFAULT_JAR_PATH
+        self.java_path = java_path or self._resolve_java_path()
+        self.jar_path = jar_path or self._resolve_jar_path()
         self.timeout = timeout
         
     def validate_environment(self) -> tuple[bool, str]:

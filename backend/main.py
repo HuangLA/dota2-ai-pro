@@ -107,16 +107,11 @@ app = FastAPI(
 )
 
 # Configure CORS
+# In packaged mode, Electron uses file:// protocol which sends null origin.
+# Since this is a local-only server (bound to 127.0.0.1), allowing all origins is safe.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:5173",  # Vite dev server (explicit IP host)
-        "http://localhost:3000",  # Alternative dev server
-        "http://127.0.0.1:3000",  # Alternative dev server (explicit IP host)
-        "app://.",                # Electron app
-    ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -152,6 +147,11 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 
+def _is_frozen() -> bool:
+    """Check if running as a PyInstaller bundle."""
+    return getattr(sys, 'frozen', False)
+
+
 if __name__ == "__main__":
     import uvicorn
     
@@ -159,10 +159,20 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     debug = os.getenv("DEBUG", "true").lower() == "true"
     
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=port,
-        reload=debug,
-        log_level="info" if debug else "warning",
-    )
+    if _is_frozen():
+        # PyInstaller bundle: pass app object directly (reload not supported)
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+        )
+    else:
+        # Development: use string reference for hot-reload support
+        uvicorn.run(
+            "main:app",
+            host=host,
+            port=port,
+            reload=debug,
+            log_level="info" if debug else "warning",
+        )

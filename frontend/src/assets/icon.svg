@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient - deep cosmic blue -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1a3e"/>
+      <stop offset="100%" stop-color="#0a0a1a"/>
+    </radialGradient>
+    
+    <!-- Eye glow gradient -->
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#0088cc" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#003366" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- Iris gradient - golden amber like True Sight gem -->
+    <radialGradient id="irisGrad" cx="45%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="40%" stop-color="#ff8c00"/>
+      <stop offset="80%" stop-color="#cc4400"/>
+      <stop offset="100%" stop-color="#881100"/>
+    </radialGradient>
+    
+    <!-- Pupil gradient -->
+    <radialGradient id="pupilGrad" cx="45%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#220000"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    
+    <!-- Outer ring gradient -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="50%" stop-color="#0088cc"/>
+      <stop offset="100%" stop-color="#00d4ff"/>
+    </linearGradient>
+    
+    <!-- Diamond/gem facet gradient -->
+    <linearGradient id="gemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4de8ff"/>
+      <stop offset="50%" stop-color="#00aadd"/>
+      <stop offset="100%" stop-color="#006699"/>
+    </linearGradient>
+    
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Strong glow -->
+    <filter id="strongGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="15" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Inner shadow for depth -->
+    <filter id="innerShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+      <feOffset dx="0" dy="2"/>
+      <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1"/>
+      <feFlood flood-color="#000" flood-opacity="0.5"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="250" fill="url(#bgGrad)" stroke="#112244" stroke-width="4"/>
+  
+  <!-- Subtle hex grid pattern for tech feel -->
+  <g opacity="0.08">
+    <path d="M128,100 L158,83 L188,100 L188,134 L158,151 L128,134 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M188,100 L218,83 L248,100 L248,134 L218,151 L188,134 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M248,100 L278,83 L308,100 L308,134 L278,151 L248,134 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M308,100 L338,83 L368,100 L368,134 L338,151 L308,134 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M98,134 L128,117 L158,134 L158,168 L128,185 L98,168 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M338,134 L368,117 L398,134 L398,168 L368,185 L338,168 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M98,340 L128,323 L158,340 L158,374 L128,391 L98,374 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M338,340 L368,323 L398,340 L398,374 L368,391 L338,374 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M128,374 L158,357 L188,374 L188,408 L158,425 L128,408 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+    <path d="M308,374 L338,357 L368,374 L368,408 L338,425 L308,408 Z" fill="none" stroke="#00d4ff" stroke-width="1"/>
+  </g>
+
+  <!-- Outer tech ring -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#ringGrad)" stroke-width="2" opacity="0.4"/>
+  
+  <!-- Tick marks on outer ring -->
+  <g stroke="#00d4ff" stroke-width="2" opacity="0.5">
+    <line x1="256" y1="46" x2="256" y2="56"/>
+    <line x1="256" y1="456" x2="256" y2="466"/>
+    <line x1="46" y1="256" x2="56" y2="256"/>
+    <line x1="456" y1="256" x2="466" y2="256"/>
+    <line x1="404" y1="108" x2="397" y2="116"/>
+    <line x1="108" y1="404" x2="116" y2="397"/>
+    <line x1="404" y1="404" x2="397" y2="397"/>
+    <line x1="108" y1="108" x2="116" y2="116"/>
+  </g>
+
+  <!-- Eye glow aura -->
+  <ellipse cx="256" cy="256" rx="180" ry="110" fill="url(#eyeGlow)" filter="url(#strongGlow)"/>
+
+  <!-- Diamond/gem shape - the True Sight gem housing -->
+  <path d="M256,120 L380,256 L256,392 L132,256 Z" 
+        fill="none" stroke="url(#gemGrad)" stroke-width="3" opacity="0.6"
+        filter="url(#glow)"/>
+  
+  <!-- Inner diamond -->
+  <path d="M256,150 L360,256 L256,362 L152,256 Z" 
+        fill="none" stroke="#00aadd" stroke-width="1.5" opacity="0.3"/>
+
+  <!-- Eye shape - almond/leaf form -->
+  <path d="M90,256 Q170,155 256,145 Q342,155 422,256 Q342,357 256,367 Q170,357 90,256 Z" 
+        fill="#0d1b2a" stroke="#00bbee" stroke-width="2.5" filter="url(#innerShadow)"/>
+  
+  <!-- Eye white / sclera with subtle gradient -->
+  <path d="M105,256 Q180,168 256,158 Q332,168 407,256 Q332,344 256,354 Q180,344 105,256 Z" 
+        fill="#0f2235" opacity="0.8"/>
+
+  <!-- Iris outer ring -->
+  <circle cx="256" cy="256" r="82" fill="#1a0800" stroke="#cc6600" stroke-width="1.5"/>
+  
+  <!-- Iris main -->
+  <circle cx="256" cy="256" r="78" fill="url(#irisGrad)"/>
+  
+  <!-- Iris detail lines - radial pattern -->
+  <g stroke="#ffaa00" stroke-width="0.8" opacity="0.5">
+    <line x1="256" y1="178" x2="256" y2="200"/>
+    <line x1="256" y1="312" x2="256" y2="334"/>
+    <line x1="178" y1="256" x2="200" y2="256"/>
+    <line x1="312" y1="256" x2="334" y2="256"/>
+    <line x1="201" y1="201" x2="214" y2="214"/>
+    <line x1="298" y1="298" x2="311" y2="311"/>
+    <line x1="311" y1="201" x2="298" y2="214"/>
+    <line x1="201" y1="311" x2="214" y2="298"/>
+    <line x1="230" y1="180" x2="236" y2="200"/>
+    <line x1="282" y1="180" x2="276" y2="200"/>
+    <line x1="230" y1="332" x2="236" y2="312"/>
+    <line x1="282" y1="332" x2="276" y2="312"/>
+    <line x1="180" y1="230" x2="200" y2="236"/>
+    <line x1="180" y1="282" x2="200" y2="276"/>
+    <line x1="332" y1="230" x2="312" y2="236"/>
+    <line x1="332" y1="282" x2="312" y2="276"/>
+  </g>
+  
+  <!-- Pupil -->
+  <circle cx="256" cy="256" r="32" fill="url(#pupilGrad)"/>
+  
+  <!-- Pupil highlight / light reflection -->
+  <ellipse cx="244" cy="244" rx="10" ry="12" fill="white" opacity="0.7"/>
+  <ellipse cx="268" cy="262" rx="4" ry="5" fill="white" opacity="0.3"/>
+
+  <!-- Scanning line effect - horizontal -->
+  <line x1="105" y1="256" x2="178" y2="256" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+  <line x1="334" y1="256" x2="407" y2="256" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+
+  <!-- Corner bracket decorations - HUD feel -->
+  <g stroke="#00d4ff" stroke-width="2" fill="none" opacity="0.5">
+    <!-- Top-left -->
+    <path d="M80,100 L80,80 L100,80"/>
+    <!-- Top-right -->
+    <path d="M432,80 L412,80 L412,100" transform="translate(0,0)"/>
+    <path d="M412,80 L432,80 L432,100"/>
+    <!-- Bottom-left -->
+    <path d="M80,412 L80,432 L100,432"/>
+    <!-- Bottom-right -->
+    <path d="M412,432 L432,432 L432,412"/>
+  </g>
+
+  <!-- "TS" text or small label at bottom -->
+  <text x="256" y="468" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" 
+        font-size="24" font-weight="700" letter-spacing="6" fill="#00d4ff" opacity="0.6">
+    TRUE SIGHT
+  </text>
+</svg>
