@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
-
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
+import { useMatchStore, useNavigationStore } from './store';
 
 vi.mock('./pages/MatchDatabasePage', () => ({
   __esModule: true,
@@ -13,41 +13,41 @@ vi.mock('./pages/MatchDatabasePage', () => ({
 
 vi.mock('./pages/TeamProfilePage', () => ({
   __esModule: true,
-  default: ({
-    onViewStateChange,
-    onOpenReplay,
-    initialViewState,
-  }: {
-    onViewStateChange?: (viewState: unknown) => void;
-    onOpenReplay?: (context: unknown) => void;
-    initialViewState?: { teamIdInput?: string; selectedLeagueFilterKey?: string };
-  }) => (
-    <div>
-      <span data-testid="team-profile-state-team-id">{initialViewState?.teamIdInput ?? 'none'}</span>
-      <span data-testid="team-profile-state-league-filter">
-        {initialViewState?.selectedLeagueFilterKey ?? 'none'}
-      </span>
-      <button
-        onClick={() => {
-          onViewStateChange?.({
-            teamIdInput: '15',
-            limitInput: '50',
-            currentTeamId: 15,
-            matches: [],
-            onlyWithDownloadStatus: true,
-            sortOrder: 'asc',
-            selectedLeagueFilterKey: 'league-15475',
-          });
-          onOpenReplay?.({
-            source: 'team_profile',
-            matchId: 8674716612,
-          });
-        }}
-      >
-        Mock Open Replay From Team Profile
-      </button>
-    </div>
-  ),
+  default: () => {
+    const { selectMatch } = useMatchStore();
+    const { setTeamProfileViewState, teamProfileViewState } = useNavigationStore();
+    
+    return (
+      <div>
+        <span data-testid="team-profile-state-team-id">{teamProfileViewState?.teamId ?? 'none'}</span>
+        <span data-testid="team-profile-state-league-filter">
+          {teamProfileViewState?.leagueQuickFilter ?? 'none'}
+        </span>
+        <button
+          onClick={() => {
+            setTeamProfileViewState({
+              teamId: 15,
+              limit: 50,
+              leagueQuickFilter: 15475,
+              sort: 'newest',
+              onlyWithDownload: true,
+              focusLatestLeague: false,
+              presetView: 'all',
+              compareSelection: [],
+              expandedLeagues: new Set(),
+              snapshots: [],
+            });
+            selectMatch(8674716612, {
+              source: 'team_profile',
+              matchId: 8674716612,
+            });
+          }}
+        >
+          Mock Open Replay From Team Profile
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('./pages/RealMatchViewer', () => ({
@@ -67,7 +67,7 @@ vi.mock('./pages/RealMatchViewer', () => ({
 }));
 
 describe('App Team Profile replay navigation', () => {
-  it('returns to Team Profile and restores in-session view state', () => {
+  it('returns to Team Profile and restores in-session view state', async () => {
     render(
       <MemoryRouter initialEntries={['/teamProfile']}>
         <App />
@@ -77,13 +77,17 @@ describe('App Team Profile replay navigation', () => {
     fireEvent.click(screen.getByRole('link', { name: '战队档案' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mock Open Replay From Team Profile' }));
 
-    expect(screen.getByTestId('viewer-match').textContent).toBe('8674716612');
+    await waitFor(() => {
+      expect(screen.getByTestId('viewer-match').textContent).toBe('8674716612');
+    });
     expect(screen.getByTestId('viewer-source').textContent).toBe('team_profile');
     expect(screen.getByRole('button', { name: '← 返回' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '← 返回' }));
 
-    expect(screen.getByTestId('team-profile-state-team-id').textContent).toBe('15');
-    expect(screen.getByTestId('team-profile-state-league-filter').textContent).toBe('league-15475');
+    await waitFor(() => {
+      expect(screen.getByTestId('team-profile-state-team-id').textContent).toBe('15');
+    });
+    expect(screen.getByTestId('team-profile-state-league-filter').textContent).toBe('15475');
   });
 });

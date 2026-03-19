@@ -1,24 +1,39 @@
 # True Sight - 快速启动摘要
 
-## 🚀 最快启动方式
+## 🚀 启动方式
+
+需要同时启动前端和后端两个服务。
 
 ### Windows 用户
-直接双击项目根目录的 `start-all.bat`
 
-### 其他方式
+打开两个 PowerShell/CMD 窗口：
 
-**后端**:
-```bash
+**窗口 1 - 启动后端：**
+```cmd
 cd backend
-./start-backend.bat    # Windows
-./start-backend.sh     # Linux/Mac
+start-backend.bat
 ```
 
-**前端**:
+**窗口 2 - 启动前端：**
+```cmd
+cd frontend
+start-frontend.bat
+```
+
+### macOS/Linux 用户
+
+打开两个 Terminal 窗口：
+
+**窗口 1 - 启动后端：**
+```bash
+cd backend
+./start-backend.sh
+```
+
+**窗口 2 - 启动前端：**
 ```bash
 cd frontend
-./start-frontend.bat   # Windows
-./start-frontend.sh    # Linux/Mac
+./start-frontend.sh
 ```
 
 ---
@@ -29,7 +44,7 @@ cd frontend
    - 应返回: `{"status":"healthy"}`
 
 2. **前端**: 访问 http://localhost:5173
-   - 应看到: "True Sight" 金色标题
+   - 应看到: "True Sight" 桌面分析台
 
 ---
 

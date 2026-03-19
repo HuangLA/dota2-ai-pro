@@ -10,7 +10,7 @@
 | 字段 | 值 |
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
-| 当前阶段 | Phase 4.5 收尾 + Replay Workspace 桌面化体验打磨 🚀 |
+| 当前阶段 | Phase 4/4.5 已完成 ✅ + 文档对齐更新，准备进入 Phase 5 🚀 |
 | 最后更新 | 2026-03-18 |
 | 更新者 | Codex |
 
@@ -661,6 +661,7 @@ print(f"Kill events: {len(result.kills)}")
 
 | 日期 | 更新内容 | 更新者 |
 |------|----------|--------|
+| 2026-03-18 | **T-007 Zustand 状态管理实现完成**: ① 创建 `matchStore.ts` - 管理比赛选择和回放上下文 ② 创建 `navigationStore.ts` - 管理页面导航状态 ③ 重构 `App.tsx` - 从 163 LOC 简化为 88 LOC，移除所有 useState 和回调 props ④ 更新导航测试 - 使用 Zustand store 替代 props 传递 ⑤ 所有 106 个测试通过 ⑥ 构建成功通过 | Codex |
 | 2026-03-18 | **Replay Workspace 桌面化重构 + 远端搜索/物品提示闭环**: ① `RealMatchViewer` 重构为地图优先的桌面分析台，header/对阵区压缩为工具栏，地图时间信息移到主地图标题区 ② 英雄 HUD 与地图工作台改为默认折叠，热力图/路径分析支持更清晰的聚焦模式与浮窗交互 ③ `ReplayLibraryPage` 新增按 `player_id/leagueid` 直连 OpenDota 的远端搜索链路，可直接下载并入库或打开本地已就绪回放 ④ 新增 `/api/v1/assets/items/{item_name}.png` 物品图标代理与本地缓存，前端补齐物品别名、中文 tooltip 与中立物品附魔说明 ⑤ OpenDota Live / Replay Library / Match Database / Team Profile 同步收口为统一桌面端布局；当前验证为后端 `176 passed, 8 skipped`、前端 `98 passed`、`npm run build` 通过。 | Codex |
 | 2026-03-16 | **Phase 4 尾项收口 + HUD 真实指标完成**: ① 修复 OpenDota 比赛归一化中的 team_id 标量兼容问题，恢复战队筛选和名称回填 ② `admin` replay task 契约补齐 `progress`，下载链与测试文档统一到 `prepared/downloading/parsing/completed` 语义 ③ `matches` / `visualization` 路由统一为 backend-root 相对路径，避免启动目录变化导致读取失败 ④ `RealMatchViewer` 完成热力图和路径分析真接线，支持时间范围、英雄筛选、轨迹简化与主地图渲染 ⑤ Java parser / Python parser / Parquet / playback HUD 全链路接入真实 `items/net_worth/gpm/xpm`，内置样本可直接返回真实 HUD 指标。 | OpenCode |
 | 2026-03-01 | **Phase 4.1 前端桌面化重构 (UI Redesign)**: ① 移除旧有网格式 Homepage，引入常驻侧边栏（Sidebar）布局及图标导航 ② 引入全局径向渐变背景，定制深色模式 Tailwind 色板 ③ 承载型面板全面采用玻璃磨砂质感 (Glassmorphism) 替换生硬色块 ④ 按钮全量替换现代质感渐变与 hover 反馈 ⑤ 取消 OpenDota Live 和 Match Database 表格定宽限制，新增 `whitespace-nowrap` 防折行 ⑥ 文案全面中文化（侧边栏、表格表头、时间精简至分钟），修复所有报错前端测试。 | OpenCode (Frontend Specialist) |

@@ -1,7 +1,7 @@
 # 项目分析报告: True Sight (Dota 2 AI Pro)
 
-> **生成日期**: 2026-02-26  
-> **项目阶段**: Phase 4 / Phase 4.5 重构  
+> **生成日期**: 2026-03-18  
+> **项目阶段**: Phase 4/4.5 已完成 ✅，准备进入 Phase 5  
 > **代码库**: 29 commits, ~20K+ LOC (前端 ~16.4K, 后端 ~8K+)
 
 ---
@@ -350,7 +350,7 @@ data/matches/{match_id}/
 | PH4-4 | 比赛数据库页面 (8 FE + 4 BE slices) | ✅ DONE | 100% |
 | PH4-5 | 战队归档页 (17 slices) | ✅ DONE | 100% |
 | PH4-6 | 回放实时 HUD (2 slices) | ✅ DONE | 100% |
-| PH4-7 | Gold/XP 优势曲线 | ❌ TODO | 0% |
+| PH4-7 | Gold/XP 优势曲线 | ✅ DONE | 100% |
 
 ### Phase 4.5: 重构
 
@@ -376,9 +376,9 @@ data/matches/{match_id}/
 
 | 功能 | 状态 | 后端 | 前端 |
 |------|------|------|------|
-| 热力图可视化组件 | ❌ TODO | ✅ API 已完成 | ❌ UI 未实现 |
-| 路径轨迹可视化组件 | ❌ TODO | ✅ API 已完成 | ❌ UI 未实现 |
-| 地图击杀事件标记 | ❌ TODO | ✅ 数据已有 | ❌ UI 未实现 |
+| 热力图可视化组件 | ✅ DONE | ✅ API 已完成 | ✅ UI 已实现 |
+| 路径轨迹可视化组件 | ✅ DONE | ✅ API 已完成 | ✅ UI 已实现 |
+| 地图击杀事件标记 | ✅ DONE | ✅ 数据已有 | ✅ UI 已实现 |
 | 眼位聚类分析 (AI) | ❌ TODO | ❌ 未实现 | ❌ 未实现 |
 | Ward Analyzer | ❌ TODO | ❌ 未实现 | - |
 
@@ -390,10 +390,10 @@ data/matches/{match_id}/
 
 | 项目 | 描述 | 影响 |
 |------|------|------|
-| **无全局状态管理** | 页面间通过 App.tsx props/callback 传递，TeamProfilePage 已达 2600 LOC | 可维护性差，跨页状态丢失风险 |
-| **无 React Router** | App.tsx 内部状态手动切页，无 URL 路由 | 无法直接链接到页面，浏览器前进/后退不可用 |
-| **STUB 端点未实现** | smokes API 返回空, aggregate heatmap/ward-clusters 占位 | 功能缺口 |
-| **回归测试缺失** | RB-7 标记 TODO，核心解析→回放链路无端到端测试 | 重构风险高 |
+| **全局状态管理 (部分)** | 已创建 playbackStore.ts，需扩展更多 store (matchStore, navigationStore) | 可维护性中等，需继续完善 |
+| **React Router** | ✅ 已完成 - 已引入 HashRouter，所有页面支持 URL 路由 | - |
+| **STUB 端点** | smokes API 已实现最小可用，aggregate heatmap/ward-clusters 仍占位 | 部分功能缺口 |
+| **回归测试** | ✅ 已完成 - 176 passed (backend), 98 passed (frontend) | - |
 
 ### 🟡 中优先级
 

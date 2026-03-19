@@ -1,7 +1,7 @@
 # API 规范文档 - True Sight
 
-> 版本: v1.3 (implementation-aligned)
-> 最后更新: 2026-03-18
+> 版本: v1.4 (implementation-aligned)  
+> 最后更新: 2026-03-18  
 > 基础 URL: `http://127.0.0.1:8000`
 
 本文件以当前代码实现为准（`backend/routers/*.py`），并明确区分：
@@ -62,7 +62,7 @@
 | GET | `/api/v1/playback/{match_id}/wards` | DONE | 眼位事件与摘要 |
 | GET | `/api/v1/playback/{match_id}/heroes` | DONE | 对局英雄与阵营 |
 | GET | `/api/v1/playback/{match_id}/hud` | DONE | 实时 HUD 指标快照（`game_time` 或 `tick` 二选一；都不传取最新） |
-| GET | `/api/v1/playback/{match_id}/smokes` | DONE | 最小可用：支持 `start_time/end_time/team` 过滤，返回 `smokes/time_basis/pause_intervals/summary` |
+| GET | `/api/v1/playback/{match_id}/smokes` | DONE | 最小可用实现：支持 `start_time/end_time/team` 过滤，返回 `smokes/time_basis/pause_intervals/summary` |
 
 以下历史接口当前未实现：
 - `GET /api/v1/playback/{match_id}/timeline` (`NOT_IMPLEMENTED`)
@@ -821,11 +821,17 @@ FormData:
 - HUD 血条数据来源于 `ticks.heroes[].hp/max_hp`
 - 小地图英雄图标名称兼容增强属于前端渲染层，不新增后端 API 字段
 
-## 5. 未实现能力清单（明确标注）
+## 5. 文档更新日志
 
-以下能力仍在规划或待实现：
-- OpenDota/Stratz 自动下载 replay
-- 多场聚合热力图真实聚合
-- 眼位聚类分析
-- Playback timeline/buildings/combat-log/teamfights/snapshot 系列接口
+| 日期 | 版本 | 更新内容 |
+|------|------|----------|
+| 2026-03-18 | v1.4 | 对齐实际代码实现：smokes API 已升级为 DONE（最小可用实现），热力图/路径/击杀标记 UI 已完成，Phase 4/4.5 全部完成 |
+| 2026-03-16 | v1.3 | 增加 advantage/hud/smokes API 文档，完善时间契约说明 |
+
+## 6. 未实现能力清单（明确标注）
+
+以下能力仍在规划或待实现（Phase 5）：
+- 多场聚合热力图真实聚合（aggregate heatmap）
+- 眼位聚类分析（ward-clusters）
+- Playback buildings/combat-log/teamfights/snapshot 系列接口
 - BP 辅助、高级 analytics、WebSocket 通信

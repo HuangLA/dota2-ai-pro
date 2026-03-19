@@ -60,48 +60,101 @@ dota2-ai-pro/
 
 - Node.js 18+
 - Python 3.10+
-- Java 17+
+- Java 17+ (已包含在 `parsers/jdk17/`)
 
 ### 安装依赖
 
-前端：
+**首次运行前，需要安装依赖：**
+
+**Windows:**
+
+```cmd
+cd frontend
+npm install
+cd ..\backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+**macOS/Linux:**
 
 ```bash
 cd frontend
 npm install
-```
-
-后端：
-
-```bash
-cd backend
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
+cd ../backend
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 启动方式
+### 启动项目
 
-方式 A（Windows 一键启动）：
+需要同时启动前端和后端服务。
 
+#### Windows 启动方式
+
+**方法 1：使用启动脚本（推荐）**
+
+打开两个 PowerShell/CMD 窗口：
+
+窗口 1 - 启动后端：
 ```cmd
-start-all.bat
+cd backend
+start-backend.bat
 ```
 
-方式 B（手动启动）：
+窗口 2 - 启动前端：
+```cmd
+cd frontend
+start-frontend.bat
+```
 
-后端：
+**方法 2：手动启动**
 
-```bash
+窗口 1 - 后端：
+```cmd
 cd backend
+.venv\Scripts\activate
 python main.py
 ```
 
-前端：
+窗口 2 - 前端：
+```cmd
+cd frontend
+npm run dev
+```
 
+#### macOS 启动方式
+
+**方法 1：使用启动脚本（推荐）**
+
+打开两个 Terminal 窗口：
+
+窗口 1 - 启动后端：
+```bash
+cd backend
+chmod +x start-backend.sh
+./start-backend.sh
+```
+
+窗口 2 - 启动前端：
+```bash
+cd frontend
+chmod +x start-frontend.sh
+./start-frontend.sh
+```
+
+**方法 2：手动启动**
+
+窗口 1 - 后端：
+```bash
+cd backend
+source .venv/bin/activate
+python3 main.py
+```
+
+窗口 2 - 前端：
 ```bash
 cd frontend
 npm run dev
@@ -109,9 +162,15 @@ npm run dev
 
 ### 访问地址
 
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:8000`
-- Swagger：`http://localhost:8000/docs`
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| 前端 | http://localhost:5173 | 桌面分析台界面 |
+| 后端 API | http://localhost:8000 | FastAPI 服务 |
+| API 文档 | http://localhost:8000/docs | Swagger UI |
+
+### 停止服务
+
+在两个窗口中分别按 `Ctrl+C` 停止服务。
 
 ## 重要文档
 

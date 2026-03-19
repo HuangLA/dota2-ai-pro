@@ -1,27 +1,30 @@
 // @vitest-environment jsdom
 
-
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
+import { useMatchStore } from './store';
 
 vi.mock('./pages/MatchDatabasePage', () => ({
   __esModule: true,
-  default: ({ onOpenReplay }: { onOpenReplay?: (context: unknown) => void }) => (
-    <button
-      onClick={() =>
-        onOpenReplay?.({
-          source: 'match_database',
-          matchId: 8674716612,
-          downloadStatus: 'prepared',
-          downloadTaskId: 'task-8674716612-1',
-        })
-      }
-    >
-      Mock Open Replay
-    </button>
-  ),
+  default: () => {
+    const { selectMatch } = useMatchStore();
+    return (
+      <button
+        onClick={() =>
+          selectMatch(8674716612, {
+            source: 'match_database',
+            matchId: 8674716612,
+            downloadStatus: 'prepared',
+            downloadTaskId: 'task-8674716612-1',
+          })
+        }
+      >
+        Mock Open Replay
+      </button>
+    );
+  },
 }));
 
 vi.mock('./pages/RealMatchViewer', () => ({
@@ -42,7 +45,7 @@ vi.mock('./pages/RealMatchViewer', () => ({
 }));
 
 describe('App Match Database replay navigation', () => {
-  it('navigates to replay viewer with Match Database context', () => {
+  it('navigates to replay viewer with Match Database context', async () => {
     render(
       <MemoryRouter initialEntries={['/matchDatabase']}>
         <App />
@@ -52,7 +55,9 @@ describe('App Match Database replay navigation', () => {
     fireEvent.click(screen.getByRole('link', { name: '比赛数据库' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mock Open Replay' }));
 
-    expect(screen.getByTestId('viewer-match').textContent).toBe('8674716612');
+    await waitFor(() => {
+      expect(screen.getByTestId('viewer-match').textContent).toBe('8674716612');
+    });
     expect(screen.getByTestId('viewer-source').textContent).toBe('match_database');
     expect(screen.getByTestId('viewer-status').textContent).toBe('prepared');
     expect(screen.getByRole('button', { name: '← 返回' })).toBeTruthy();

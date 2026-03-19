@@ -1,7 +1,7 @@
 # 技术设计文档 (Implementation-Aligned)
 
-> 最后更新: 2026-02-26
-> 对齐基线: `PROGRESS.md`（Phase 4 冲刺完成 + Phase 4.5 重构进行中）
+> 最后更新: 2026-03-18
+> 对齐基线: `PROGRESS.md`（Phase 4/4.5 已完成 ✅，Phase 5 准备启动）
 
 ## 1. 当前架构总览
 
@@ -168,8 +168,8 @@ parsers/
 - `library`：本地已解析库
 
 Stub/部分实现：
-- `GET /playback/{match_id}/smokes`（返回空数组）
-- `POST /visualization/aggregate/heatmap`（基于单场）
-- `POST /visualization/aggregate/ward-clusters`（占位）
+- `GET /playback/{match_id}/smokes`（✅ 最小可用实现 - 支持时间/队伍筛选）
+- `POST /visualization/aggregate/heatmap`（✅ 基于单场聚合）
+- `POST /visualization/aggregate/ward-clusters`（占位 - Phase 5实现）
 
 详细端点状态见：`docs/api_specification.md`
