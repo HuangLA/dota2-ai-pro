@@ -445,6 +445,43 @@ def test_upsert_recent_matches_tracks_source_and_icon_urls() -> None:
     assert row["league_icon_url"] == "l.png"
 
 
+def test_upsert_match_detail_preserves_cached_public_source_without_explicit_source() -> None:
+    storage = OpenDotaMatchStorage()
+    storage.upsert_recent_matches(
+        [
+            {
+                "match_id": 850,
+                "start_time": 1700000850,
+                "duration": 2000,
+            }
+        ],
+        source="public",
+    )
+
+    storage.upsert_match_detail(
+        {
+            "match_id": 850,
+            "start_time": 1700000850,
+            "duration": 2050,
+            "radiant_win": True,
+            "players": [
+                {
+                    "player_slot": 0,
+                    "account_id": 123,
+                    "hero_id": 2,
+                    "isRadiant": True,
+                    "personaname": "Pub Star",
+                }
+            ],
+        }
+    )
+
+    row = storage.get_match(850)
+    assert row is not None
+    assert row["source"] == "public"
+    assert row["is_professional"] == 0
+
+
 def test_list_recent_matches_filters_by_source_flags() -> None:
     storage = OpenDotaMatchStorage()
     storage.upsert_recent_matches(

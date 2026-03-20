@@ -38,7 +38,7 @@ class _FakeHudParquetStorage:
         return self._metadata
 
 
-def _build_positions() -> pd.DataFrame:
+def _build_positions(include_summon: bool = False) -> pd.DataFrame:
     radiant = ["axe", "crystal_maiden", "juggernaut", "earthshaker", "lina"]
     dire = ["lion", "juggernaut", "slark", "phantom_assassin", "tiny"]
 
@@ -73,6 +73,34 @@ def _build_positions() -> pd.DataFrame:
                 }
             )
             handle += 1
+
+    if include_summon:
+        rows.extend(
+            [
+                {
+                    "tick": 30,
+                    "hero": "npc_dota_hero_beastmaster_boar",
+                    "handle": 999,
+                    "team": 3,
+                    "x": 400.0,
+                    "y": 500.0,
+                    "level": 1,
+                    "items": "[]",
+                    "game_time": 60.0,
+                },
+                {
+                    "tick": 60,
+                    "hero": "npc_dota_hero_beastmaster_boar",
+                    "handle": 999,
+                    "team": 3,
+                    "x": 420.0,
+                    "y": 520.0,
+                    "level": 1,
+                    "items": "[]",
+                    "game_time": 120.0,
+                },
+            ]
+        )
 
     return pd.DataFrame(rows)
 
@@ -200,6 +228,17 @@ def client_with_hud_assist_storage(monkeypatch: pytest.MonkeyPatch) -> TestClien
     return TestClient(app)
 
 
+@pytest.fixture
+def client_with_summon_storage(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    fake_storage = _FakeHudParquetStorage(
+        _build_positions(include_summon=True),
+        _build_kills(),
+        _build_economy(),
+    )
+    monkeypatch.setattr(playback, "parquet_storage", fake_storage)
+    return TestClient(app)
+
+
 def test_hud_endpoint_returns_stable_hero_contract(client_with_hud_storage: TestClient) -> None:
     response = client_with_hud_storage.get("/api/v1/playback/1/hud")
 
@@ -320,6 +359,35 @@ def test_hud_endpoint_maps_assists_from_assist_players(
     assert crystal_maiden["assists"] == 1
     assert earthshaker["assists"] == 1
     assert lion["deaths"] == 1
+
+
+def test_hud_endpoint_filters_non_player_summons(client_with_summon_storage: TestClient) -> None:
+    response = client_with_summon_storage.get("/api/v1/playback/1/hud")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["heroes"]) == 10
+    assert all(hero["hero"] != "npc_dota_hero_beastmaster_boar" for hero in payload["heroes"])
+
+
+def test_ticks_endpoint_filters_non_player_summons(client_with_summon_storage: TestClient) -> None:
+    response = client_with_summon_storage.get("/api/v1/playback/1/ticks")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ticks"]
+    for tick in payload["ticks"]:
+        assert len(tick["heroes"]) == 10
+        assert all(hero["hero"] != "npc_dota_hero_beastmaster_boar" for hero in tick["heroes"])
+
+
+def test_heroes_endpoint_filters_non_player_summons(client_with_summon_storage: TestClient) -> None:
+    response = client_with_summon_storage.get("/api/v1/playback/1/heroes")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 10
+    assert all(hero["name"] != "npc_dota_hero_beastmaster_boar" for hero in payload["dire"])
 
 
 def test_hud_endpoint_rejects_game_time_and_tick_together(client_with_hud_storage: TestClient) -> None:

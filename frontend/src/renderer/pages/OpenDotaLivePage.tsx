@@ -1,37 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  RemoteMatchPlayer,
   RemoteMatchRecord,
   RemoteMatchSource,
   RemoteMatchStatusResponse,
   remoteService,
 } from '../api/remoteService';
+import { getHeroById, getHeroIconUrl } from '../data/heroes';
 import { formatDurationClock, formatUnixTimestampLocal } from './matchDatabaseFormatting';
 
 const PAGE_LIMIT = 20;
+const DEFAULT_LIST_SOURCES: RemoteMatchSource[] = ['pro'];
+const SEARCH_SOURCES: RemoteMatchSource[] = ['pro', 'public'];
 
-interface FiltersState {
-  includePro: boolean;
-  includePublic: boolean;
-  matchId: string;
-  leagueId: string;
+type MatchSide = 'radiant' | 'dire';
+
+interface UnifiedSearchSpec {
+  label: string;
+  error?: string;
 }
 
-const DEFAULT_FILTERS: FiltersState = {
-  includePro: true,
-  includePublic: false,
-  matchId: '',
-  leagueId: '',
-};
-
-function pickSources(filters: Pick<FiltersState, 'includePro' | 'includePublic'>): RemoteMatchSource[] {
-  const selected: RemoteMatchSource[] = [];
-  if (filters.includePro) {
-    selected.push('pro');
-  }
-  if (filters.includePublic) {
-    selected.push('public');
-  }
-  return selected;
+interface TeamRosterEntry {
+  heroId: number | null;
+  heroName: string;
+  heroIconUrl: string | null;
+  playerLabel: string | null;
+  playerMeta: string | null;
 }
 
 function toOptionalInt(value: string): number | undefined {
@@ -43,14 +37,15 @@ function toOptionalInt(value: string): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function getSourceLabel(source: string | null | undefined): string {
-  if (source === 'pro') {
-    return '职业';
+function normalizeTeamSide(team: string | number | null | undefined): MatchSide | null {
+  const normalized = String(team ?? '').trim().toLowerCase();
+  if (team === 2 || normalized === '2' || normalized === 'radiant' || normalized === 'goodguys') {
+    return 'radiant';
   }
-  if (source === 'public') {
-    return '路人';
+  if (team === 3 || normalized === '3' || normalized === 'dire' || normalized === 'badguys') {
+    return 'dire';
   }
-  return '--';
+  return null;
 }
 
 function getTeamLabel(name: string | null | undefined, teamId: number | null | undefined): string {
@@ -70,7 +65,150 @@ function getLeagueLabel(name: string | null | undefined, leagueId: number | null
   if (leagueId !== undefined && leagueId !== null) {
     return `联赛 ${leagueId}`;
   }
-  return '未知联赛';
+  return '路人';
+}
+
+function hasLeagueMetadata(
+  match: Pick<
+    RemoteMatchRecord,
+    'leagueid' | 'league_name' | 'league_icon_url' | 'league_image_url' | 'league_banner_url' | 'league_logo_url'
+  >
+): boolean {
+  return Boolean(
+    match.leagueid ||
+      match.league_name ||
+      match.league_icon_url ||
+      match.league_image_url ||
+      match.league_banner_url ||
+      match.league_logo_url
+  );
+}
+
+function shouldRenderLeagueBadge(
+  match: Pick<
+    RemoteMatchRecord,
+    'source' | 'leagueid' | 'league_name' | 'league_icon_url' | 'league_image_url' | 'league_banner_url' | 'league_logo_url'
+  >
+): boolean {
+  return !(match.source === 'public' && !hasLeagueMetadata(match));
+}
+
+function getRosterTeamName(match: RemoteMatchRecord, side: MatchSide): string {
+  const teamName =
+    side === 'radiant'
+      ? getTeamLabel(match.radiant_team_name ?? match.radiant_name, match.radiant_team_id)
+      : getTeamLabel(match.dire_team_name ?? match.dire_name, match.dire_team_id);
+  if (teamName !== '未知战队') {
+    return teamName;
+  }
+  if (match.source === 'public') {
+    return side === 'radiant' ? '天辉' : '夜魇';
+  }
+  return teamName;
+}
+
+function getWinnerSide(match: {
+  winner_team?: string | number | null;
+  radiant_win?: boolean | null;
+  winner_name?: string | null;
+  winner_display_name?: string | null;
+}): MatchSide | null {
+  const normalizedWinner = normalizeTeamSide(match.winner_team);
+  if (normalizedWinner) {
+    return normalizedWinner;
+  }
+  if (typeof match.radiant_win === 'boolean') {
+    return match.radiant_win ? 'radiant' : 'dire';
+  }
+
+  const winnerName = `${match.winner_display_name ?? ''} ${match.winner_name ?? ''}`.toLowerCase();
+  if (winnerName.includes('radiant') || winnerName.includes('天辉')) {
+    return 'radiant';
+  }
+  if (winnerName.includes('dire') || winnerName.includes('夜魇')) {
+    return 'dire';
+  }
+
+  return null;
+}
+
+function getPlayerDisplayName(player: RemoteMatchPlayer | string | null | undefined): string | null {
+  if (typeof player === 'string') {
+    return player.trim() || null;
+  }
+  if (!player) {
+    return null;
+  }
+
+  const name = player.display_name ?? player.pro_name ?? player.persona_name ?? player.player_name;
+  if (name && name.trim()) {
+    return name.trim();
+  }
+
+  if (typeof player.account_id === 'number') {
+    return `ID ${player.account_id}`;
+  }
+
+  return null;
+}
+
+function getPlayerMetaLabel(player: RemoteMatchPlayer | string | null | undefined): string | null {
+  if (!player || typeof player === 'string') {
+    return null;
+  }
+  return typeof player.account_id === 'number' ? `ID ${player.account_id}` : null;
+}
+
+function getTeamLineup(match: RemoteMatchRecord, side: MatchSide): Array<string | RemoteMatchPlayer> {
+  const teamPlayers = side === 'radiant' ? match.radiant_players : match.dire_players;
+  if (Array.isArray(teamPlayers) && teamPlayers.length > 0) {
+    return teamPlayers;
+  }
+
+  const genericPlayers = Array.isArray(match.players) ? match.players : [];
+  const filteredPlayers = genericPlayers.filter((player) => normalizeTeamSide(player.team) === side);
+  if (filteredPlayers.length > 0) {
+    return filteredPlayers;
+  }
+
+  const teamLineup = side === 'radiant' ? match.radiant_lineup : match.dire_lineup;
+  if (Array.isArray(teamLineup) && teamLineup.length > 0) {
+    return teamLineup;
+  }
+
+  const nestedLineup = match.lineup?.[side];
+  return Array.isArray(nestedLineup) ? nestedLineup : [];
+}
+
+function getTeamRosterEntries(match: RemoteMatchRecord, side: MatchSide): TeamRosterEntry[] {
+  return getTeamLineup(match, side)
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const heroName = entry.trim();
+        return {
+          heroId: null,
+          heroName: heroName || '未知英雄',
+          heroIconUrl: null,
+          playerLabel: heroName || null,
+          playerMeta: null,
+        };
+      }
+
+      const heroId = typeof entry.hero_id === 'number' ? entry.hero_id : null;
+      const hero = heroId ? getHeroById(heroId) : undefined;
+      return {
+        heroId,
+        heroName:
+          entry.hero_name?.trim() ||
+          hero?.localizedName ||
+          hero?.chineseName ||
+          (heroId ? `Hero ${heroId}` : '未知英雄'),
+        heroIconUrl: heroId ? getHeroIconUrl(heroId) : null,
+        playerLabel: getPlayerDisplayName(entry),
+        playerMeta: getPlayerMetaLabel(entry),
+      };
+    })
+    .filter((entry) => Boolean(entry.heroName || entry.playerLabel));
 }
 
 function getDownloadStatusBadge(status: string | null | undefined): { label: string; className: string } {
@@ -103,6 +241,26 @@ function getParseStatusBadge(status: string | null | undefined): { label: string
   }
 }
 
+function resolvePipelineParseStatus(
+  downloadStatus: string | null | undefined,
+  parseStatus: string | null | undefined
+): string | null {
+  const normalizedParseStatus = (parseStatus || '').toLowerCase();
+  if (normalizedParseStatus) {
+    return normalizedParseStatus;
+  }
+
+  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
+  if (normalizedDownloadStatus === 'parsing') {
+    return 'parsing';
+  }
+  if (normalizedDownloadStatus === 'completed') {
+    return 'pending';
+  }
+
+  return null;
+}
+
 function getPipelineStatusBadge(
   downloadStatus: string | null | undefined,
   parseStatus: string | null | undefined
@@ -128,26 +286,6 @@ function getPipelineStatusBadge(
   return { label: '未开始', className: 'border-slate-500/60 bg-slate-800/60 text-slate-300' };
 }
 
-function resolvePipelineParseStatus(
-  downloadStatus: string | null | undefined,
-  parseStatus: string | null | undefined
-): string | null {
-  const normalizedParseStatus = (parseStatus || '').toLowerCase();
-  if (normalizedParseStatus) {
-    return normalizedParseStatus;
-  }
-
-  const normalizedDownloadStatus = (downloadStatus || '').toLowerCase();
-  if (normalizedDownloadStatus === 'parsing') {
-    return 'parsing';
-  }
-  if (normalizedDownloadStatus === 'completed') {
-    return 'pending';
-  }
-
-  return null;
-}
-
 function isTerminalParseStatus(status: string | null | undefined): boolean {
   const normalized = (status || '').toLowerCase();
   return normalized === 'completed' || normalized === 'failed';
@@ -168,27 +306,155 @@ function isTerminalPipelineStatus(
   return isTerminalParseStatus(resolvePipelineParseStatus(downloadStatus, parseStatus));
 }
 
-interface LiveMatchStatus {
-  downloadStatus: string;   // 'downloading' | 'parsing' | 'completed' | 'failed' | ...
-  downloadProgress: number; // 0-100
-  parseStatus: string | null;
+function pickAssetUrl(...candidates: Array<string | null | undefined>): string | null {
+  for (const candidate of candidates) {
+    if (candidate && candidate.trim()) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
-function MatchIcon({ url, label }: { url?: string | null; label: string }) {
+function pickLeagueAssetUrl(
+  match: Pick<RemoteMatchRecord, 'league_icon_url' | 'league_image_url' | 'league_banner_url' | 'league_logo_url'>
+): string | null {
+  return pickAssetUrl(match.league_banner_url, match.league_image_url, match.league_icon_url, match.league_logo_url);
+}
+
+function pickLeagueAssetVariant(
+  match: Pick<RemoteMatchRecord, 'league_image_url' | 'league_banner_url'>
+): 'banner' | 'logo' {
+  return match.league_banner_url || match.league_image_url ? 'banner' : 'logo';
+}
+
+function LeagueArtwork({
+  match,
+  leagueName,
+  subtitle,
+  archiveLabel,
+}: {
+  match: RemoteMatchRecord;
+  leagueName: string;
+  subtitle: string;
+  archiveLabel: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const assetUrl = pickLeagueAssetUrl(match);
+  const leagueAssetVariant = pickLeagueAssetVariant(match);
+  const tagShellClass =
+    match.source === 'public'
+      ? 'border-amber-400/30 bg-amber-500/14 text-amber-100'
+      : 'border-cyan-400/30 bg-cyan-500/14 text-cyan-100';
+
+  if (!assetUrl || broken) {
+    return (
+      <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-[22px] border border-amber-500/25 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_40%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]">
+        <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(rgba(148,163,184,0.06)_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="relative flex min-h-[148px] items-end p-4">
+          <div className="min-w-0">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tagShellClass}`}>
+                {archiveLabel}
+              </span>
+              {match.leagueid ? (
+                <span className="inline-flex items-center rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-white/85">
+                  联赛 {match.leagueid}
+                </span>
+              ) : null}
+            </div>
+            <p className="max-w-[560px] text-[18px] font-semibold leading-6 text-white" title={leagueName}>
+              {leagueName}
+            </p>
+            <p className="mt-1 text-xs leading-5 tracking-[0.06em] text-slate-300">{subtitle}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-[22px] border border-amber-500/25 bg-slate-950/90">
+      <img
+        src={assetUrl}
+        alt={`${leagueName} 背景`}
+        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-28 blur-2xl"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setBroken(true)}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92),rgba(2,6,23,0.58)_42%,rgba(2,6,23,0.84))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.2),transparent_42%)]" />
+      <div className="relative flex aspect-[1024/400] min-h-[146px] items-stretch">
+        <div
+          className={`min-w-0 flex-1 ${
+            leagueAssetVariant === 'banner' ? 'flex items-center justify-center px-4 py-3.5' : 'flex items-center justify-center px-7 py-4'
+          }`}
+        >
+          <img
+            src={assetUrl}
+            alt={`${leagueName} 横幅`}
+            className={`h-full w-full drop-shadow-[0_18px_32px_rgba(15,23,42,0.42)] ${
+              leagueAssetVariant === 'banner' ? 'object-contain object-center' : 'object-contain object-center'
+            }`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setBroken(true)}
+          />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap justify-between gap-2 p-3.5">
+          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold backdrop-blur ${tagShellClass}`}>
+            {archiveLabel}
+          </span>
+          {match.leagueid ? (
+            <span className="inline-flex items-center rounded-full border border-white/12 bg-slate-950/48 px-2.5 py-1 text-[10px] font-semibold text-white/85 backdrop-blur">
+              联赛 {match.leagueid}
+            </span>
+          ) : null}
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3.5">
+          <div className="max-w-[min(66%,520px)] rounded-[18px] border border-white/10 bg-slate-950/42 px-3.5 py-2.5 backdrop-blur-md">
+            <p className="text-[18px] font-semibold leading-6 text-white" title={leagueName}>
+              {leagueName}
+            </p>
+            <p className="mt-1 text-[11px] leading-[18px] tracking-[0.05em] text-slate-300">{subtitle}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatchIcon({
+  url,
+  label,
+  iconClassName,
+  fallbackClassName,
+  fallbackSizeClassName,
+}: {
+  url?: string | null;
+  label: string;
+  iconClassName?: string;
+  fallbackClassName?: string;
+  fallbackSizeClassName?: string;
+}) {
   const [broken, setBroken] = useState(false);
   const fallbackText = label === 'Radiant' ? '天' : label === 'Dire' ? '夜' : '联';
-  const fallbackClassName =
+  const defaultFallbackClassName =
     label === 'Radiant'
       ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
       : label === 'Dire'
         ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
         : 'border-amber-500/40 bg-amber-500/10 text-amber-200';
+  const resolvedIconClassName =
+    iconClassName ??
+    'max-h-7 max-w-[56px] shrink-0 rounded border border-slate-600/40 bg-slate-900/60 object-contain';
+  const resolvedFallbackClassName = fallbackClassName ?? defaultFallbackClassName;
 
   if (!url || broken) {
     return (
       <div
         title={`${label} 图标缺失`}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border border-dashed text-xs font-semibold ${fallbackClassName}`}
+        className={`flex ${fallbackSizeClassName ?? 'h-7 w-7'} shrink-0 items-center justify-center rounded border border-dashed text-xs font-semibold ${resolvedFallbackClassName}`}
       >
         {fallbackText}
       </div>
@@ -199,7 +465,7 @@ function MatchIcon({ url, label }: { url?: string | null; label: string }) {
     <img
       src={url}
       alt={`${label} 图标`}
-      className="max-h-7 max-w-[56px] shrink-0 rounded border border-slate-600/40 bg-slate-900/60 object-contain"
+      className={resolvedIconClassName}
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setBroken(true)}
@@ -207,18 +473,266 @@ function MatchIcon({ url, label }: { url?: string | null; label: string }) {
   );
 }
 
-function pickAssetUrl(...candidates: Array<string | null | undefined>): string | null {
-  for (const candidate of candidates) {
-    if (candidate && candidate.trim()) {
-      return candidate;
+function LeagueBadge({
+  match,
+  leagueName,
+}: {
+  match: RemoteMatchRecord;
+  leagueName: string;
+}) {
+  if (!shouldRenderLeagueBadge(match)) {
+    return null;
+  }
+
+  const isPublic = match.source === 'public';
+  const shellClass = isPublic
+    ? 'border-amber-500/40 bg-[linear-gradient(135deg,rgba(120,53,15,0.32),rgba(15,23,42,0.94))]'
+    : 'border-amber-500/35 bg-[linear-gradient(135deg,rgba(146,64,14,0.18),rgba(15,23,42,0.94))]';
+  const subtitle = isPublic ? '公开匹配 / 路人来源' : '联赛 / 训练赛镜像';
+  const archiveLabel = isPublic ? '路人来源' : '联赛档案';
+  const metaCards = [
+    { label: '赛道', value: isPublic ? '公开匹配' : '职业镜像' },
+    { label: '数据状态', value: hasLeagueMetadata(match) ? '联赛元数据已就绪' : '仅比赛摘要' },
+    { label: '最近同步', value: match.last_synced_at ? formatUnixTimestampLocal(match.last_synced_at) : '等待刷新' },
+    { label: '检索标签', value: leagueName },
+  ];
+
+  return (
+    <div
+      data-testid={`live-league-badge-${match.match_id}`}
+      className={`w-full rounded-[28px] border px-4 py-4 shadow-[0_14px_36px_rgba(2,6,23,0.22)] ${shellClass}`}
+    >
+      <LeagueArtwork match={match} leagueName={leagueName} subtitle={subtitle} archiveLabel={archiveLabel} />
+      <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-4">
+        {metaCards.map((item) => (
+          <div
+            key={`${match.match_id}-${item.label}`}
+            className="rounded-2xl border border-slate-700/60 bg-slate-950/55 px-3 py-2.5"
+          >
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-100" title={item.value}>
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function describeUnifiedSearchQuery(rawQuery: string): UnifiedSearchSpec {
+  const trimmed = rawQuery.trim();
+  if (!trimmed) {
+    return { label: '职业镜像' };
+  }
+
+  const prefixed = trimmed.match(
+    /^(match|match_id|player|player_id|player_name|league|league_id|league_name|比赛|玩家|联赛)\s*[:：=]?\s*(.+)$/i
+  );
+
+  if (prefixed) {
+    const key = prefixed[1].toLowerCase();
+    const value = prefixed[2].trim();
+    if (!value) {
+      return { label: '无效输入', error: '请输入具体的搜索内容。' };
+    }
+
+    if (key.startsWith('match') || key === '比赛') {
+      const matchId = toOptionalInt(value);
+      if (matchId === undefined) {
+        return { label: '无效输入', error: '比赛关键词后请输入数字比赛 ID。' };
+      }
+      return { label: `比赛 ${matchId}` };
+    }
+
+    if (key === 'player' || key === 'player_name' || key === '玩家') {
+      const playerId = toOptionalInt(value);
+      if (playerId !== undefined) {
+        return { label: `玩家 ID ${playerId}` };
+      }
+
+      return { label: `玩家 ${value}` };
+    }
+
+    if (key === 'league' || key === 'league_name' || key === '联赛') {
+      const leagueId = toOptionalInt(value);
+      if (leagueId !== undefined) {
+        return { label: `联赛 ID ${leagueId}` };
+      }
+
+      return { label: `联赛 ${value}` };
+    }
+
+    if (key === 'league_id') {
+      const leagueId = toOptionalInt(value);
+      if (leagueId === undefined) {
+        return { label: '无效输入', error: 'league_id 之后请输入数字联赛 ID。' };
+      }
+      return { label: `联赛 ID ${leagueId}` };
+    }
+
+    if (key === 'player_id') {
+      const playerId = toOptionalInt(value);
+      if (playerId === undefined) {
+        return { label: '无效输入', error: 'player_id 之后请输入数字玩家 ID。' };
+      }
+      return { label: `玩家 ID ${playerId}` };
     }
   }
-  return null;
+
+  if (/^\d+$/.test(trimmed)) {
+    if (trimmed.length >= 10) {
+      const matchId = Number.parseInt(trimmed, 10);
+      return { label: `比赛 ${matchId}` };
+    }
+
+    if (trimmed.length >= 7) {
+      const playerId = Number.parseInt(trimmed, 10);
+      return { label: `玩家 ID ${playerId}` };
+    }
+
+    const leagueId = Number.parseInt(trimmed, 10);
+    return { label: `联赛 ID ${leagueId}` };
+  }
+
+  return { label: `全域 ${trimmed}` };
+}
+
+function SearchPresetButton({
+  value,
+  children,
+  onPick,
+}: {
+  value: string;
+  children: React.ReactNode;
+  onPick: (value: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(value)}
+      className="rounded-full border border-slate-700/80 bg-slate-950/70 px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-cyan-500/50 hover:text-cyan-100"
+    >
+      {children}
+    </button>
+  );
+}
+
+function TeamRosterCard({
+  match,
+  side,
+  winnerSide,
+}: {
+  match: RemoteMatchRecord;
+  side: MatchSide;
+  winnerSide: MatchSide | null;
+}) {
+  const teamName = getRosterTeamName(match, side);
+  const entries = getTeamRosterEntries(match, side);
+  const isWinner = winnerSide === side;
+  const accentClass =
+    side === 'radiant'
+      ? isWinner
+        ? 'border-emerald-500/45 bg-emerald-950/45 shadow-[0_20px_60px_rgba(16,185,129,0.08)]'
+        : 'border-slate-700/80 bg-slate-950/75'
+      : isWinner
+        ? 'border-rose-500/45 bg-rose-950/45 shadow-[0_20px_60px_rgba(244,63,94,0.08)]'
+        : 'border-slate-700/80 bg-slate-950/75';
+  const sideLabel = side === 'radiant' ? '天辉' : '夜魇';
+  const teamScore = side === 'radiant' ? match.radiant_score : match.dire_score;
+
+  return (
+    <div
+      data-testid={`live-team-${side}-${match.match_id}`}
+      className={`rounded-[24px] border p-3 ${accentClass}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <MatchIcon
+            label={side === 'radiant' ? 'Radiant' : 'Dire'}
+            url={pickAssetUrl(
+              side === 'radiant'
+                ? match.radiant_icon_url ?? match.radiant_logo_url ?? match.radiant_logo_sponsor_url
+                : match.dire_icon_url ?? match.dire_logo_url ?? match.dire_logo_sponsor_url
+            )}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{sideLabel}</p>
+              {isWinner && (
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                    side === 'radiant'
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
+                      : 'border-rose-500/50 bg-rose-500/10 text-rose-200'
+                  }`}
+                >
+                  获胜
+                </span>
+              )}
+            </div>
+            <p className="mt-1 truncate text-sm font-semibold text-white" title={teamName}>
+              {teamName}
+            </p>
+          </div>
+        </div>
+        {typeof teamScore === 'number' && (
+          <div className="shrink-0 rounded-2xl border border-slate-700/80 bg-slate-950/70 px-3 py-2 text-right">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">击杀</p>
+            <p className="text-lg font-semibold text-white">{teamScore}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {entries.length > 0 ? (
+          entries.map((entry, index) => (
+            <div
+              key={`${match.match_id}-${side}-entry-${index}-${entry.heroName}-${entry.playerLabel ?? 'unknown'}`}
+              className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-700/70 bg-slate-900/55 px-2.5 py-2"
+            >
+              {entry.heroIconUrl ? (
+                <img
+                  src={entry.heroIconUrl}
+                  alt={entry.heroName}
+                  className="h-9 w-9 shrink-0 rounded-xl border border-slate-700/70 bg-slate-950 object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-950 text-[10px] text-slate-500">
+                  {entry.heroName.slice(0, 2)}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-[11px] font-semibold leading-4 text-white">
+                  {entry.playerLabel ?? '未知玩家'}
+                </div>
+                <div className="truncate text-[10px] leading-4 text-slate-400">
+                  {entry.heroName}
+                  {entry.playerMeta ? ` · ${entry.playerMeta}` : ''}
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-700/70 px-3 py-3 text-[11px] text-slate-500 sm:col-span-2">
+            暂无阵容信息
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface LiveMatchStatus {
+  downloadStatus: string;
+  downloadProgress: number;
+  parseStatus: string | null;
 }
 
 export function OpenDotaLivePage() {
-  const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<FiltersState>(DEFAULT_FILTERS);
+  const [searchText, setSearchText] = useState('');
+  const [appliedSearchText, setAppliedSearchText] = useState('');
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -228,6 +742,7 @@ export function OpenDotaLivePage() {
   const [actionMatchId, setActionMatchId] = useState<number | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchNotice, setSearchNotice] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [statusPanel, setStatusPanel] = useState<{
     matchId: number;
@@ -238,15 +753,19 @@ export function OpenDotaLivePage() {
   } | null>(null);
   const [liveStatus, setLiveStatus] = useState<Map<number, LiveMatchStatus>>(new Map());
 
+  const searchSpec = useMemo(() => describeUnifiedSearchQuery(appliedSearchText), [appliedSearchText]);
+  const hasSearchQuery = appliedSearchText.trim().length > 0;
+  const searchModeLabel = hasSearchQuery ? searchSpec.label : '职业镜像';
+
   const refreshStatusPanel = useCallback(async (matchId: number, withLoading = true) => {
     if (withLoading) {
       setStatusPanel((current) =>
         current && current.matchId === matchId
           ? {
-            ...current,
-            loading: true,
-            error: null,
-          }
+              ...current,
+              loading: true,
+              error: null,
+            }
           : current
       );
     }
@@ -262,10 +781,7 @@ export function OpenDotaLivePage() {
           loading: false,
           error: null,
           detail,
-          autoPolling: isTerminalPipelineStatus(
-            detail.download_task?.status,
-            detail.local_parse_status
-          )
+          autoPolling: isTerminalPipelineStatus(detail.download_task?.status, detail.local_parse_status)
             ? false
             : current.autoPolling,
         };
@@ -275,73 +791,82 @@ export function OpenDotaLivePage() {
       setStatusPanel((current) =>
         current && current.matchId === matchId
           ? {
-            ...current,
-            loading: false,
-            error: '状态详情加载失败。',
-            autoPolling: false,
-          }
+              ...current,
+              loading: false,
+              error: '状态详情加载失败。',
+              autoPolling: false,
+            }
           : current
       );
     }
   }, []);
 
-  const sources = useMemo<RemoteMatchSource[]>(() => {
-    return pickSources(appliedFilters);
-  }, [appliedFilters.includePro, appliedFilters.includePublic]);
-
   const fetchMatches = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSearchNotice(null);
 
     try {
-      const result = await remoteService.getRemoteMatches({
-        limit: PAGE_LIMIT,
-        offset,
-        match_id: toOptionalInt(appliedFilters.matchId),
-        leagueid: toOptionalInt(appliedFilters.leagueId),
-        sources,
-      });
+      const result = hasSearchQuery
+        ? await remoteService.searchRemoteMatches({
+            q: appliedSearchText,
+            limit: PAGE_LIMIT,
+            offset,
+            sources: SEARCH_SOURCES,
+          })
+        : await remoteService.getRemoteMatches({
+            limit: PAGE_LIMIT,
+            offset,
+            sources: DEFAULT_LIST_SOURCES,
+          });
+
       setMatches(result.matches ?? []);
       setTotal(result.total ?? 0);
-    // Seed liveStatus for active downloads so progress tracking survives page refresh
-    setLiveStatus((prev) => {
-      const next = new Map(prev);
-      for (const m of result.matches ?? []) {
-        if (next.has(m.match_id)) continue;
-        const rawStatus = (m.download_status ?? '').toLowerCase();
-        if (!rawStatus || isTerminalPipelineStatus(rawStatus, m.local_parse_status)) continue;
-        const progress = rawStatus === 'parsing' ? 50 : rawStatus === 'completed' ? 100 : rawStatus === 'prepared' ? 5 : 10;
-        next.set(m.match_id, {
-          downloadStatus: rawStatus,
-          downloadProgress: progress,
-          parseStatus: m.local_parse_status ?? null,
-        });
-      }
-      return next;
-    });
+      setSearchNotice(hasSearchQuery ? result.message ?? null : null);
+      setLiveStatus((prev) => {
+        const next = new Map(prev);
+        for (const match of result.matches ?? []) {
+          if (next.has(match.match_id)) {
+            continue;
+          }
+          const rawStatus = (match.download_status ?? '').toLowerCase();
+          if (!rawStatus || isTerminalPipelineStatus(rawStatus, match.local_parse_status)) {
+            continue;
+          }
+          const progress =
+            rawStatus === 'parsing' ? 50 : rawStatus === 'completed' ? 100 : rawStatus === 'prepared' ? 5 : 10;
+          next.set(match.match_id, {
+            downloadStatus: rawStatus,
+            downloadProgress: progress,
+            parseStatus: match.local_parse_status ?? null,
+          });
+        }
+        return next;
+      });
     } catch (fetchError) {
       console.error('Failed to fetch remote matches:', fetchError);
       setMatches([]);
       setTotal(0);
-      setError('OpenDota 实时列表加载失败，请重试。');
+      setSearchNotice(null);
+      setError(hasSearchQuery ? 'OpenDota 搜索失败，请重试。' : 'OpenDota 实时列表加载失败，请重试。');
     } finally {
       setLoading(false);
     }
-  }, [appliedFilters.leagueId, appliedFilters.matchId, offset, sources]);
+  }, [appliedSearchText, hasSearchQuery, offset]);
 
   useEffect(() => {
     void fetchMatches();
   }, [fetchMatches]);
 
   useEffect(() => {
+    if (hasSearchQuery) {
+      return;
+    }
+
     const timer = window.setInterval(() => {
       void (async () => {
         try {
-          const autoSyncSources = pickSources(appliedFilters);
-          if (autoSyncSources.length === 0) {
-            return;
-          }
-          await remoteService.syncRemoteMatches({ sources: autoSyncSources });
+          await remoteService.syncRemoteMatches({ sources: DEFAULT_LIST_SOURCES });
           await fetchMatches();
         } catch (autoSyncError) {
           console.error('Failed to auto-sync remote matches:', autoSyncError);
@@ -350,17 +875,14 @@ export function OpenDotaLivePage() {
     }, 60_000);
 
     return () => window.clearInterval(timer);
-  }, [appliedFilters, fetchMatches]);
+  }, [fetchMatches, hasSearchQuery]);
 
   useEffect(() => {
     if (!statusPanel || !statusPanel.autoPolling) {
       return;
     }
     if (
-      isTerminalPipelineStatus(
-        statusPanel.detail?.download_task?.status,
-        statusPanel.detail?.local_parse_status
-      )
+      isTerminalPipelineStatus(statusPanel.detail?.download_task?.status, statusPanel.detail?.local_parse_status)
     ) {
       return;
     }
@@ -370,11 +892,9 @@ export function OpenDotaLivePage() {
     }, 3000);
 
     return () => window.clearTimeout(timer);
-  }, [statusPanel, refreshStatusPanel]);
+  }, [refreshStatusPanel, statusPanel]);
 
-  // Per-row live status polling (same pattern as statusPanel auto-polling above)
   useEffect(() => {
-    // Find active entries that still need polling across download + parse stages
     const activeIds: number[] = [];
     liveStatus.forEach((entry, matchId) => {
       if (!isTerminalPipelineStatus(entry.downloadStatus, entry.parseStatus)) {
@@ -413,28 +933,34 @@ export function OpenDotaLivePage() {
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (pickSources(filters).length === 0) {
-      setFeedback({ type: 'error', message: '请至少选择一个来源（职业或路人）。' });
+    const parsed = describeUnifiedSearchQuery(searchText);
+    if (parsed.error) {
+      setFeedback({ type: 'error', message: parsed.error });
       return;
     }
+
     setOffset(0);
-    setAppliedFilters(filters);
+    setAppliedSearchText(searchText.trim());
+    setSelectedMatchIds([]);
+    setFeedback(null);
+  };
+
+  const handleClear = () => {
+    setSearchText('');
+    setAppliedSearchText('');
+    setOffset(0);
+    setSelectedMatchIds([]);
+    setSearchNotice(null);
     setFeedback(null);
   };
 
   const handleManualSync = async () => {
-    const syncSources = pickSources(appliedFilters);
-    if (syncSources.length === 0) {
-      setFeedback({ type: 'error', message: '当前没有启用的来源，无法同步。' });
-      return;
-    }
-
     setSyncing(true);
     setFeedback(null);
 
     try {
       const result = await remoteService.syncRemoteMatches({
-        sources: syncSources,
+        sources: DEFAULT_LIST_SOURCES,
       });
       setFeedback({
         type: 'success',
@@ -462,7 +988,6 @@ export function OpenDotaLivePage() {
       setBatchLoading(true);
     }
 
-    // Immediately set live status so UI shows progress without waiting for API response
     setLiveStatus((prev) => {
       const next = new Map(prev);
       for (const id of matchIds) {
@@ -483,12 +1008,8 @@ export function OpenDotaLivePage() {
       console.error('Failed to ingest remote matches:', ingestError);
       setFeedback({
         type: 'error',
-        message:
-          singleMatchId !== null
-            ? `比赛 ${singleMatchId} 入库失败。`
-            : `批量入库失败（${matchIds.length} 场）。`,
+        message: singleMatchId !== null ? `比赛 ${singleMatchId} 入库失败。` : `批量入库失败（${matchIds.length} 场）。`,
       });
-      // Clear live status for failed ingest calls
       setLiveStatus((prev) => {
         const next = new Map(prev);
         for (const id of matchIds) {
@@ -518,48 +1039,33 @@ export function OpenDotaLivePage() {
     }
   };
 
-  const currentPageMatchIds = matches
-    .map((match) => match.match_id)
-    .filter((matchId) => Number.isFinite(matchId) && matchId > 0);
-  const selectedCurrentPageCount = currentPageMatchIds.filter((matchId) =>
-    selectedMatchIds.includes(matchId)
-  ).length;
-  const isAllCurrentPageSelected =
-    currentPageMatchIds.length > 0 && selectedCurrentPageCount === currentPageMatchIds.length;
-  const isSomeCurrentPageSelected =
-    selectedCurrentPageCount > 0 && selectedCurrentPageCount < currentPageMatchIds.length;
-  const selectedSources = pickSources(appliedFilters);
-  const activeFilterCount = [appliedFilters.matchId, appliedFilters.leagueId].filter(
-    (value) => value.trim().length > 0
-  ).length + selectedSources.length;
+  const currentPageMatchIds = matches.map((match) => match.match_id).filter((matchId) => Number.isFinite(matchId) && matchId > 0);
+  const selectedCurrentPageCount = currentPageMatchIds.filter((matchId) => selectedMatchIds.includes(matchId)).length;
+  const isAllCurrentPageSelected = currentPageMatchIds.length > 0 && selectedCurrentPageCount === currentPageMatchIds.length;
+  const isSomeCurrentPageSelected = selectedCurrentPageCount > 0 && selectedCurrentPageCount < currentPageMatchIds.length;
+  const activeFilterCount = hasSearchQuery ? 1 : 0;
   const activePipelineCount = matches.filter((match) => {
     const live = liveStatus.get(match.match_id);
-    return !isTerminalPipelineStatus(
-      live?.downloadStatus ?? match.download_status,
-      live?.parseStatus ?? match.local_parse_status
-    );
+    return !isTerminalPipelineStatus(live?.downloadStatus ?? match.download_status, live?.parseStatus ?? match.local_parse_status);
   }).length;
   const replayReadyCount = matches.filter((match) => {
     const live = liveStatus.get(match.match_id);
-    return resolvePipelineParseStatus(
-      live?.downloadStatus ?? match.download_status,
-      live?.parseStatus ?? match.local_parse_status
-    ) === 'completed';
+    return resolvePipelineParseStatus(live?.downloadStatus ?? match.download_status, live?.parseStatus ?? match.local_parse_status) === 'completed';
   }).length;
 
   return (
     <div className="workspace-page bg-dota-bg">
       <div className="workspace-stack">
-        <div className="workspace-header border-cyan-500/20">
+        <div className="workspace-header rounded-[22px] border-cyan-500/20 p-3.5 lg:rounded-[24px] lg:p-4">
           <div className="workspace-header-row">
             <div>
               <p className="workspace-eyebrow text-cyan-300/80">OpenDota Live Intake</p>
-              <h1 className="workspace-title text-dota-gold">OpenDota 实时比赛</h1>
+              <h1 className="workspace-title text-dota-gold">OpenDota 职业比赛台</h1>
               <p className="workspace-description text-cyan-100/75">
-                自动同步远端比赛列表，并把下载、解析和可回放状态放到同一条流水线里。
+                默认只展示职业比赛；搜索时仍可用一个输入框查比赛、联赛、玩家名字和 ID，继续保留职业与路人的统一搜索体验。
               </p>
             </div>
-            <div className="workspace-kpi-grid 2xl:min-w-[420px]">
+            <div className="workspace-kpi-grid 2xl:min-w-[392px]">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">流水线进行中</p>
                 <p className="workspace-kpi-value">{activePipelineCount}</p>
@@ -579,146 +1085,77 @@ export function OpenDotaLivePage() {
           </div>
 
           <div className="workspace-pill-row">
-            <span className="workspace-pill">
-              自动同步 每 1 分钟
-            </span>
-            <span className="workspace-pill">
-              激活筛选 {activeFilterCount}
-            </span>
-            <span className="workspace-pill">
-              来源 {selectedSources.length > 0 ? selectedSources.map(getSourceLabel).join(' + ') : '未选择'}
-            </span>
-            <span className="workspace-pill">
-              当前页 {matches.length} / 总数 {total}
-            </span>
-              <button
-                onClick={() => {
-                  void handleManualSync();
-                }}
-                disabled={syncing}
-                className="inline-flex whitespace-nowrap rounded-full border border-cyan-500/50 bg-cyan-600/15 px-3 py-1.5 text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {syncing ? '同步中...' : '立即同步远端列表'}
-              </button>
+            <span className="workspace-pill">自动同步 每 1 分钟</span>
+            <span className="workspace-pill">模式 {searchModeLabel}</span>
+            <span className="workspace-pill">激活筛选 {activeFilterCount}</span>
+            <span className="workspace-pill">当前页 {matches.length} / 总数 {total}</span>
+            <button
+              onClick={() => {
+                void handleManualSync();
+              }}
+              disabled={syncing}
+              className="workspace-chip-button border border-cyan-500/50 bg-cyan-600/15 text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {syncing ? '同步中...' : '立即同步远端列表'}
+            </button>
           </div>
         </div>
 
-        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.24fr)_340px]">
+        <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.18fr)_320px]">
           <div className="workspace-panel">
             <div className="workspace-panel-header">
-              <h2 className="workspace-panel-title">筛选实时比赛</h2>
+              <h2 className="workspace-panel-title">统一搜索</h2>
               <p className="workspace-panel-description">
-                先确定来源，再用比赛 ID 或联赛 ID 缩小远端候选集合。
+                直接输入 `8735428765`、`Ame`、`DreamLeague`，或者用 `比赛/玩家/联赛`、`match/player/league` 前缀显式指定；默认列表只保留职业比赛。
               </p>
             </div>
-            <form
-              onSubmit={handleSearch}
-              data-testid="live-filter-form"
-              className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_220px]"
-            >
-              <fieldset
-                data-testid="live-source-filter-group"
-                className="rounded-[22px] border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(8,47,73,0.2),rgba(2,6,23,0.76))] p-3.5 xl:col-span-2 2xl:col-span-1"
-              >
-                <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200/75">
-                  来源
-                </legend>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <label
-                    className={`flex min-h-[54px] cursor-pointer items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition ${
-                      filters.includePro
-                        ? 'border-cyan-400/40 bg-cyan-500/10 text-white shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                        : 'border-slate-700/80 bg-slate-950/75 text-slate-200 hover:border-slate-500/80'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-semibold">职业</p>
-                      <p className="mt-1 text-xs text-slate-400">优先查看职业赛事与战队对局</p>
-                    </div>
-                    <input
-                      aria-label="职业"
-                      type="checkbox"
-                      checked={filters.includePro}
-                      onChange={(event) =>
-                        setFilters((current) => ({ ...current, includePro: event.target.checked }))
-                      }
-                      className="h-4 w-4 shrink-0 accent-cyan-500"
-                    />
-                  </label>
-                  <label
-                    className={`flex min-h-[54px] cursor-pointer items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition ${
-                      filters.includePublic
-                        ? 'border-cyan-400/40 bg-cyan-500/10 text-white shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                        : 'border-slate-700/80 bg-slate-950/75 text-slate-200 hover:border-slate-500/80'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-semibold">路人</p>
-                      <p className="mt-1 text-xs text-slate-400">补充公开匹配与普通对局样本</p>
-                    </div>
-                    <input
-                      aria-label="路人"
-                      type="checkbox"
-                      checked={filters.includePublic}
-                      onChange={(event) =>
-                        setFilters((current) => ({ ...current, includePublic: event.target.checked }))
-                      }
-                      className="h-4 w-4 shrink-0 accent-cyan-500"
-                    />
-                  </label>
+
+            <form onSubmit={handleSearch} className="space-y-3">
+              <div className="rounded-[22px] border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(8,47,73,0.2),rgba(2,6,23,0.76))] p-4">
+                <label className="workspace-field-label">搜索词</label>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                  <input
+                    aria-label="统一搜索"
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    placeholder="8735428765 / Ame / DreamLeague / 玩家 86745912"
+                    className="workspace-input flex-1"
+                  />
+                  <div className="workspace-action-row lg:flex-nowrap">
+                    <button
+                      type="submit"
+                      className="workspace-action-button min-w-[112px] flex-1 border border-cyan-500/60 bg-cyan-700 text-white transition hover:bg-cyan-600 sm:flex-none"
+                    >
+                      查询
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="workspace-action-button min-w-[112px] flex-1 border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600 sm:flex-none"
+                    >
+                      清空
+                    </button>
+                  </div>
                 </div>
-              </fieldset>
 
-              <div className="rounded-[22px] border border-slate-700/80 bg-slate-950/65 p-3.5">
-                <label className="workspace-field-label">比赛 ID</label>
-                <input
-                  aria-label="match_id"
-                  value={filters.matchId}
-                  onChange={(event) => setFilters((current) => ({ ...current, matchId: event.target.value }))}
-                  placeholder="例如 8674716612"
-                  className="workspace-input"
-                />
-                <p className="workspace-field-hint">适合精确定位单场比赛，快速复核下载链路。</p>
-              </div>
-
-              <div className="rounded-[22px] border border-slate-700/80 bg-slate-950/65 p-3.5">
-                <label className="workspace-field-label">联赛 ID</label>
-                <input
-                  aria-label="leagueid"
-                  value={filters.leagueId}
-                  onChange={(event) => setFilters((current) => ({ ...current, leagueId: event.target.value }))}
-                  placeholder="例如 15475"
-                  className="workspace-input"
-                />
-                <p className="workspace-field-hint">更适合赛事级别收束，便于整批准备录像。</p>
-              </div>
-
-              <div
-                data-testid="live-filter-actions"
-                className="rounded-[22px] border border-slate-700/80 bg-slate-950/65 p-3.5 xl:col-span-2 2xl:col-span-1"
-              >
-                <p className="workspace-field-label">动作</p>
-                <div data-testid="live-filter-button-row" className="workspace-action-row">
-                  <button
-                    type="submit"
-                    className="workspace-action-button min-w-[112px] flex-1 border border-cyan-500/60 bg-cyan-700 text-white transition hover:bg-cyan-600 sm:flex-none"
-                  >
-                    查询
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilters(DEFAULT_FILTERS);
-                      setAppliedFilters(DEFAULT_FILTERS);
-                      setOffset(0);
-                      setFeedback(null);
-                    }}
-                    className="workspace-action-button min-w-[112px] flex-1 border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600 sm:flex-none"
-                  >
-                    清空
-                  </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <SearchPresetButton value="8735428765" onPick={setSearchText}>
+                    比赛 8735428765
+                  </SearchPresetButton>
+                  <SearchPresetButton value="Ame" onPick={setSearchText}>
+                    玩家 Ame
+                  </SearchPresetButton>
+                  <SearchPresetButton value="DreamLeague" onPick={setSearchText}>
+                    联赛 DreamLeague
+                  </SearchPresetButton>
+                  <SearchPresetButton value="联赛 15475" onPick={setSearchText}>
+                    联赛 15475
+                  </SearchPresetButton>
                 </div>
-                <p className="workspace-field-hint">至少保留一个来源；清空会同时重置当前已应用筛选。</p>
+
+                <p className="workspace-field-hint">
+                  默认会把文字同时拿去匹配玩家和联赛；纯数字会先按常见 ID 规则判断。想强制指定类型时，可以加 `比赛/玩家/联赛` 或 `match/player/league` 前缀。
+                </p>
               </div>
             </form>
           </div>
@@ -726,9 +1163,7 @@ export function OpenDotaLivePage() {
           <div className="workspace-panel">
             <div className="workspace-panel-header">
               <h2 className="workspace-panel-title">批量入库</h2>
-              <p className="workspace-panel-description">
-              勾选比赛后，会顺序执行下载和解析；可随时查看单场状态详情。
-              </p>
+              <p className="workspace-panel-description">勾选比赛后，会顺序执行下载和解析；可随时查看单场状态详情。</p>
             </div>
             <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between 2xl:flex-col 2xl:items-start">
@@ -767,10 +1202,11 @@ export function OpenDotaLivePage() {
 
         {feedback && (
           <div
-            className={`rounded border px-4 py-3 text-sm ${feedback.type === 'success'
-              ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
-              : 'border-red-500/60 bg-red-900/20 text-red-200'
-              }`}
+            className={`rounded border px-4 py-3 text-sm ${
+              feedback.type === 'success'
+                ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
+                : 'border-red-500/60 bg-red-900/20 text-red-200'
+            }`}
           >
             {feedback.message}
           </div>
@@ -778,14 +1214,31 @@ export function OpenDotaLivePage() {
 
         {error && <div className="rounded border border-red-600 bg-red-900/20 px-4 py-3 text-red-200">{error}</div>}
 
-        <div className="workspace-table-shell">
+        {searchNotice && (
+          <div className="rounded border border-amber-500/60 bg-amber-900/20 px-4 py-3 text-sm text-amber-100">
+            {searchNotice}
+          </div>
+        )}
+
+        <div className="workspace-table-shell overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-5 py-4">
             <div>
-              <p className="text-sm font-semibold text-slate-100">实时比赛列表</p>
+              <p className="text-sm font-semibold text-slate-100">
+                {hasSearchQuery ? '远端搜索结果' : '实时比赛列表'}
+              </p>
               <p className="mt-1 text-sm text-slate-300">
-                当前页可选 <span className="font-semibold text-white">{currentPageMatchIds.length}</span> 场，
-                已勾选 <span className="font-semibold text-white">{selectedMatchIds.length}</span> 场，
-                当前页命中 <span className="font-semibold text-white">{selectedCurrentPageCount}</span> 场。
+                {hasSearchQuery ? (
+                  <>
+                    当前查询 <span className="font-semibold text-white">{searchModeLabel}</span>，
+                    页面会同时保留英雄和玩家信息，方便直接挑选入库。
+                  </>
+                ) : (
+                  <>
+                    默认展示职业比赛，当前页可选 <span className="font-semibold text-white">{currentPageMatchIds.length}</span> 场，
+                    已勾选 <span className="font-semibold text-white">{selectedMatchIds.length}</span> 场，
+                    当前页命中 <span className="font-semibold text-white">{selectedCurrentPageCount}</span> 场。
+                  </>
+                )}
               </p>
             </div>
             <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
@@ -793,201 +1246,180 @@ export function OpenDotaLivePage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left table-auto">
-              <thead className="bg-gradient-to-r from-slate-900 to-slate-800 text-xs uppercase tracking-wide text-slate-300">
-                <tr>
-                  <th className="px-2 py-2">
-                    <input
-                      aria-label="全选当前页"
-                      type="checkbox"
-                      checked={isAllCurrentPageSelected}
-                      ref={(element) => {
-                        if (element) {
-                          element.indeterminate = isSomeCurrentPageSelected;
-                        }
-                      }}
-                      onChange={() => {
-                        setSelectedMatchIds((current) => {
-                          if (isAllCurrentPageSelected) {
-                            return current.filter((id) => !currentPageMatchIds.includes(id));
-                          }
-                          return Array.from(new Set([...current, ...currentPageMatchIds]));
-                        });
-                      }}
-                      className="h-4 w-4 accent-cyan-500"
-                    />
-                  </th>
-                  <th className="px-2 py-2 whitespace-nowrap">比赛 ID</th>
-                  <th className="px-2 py-2 whitespace-nowrap">开始时间</th>
-                  <th className="px-2 py-2 whitespace-nowrap">时长</th>
-                  <th className="px-2 py-2 whitespace-nowrap">天辉</th>
-                  <th className="px-2 py-2 whitespace-nowrap">夜魇</th>
-                  <th className="px-2 py-2 whitespace-nowrap">联赛</th>
-                  <th className="px-2 py-2 whitespace-nowrap">来源</th>
-                  <th className="px-2 py-2 whitespace-nowrap">下载状态</th>
-                  <th className="px-2 py-2 whitespace-nowrap">解析状态</th>
-                  <th className="px-2 py-2 text-right whitespace-nowrap">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/80">
-                {loading ? (
-                  <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-slate-400">
-                      加载中...
-                    </td>
-                  </tr>
-                ) : matches.length === 0 ? (
-                  <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-slate-400">
-                      未找到实时比赛。
-                    </td>
-                  </tr>
-                ) : (
-                  matches.map((match) => {
-                    const radiantName = getTeamLabel(
-                      match.radiant_team_name ?? match.radiant_name,
-                      match.radiant_team_id
-                    );
-                    const direName = getTeamLabel(match.dire_team_name ?? match.dire_name, match.dire_team_id);
-                    const leagueName = getLeagueLabel(match.league_name, match.leagueid);
-                    const ingesting = actionMatchId === match.match_id;
-                    const live = liveStatus.get(match.match_id);
-                    const liveParseStatus = live
-                      ? resolvePipelineParseStatus(live.downloadStatus, live.parseStatus)
-                      : null;
-                    const effectiveDownloadStatus = live?.downloadStatus ?? match.download_status;
-                    const effectiveParseStatus = live?.parseStatus ?? match.local_parse_status;
-                    const pipelineBadge = getPipelineStatusBadge(
-                      effectiveDownloadStatus,
-                      effectiveParseStatus
-                    );
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-950/50 px-5 py-3">
+            <label className="inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-200">
+              <input
+                aria-label="全选当前页"
+                type="checkbox"
+                checked={isAllCurrentPageSelected}
+                ref={(element) => {
+                  if (element) {
+                    element.indeterminate = isSomeCurrentPageSelected;
+                  }
+                }}
+                onChange={() => {
+                  setSelectedMatchIds((current) => {
+                    if (isAllCurrentPageSelected) {
+                      return current.filter((id) => !currentPageMatchIds.includes(id));
+                    }
+                    return Array.from(new Set([...current, ...currentPageMatchIds]));
+                  });
+                }}
+                className="h-4 w-4 accent-cyan-500"
+              />
+              全选当前页
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+                当前页 {currentPageMatchIds.length} 场
+              </span>
+              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+                已勾选 {selectedCurrentPageCount} 场
+              </span>
+            </div>
+          </div>
 
-                    return (
-                      <tr key={match.match_id} className="hover:bg-slate-800/40">
-                        <td className="px-2 py-2">
-                          <input
-                            aria-label={`选择比赛 ${match.match_id}`}
-                            type="checkbox"
-                            checked={selectedMatchIds.includes(match.match_id)}
-                            onChange={() => {
-                              setSelectedMatchIds((current) =>
-                                current.includes(match.match_id)
-                                  ? current.filter((id) => id !== match.match_id)
-                                  : [...current, match.match_id]
-                              );
-                            }}
-                            className="h-4 w-4 accent-cyan-500"
-                          />
-                        </td>
-                        <td className="px-2 py-2 font-mono font-semibold text-dota-gold whitespace-nowrap">
-                          {match.match_id}
-                        </td>
-                        <td className="px-2 py-2 text-slate-300 whitespace-nowrap">{formatUnixTimestampLocal(match.start_time)}</td>
-                        <td className="px-2 py-2 text-slate-300 whitespace-nowrap">{formatDurationClock(match.duration)}</td>
-                        <td className="px-2 py-1.5 text-slate-200">
-                          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
-                            <MatchIcon
-                              label="Radiant"
-                              url={pickAssetUrl(
-                                match.radiant_icon_url,
-                                match.radiant_logo_url,
-                                match.radiant_logo_sponsor_url
-                              )}
-                            />
-                            <span className="text-[10px] text-center leading-tight max-w-[60px] truncate text-slate-300" title={radiantName}>{radiantName}</span>
+          <div className="space-y-4 px-5 py-5">
+            {loading ? (
+              <div className="rounded-[24px] border border-dashed border-slate-700/70 bg-slate-950/55 px-4 py-10 text-center text-slate-400">
+                {searchModeLabel}加载中...
+              </div>
+            ) : matches.length === 0 ? (
+              <div className="rounded-[24px] border border-dashed border-slate-700/70 bg-slate-950/55 px-4 py-10 text-center text-slate-400">
+                {hasSearchQuery ? '未找到匹配的远端比赛。' : '未找到实时比赛。'}
+              </div>
+            ) : (
+              matches.map((match) => {
+                const leagueName = getLeagueLabel(match.league_name, match.leagueid);
+                const winnerSide = getWinnerSide(match);
+                const ingesting = actionMatchId === match.match_id;
+                const live = liveStatus.get(match.match_id);
+                const liveParseStatus = live ? resolvePipelineParseStatus(live.downloadStatus, live.parseStatus) : null;
+                const effectiveDownloadStatus = live?.downloadStatus ?? match.download_status;
+                const effectiveParseStatus = live?.parseStatus ?? match.local_parse_status;
+                const pipelineBadge = getPipelineStatusBadge(effectiveDownloadStatus, effectiveParseStatus);
+                const downloadBadge = getDownloadStatusBadge(effectiveDownloadStatus);
+                const parseBadge = getParseStatusBadge(effectiveParseStatus);
+                const sourceLabel = match.source === 'public' ? '路人局' : '职业赛事';
+                const sourceClass =
+                  match.source === 'public'
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                    : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200';
+
+                return (
+                  <div
+                    key={match.match_id}
+                    data-testid={`live-match-card-${match.match_id}`}
+                    className="rounded-[28px] border border-slate-700/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.94))] p-4 shadow-[0_30px_80px_rgba(2,6,23,0.32)]"
+                  >
+                    <div className="grid grid-cols-[20px_minmax(0,1fr)] gap-4 xl:grid-cols-[20px_minmax(0,1fr)_272px]">
+                      <div className="pt-1">
+                        <input
+                          aria-label={`选择比赛 ${match.match_id}`}
+                          type="checkbox"
+                          checked={selectedMatchIds.includes(match.match_id)}
+                          onChange={() => {
+                            setSelectedMatchIds((current) =>
+                              current.includes(match.match_id)
+                                ? current.filter((id) => id !== match.match_id)
+                                : [...current, match.match_id]
+                            );
+                          }}
+                          className="h-4 w-4 shrink-0 accent-cyan-500"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center rounded-full border border-dota-gold/40 bg-dota-gold/10 px-3 py-1 text-xs font-semibold text-dota-gold">
+                            比赛 {match.match_id}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${sourceClass}`}>
+                            {sourceLabel}
+                          </span>
+                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-xs text-slate-300">
+                            开赛 {formatUnixTimestampLocal(match.start_time)}
+                          </span>
+                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-xs text-slate-300">
+                            时长 {formatDurationClock(match.duration)}
+                          </span>
+                        </div>
+                        {shouldRenderLeagueBadge(match) ? (
+                          <div className="mt-3">
+                            <LeagueBadge match={match} leagueName={leagueName} />
                           </div>
-                        </td>
-                        <td className="px-2 py-1.5 text-slate-200">
-                          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
-                            <MatchIcon
-                              label="Dire"
-                              url={pickAssetUrl(
-                                match.dire_icon_url,
-                                match.dire_logo_url,
-                                match.dire_logo_sponsor_url
+                        ) : null}
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <TeamRosterCard match={match} side="radiant" winnerSide={winnerSide} />
+                          <TeamRosterCard match={match} side="dire" winnerSide={winnerSide} />
+                        </div>
+                      </div>
+
+                      <div className="col-span-2 space-y-3 xl:col-span-1">
+                        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${pipelineBadge.className}`}>
+                            {pipelineBadge.label}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${downloadBadge.className}`}>
+                            {downloadBadge.label}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${parseBadge.className}`}>
+                            {parseBadge.label}
+                          </span>
+                        </div>
+
+                        <div className="rounded-[24px] border border-slate-700/80 bg-slate-950/80 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">工作流</p>
+
+                          <div className="mt-3 space-y-2">
+                            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">下载</p>
+                              {live?.downloadStatus === 'downloading' ? (
+                                <div className="mt-2 space-y-2">
+                                  <div className="relative h-6 overflow-hidden rounded-full bg-slate-800">
+                                    <div
+                                      className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500"
+                                      style={{ width: `${live.downloadProgress}%` }}
+                                    />
+                                    <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
+                                      下载 {live.downloadProgress}%
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleCancel(match.match_id);
+                                    }}
+                                    title="取消下载"
+                                    className="w-full rounded-xl border border-red-500/60 px-3 py-1.5 text-xs text-red-200 transition hover:border-red-400 hover:text-red-100"
+                                  >
+                                    取消下载
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-sm font-semibold text-white">{downloadBadge.label}</p>
                               )}
-                            />
-                            <span className="text-[10px] text-center leading-tight max-w-[60px] truncate text-slate-300" title={direName}>{direName}</span>
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 text-slate-200">
-                          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
-                            <MatchIcon
-                              label="League"
-                              url={pickAssetUrl(
-                                match.league_icon_url,
-                                match.league_image_url,
-                                match.league_banner_url,
-                                match.league_logo_url
-                              )}
-                            />
-                            <span className="text-[10px] text-center leading-tight max-w-[60px] truncate text-slate-300" title={leagueName}>{leagueName}</span>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 text-slate-200 whitespace-nowrap">{getSourceLabel(match.source)}</td>
-                        <td className="px-2 py-2 whitespace-nowrap">
-                          {live?.downloadStatus === 'downloading' ? (
-                            <div className="space-y-1">
-                              <div className="relative h-5 w-[108px] rounded-full bg-slate-700">
-                                <div className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500" style={{ width: `${live.downloadProgress}%` }} />
-                                <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
-                                  下载 {live.downloadProgress}%
-                                </span>
-                              </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); void handleCancel(match.match_id); }}
-                                title="取消下载"
-                                className="rounded border border-red-500/60 px-2 py-0.5 text-[10px] text-red-200 transition hover:border-red-400 hover:text-red-100"
-                              >
-                                取消下载
-                              </button>
                             </div>
-                          ) : live ? (
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${
-                              live.downloadStatus === 'failed'
-                                ? 'border-red-500/60 bg-red-900/30 text-red-200'
-                                : 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200'
-                            }`}>
-                              {live.downloadStatus === 'failed' ? '下载失败' : '下载成功'}
-                            </span>
-                          ) : (
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getDownloadStatusBadge(match.download_status).className}`}>
-                              {getDownloadStatusBadge(match.download_status).label}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap">
-                          <div className="space-y-1">
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${pipelineBadge.className}`}>
-                              {pipelineBadge.label}
-                            </span>
-                            {liveParseStatus === 'parsing' ? (
-                            <div className="relative h-5 w-[56px] rounded-full bg-slate-700">
-                              <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
-                              <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
-                                解析中
-                              </span>
+
+                            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">解析</p>
+                              <p className="mt-1 text-sm font-semibold text-white">{pipelineBadge.label}</p>
+                              {liveParseStatus === 'parsing' && (
+                                <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-slate-800">
+                                  <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
+                                </div>
+                              )}
                             </div>
-                          ) : live ? (
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getParseStatusBadge(liveParseStatus).className}`}>
-                              {getParseStatusBadge(liveParseStatus).label}
-                            </span>
-                          ) : (
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-semibold leading-5 ${getParseStatusBadge(match.local_parse_status).className}`}>
-                              {getParseStatusBadge(match.local_parse_status).label}
-                            </span>
-                            )}
                           </div>
-                        </td>
-                        <td className="px-2 py-2 text-right whitespace-nowrap">
-                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+
+                          <div className="mt-3 grid gap-2">
                             <button
                               onClick={() => {
                                 void handleIngest([match.match_id]);
                               }}
                               disabled={ingesting || batchLoading}
-                              className="rounded border border-emerald-500/60 px-2 py-1 text-xs whitespace-nowrap text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {ingesting ? '入库中...' : '下载并入库'}
                             </button>
@@ -1002,18 +1434,18 @@ export function OpenDotaLivePage() {
                                 });
                                 await refreshStatusPanel(match.match_id, false);
                               }}
-                              className="rounded border border-cyan-500/60 px-2 py-1 text-xs whitespace-nowrap text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
+                              className="rounded-2xl border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
                             >
                               状态详情
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           <div className="flex items-center justify-between border-t border-slate-700 px-6 py-4 text-sm">
@@ -1095,23 +1527,16 @@ export function OpenDotaLivePage() {
                   <>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                          getPipelineStatusBadge(
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getPipelineStatusBadge(
                             statusPanel.detail.download_task?.status,
                             statusPanel.detail.local_parse_status
-                          ).className
-                        }`}>
-                          {
-                            getPipelineStatusBadge(
-                              statusPanel.detail.download_task?.status,
-                              statusPanel.detail.local_parse_status
-                            ).label
-                          }
+                          ).className}`}
+                        >
+                          {getPipelineStatusBadge(statusPanel.detail.download_task?.status, statusPanel.detail.local_parse_status).label}
                         </span>
                         {typeof statusPanel.detail.download_task?.progress === 'number' && (
-                          <span className="text-xs text-slate-400">
-                            下载进度 {statusPanel.detail.download_task.progress}%
-                          </span>
+                          <span className="text-xs text-slate-400">下载进度 {statusPanel.detail.download_task.progress}%</span>
                         )}
                       </div>
                       {typeof statusPanel.detail.download_task?.progress === 'number' && (
@@ -1125,37 +1550,28 @@ export function OpenDotaLivePage() {
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
                       <div className="text-slate-400">下载阶段</div>
-                      <div className="text-white">
-                        {getDownloadStatusBadge(statusPanel.detail.download_task?.status).label}
-                      </div>
+                      <div className="text-white">{getDownloadStatusBadge(statusPanel.detail.download_task?.status).label}</div>
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
                       <div className="text-slate-400">下载错误</div>
                       <div className="text-white break-words">
                         {statusPanel.detail.download_task?.error_code ?? '--'}
-                        {statusPanel.detail.download_task?.error_message
-                          ? `: ${statusPanel.detail.download_task.error_message}`
-                          : ''}
+                        {statusPanel.detail.download_task?.error_message ? `: ${statusPanel.detail.download_task.error_message}` : ''}
                       </div>
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
                       <div className="text-slate-400">解析阶段</div>
-                      <div className="text-white">
-                        {getParseStatusBadge(statusPanel.detail.local_parse_status).label}
-                      </div>
+                      <div className="text-white">{getParseStatusBadge(statusPanel.detail.local_parse_status).label}</div>
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
                       <div className="text-slate-400">文件状态</div>
                       <div className="text-white">
-                        DEM {statusPanel.detail.replay_dem_exists ? '已生成' : '缺失'} | 压缩包{' '}
-                        {statusPanel.detail.replay_bz2_exists ? '已保留' : '缺失'}
+                        DEM {statusPanel.detail.replay_dem_exists ? '已生成' : '缺失'} | 压缩包 {statusPanel.detail.replay_bz2_exists ? '已保留' : '缺失'}
                       </div>
                     </div>
                     <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
                       <div className="text-slate-400">本地录像路径</div>
-                      <div className="font-mono text-white break-all">
-                        {statusPanel.detail.local_replay_path ?? '--'}
-                      </div>
+                      <div className="font-mono text-white break-all">{statusPanel.detail.local_replay_path ?? '--'}</div>
                     </div>
                   </>
                 )}

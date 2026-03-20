@@ -211,6 +211,58 @@ def build_player_slot_lookup(metadata: Optional[dict]) -> dict[tuple[int, str], 
     return lookup
 
 
+def build_player_hero_lookup(metadata: Optional[dict]) -> set[tuple[int, str]]:
+    """Build the canonical set of real player heroes from metadata.players."""
+    if not metadata:
+        return set()
+
+    players = metadata.get("players")
+    if not isinstance(players, list):
+        return set()
+
+    lookup: set[tuple[int, str]] = set()
+    for index, player in enumerate(players):
+        if not isinstance(player, dict):
+            continue
+
+        hero_key = normalize_hero_key(player.get("hero_name"))
+        if not hero_key:
+            continue
+
+        team_value = _coerce_int(player.get("game_team"))
+        if team_value not in (2, 3):
+            team_value = 2 if index < 5 else 3
+
+        lookup.add((team_value, hero_key))
+
+    return lookup
+
+
+def filter_positions_to_player_heroes(
+    positions_df: pd.DataFrame,
+    metadata: Optional[dict],
+) -> pd.DataFrame:
+    """Drop summons/controlled units from hero position samples when player metadata exists."""
+    if positions_df.empty:
+        return positions_df
+
+    player_heroes = build_player_hero_lookup(metadata)
+    if not player_heroes:
+        return positions_df
+
+    filtered_df = positions_df.copy()
+    filtered_df["_hero_key"] = filtered_df["hero"].map(normalize_hero_key)
+    hero_pairs = [
+        (_coerce_int(team_value), str(hero_key or ""))
+        for team_value, hero_key in zip(
+            filtered_df["team"].tolist(),
+            filtered_df["_hero_key"].tolist(),
+        )
+    ]
+    mask = [pair in player_heroes for pair in hero_pairs]
+    return filtered_df.loc[mask].drop(columns=["_hero_key"])
+
+
 def resolve_hud_economy_snapshot(
     economy_df: pd.DataFrame,
     target_tick: int,
@@ -731,6 +783,7 @@ async def get_ticks(
         hero=hero,
         team=team
     )
+    df = filter_positions_to_player_heroes(df, meta)
     df = filter_positions_by_time(df, float(start_time), float(end_time) if end_time is not None else None)
 
     fallback_wards_df: Optional[pd.DataFrame] = None
@@ -1007,8 +1060,9 @@ async def get_heroes(match_id: int) -> dict:
     
     # Get unique heroes from positions
     df = parquet_storage.get_positions(match_id)
+    df = filter_positions_to_player_heroes(df, meta)
     
-    heroes = {}
+    heroes: dict[tuple[str, int], dict[str, object]] = {}
     
     if not df.empty:
         # Get unique hero/team combinations
@@ -1018,8 +1072,9 @@ async def get_heroes(match_id: int) -> dict:
             hero_name = row["hero"]
             team = int(row["team"])
             
-            if hero_name not in heroes:
-                heroes[hero_name] = {
+            hero_key = (str(hero_name), team)
+            if hero_key not in heroes:
+                heroes[hero_key] = {
                     "name": hero_name,
                     "team": team,
                     "team_name": "Radiant" if team == 2 else "Dire"
@@ -1057,6 +1112,8 @@ async def get_hud(
         )
 
     positions_df = parquet_storage.get_positions(match_id)
+    metadata = parquet_storage.get_metadata(match_id)
+    positions_df = filter_positions_to_player_heroes(positions_df, metadata)
     if positions_df.empty:
         return {
             "status": "ok",
@@ -1070,7 +1127,6 @@ async def get_hud(
     target_tick, target_game_time = resolve_hud_snapshot_tick(positions_df, tick, game_time)
     kills_df = parquet_storage.get_kills(match_id)
     economy_df = parquet_storage.get_economy(match_id)
-    metadata = parquet_storage.get_metadata(match_id)
     game_start_time = float(metadata.get("game_start_time", 0.0)) if metadata else 0.0
     heroes, has_realtime_metrics = build_hud_heroes(
         positions_df,

@@ -82,7 +82,36 @@ class _SuccessAsyncClient:
                     {"match_id": 302, "leagueid": 15475},
                 ]
             )
+        if path == "/search":
+            assert params == {"q": "Ame"}
+            return _FakeResponse(
+                [
+                    {"account_id": 86745912, "personaname": "Ame"},
+                    {"account_id": 11111111, "personaname": "Ame smurf"},
+                ]
+            )
         raise AssertionError(f"unexpected path: {path}")
+
+
+class _InvalidJsonAsyncClient:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    async def __aenter__(self) -> "_InvalidJsonAsyncClient":
+        return self
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    async def get(self, path: str, params: dict[str, object] | None = None) -> _FakeResponse:
+        class _BadJsonResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> object:
+                raise ValueError("bad json")
+
+        return _BadJsonResponse()
 
 
 class _TimeoutAsyncClient:
@@ -130,6 +159,21 @@ class _ForbiddenAsyncClient:
     async def get(self, path: str, params: dict[str, object] | None = None) -> httpx.Response:
         request = httpx.Request("GET", f"https://api.opendota.com/api{path}")
         return httpx.Response(status_code=403, request=request)
+
+
+class _TooManyRequestsAsyncClient:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    async def __aenter__(self) -> "_TooManyRequestsAsyncClient":
+        return self
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    async def get(self, path: str, params: dict[str, object] | None = None) -> httpx.Response:
+        request = httpx.Request("GET", f"https://api.opendota.com/api{path}")
+        return httpx.Response(status_code=429, request=request)
 
 
 @pytest.mark.asyncio
@@ -225,6 +269,16 @@ async def test_fetch_league_matches_success(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.asyncio
+async def test_search_players_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _SuccessAsyncClient)
+    service = OpenDotaService()
+
+    result = await service.search_players("Ame", limit=1)
+
+    assert result == [{"account_id": 86745912, "personaname": "Ame"}]
+
+
+@pytest.mark.asyncio
 async def test_opendota_requests_use_default_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     _CaptureHeadersAsyncClient.captured_headers = None
     monkeypatch.setattr(httpx, "AsyncClient", _CaptureHeadersAsyncClient)
@@ -251,6 +305,31 @@ async def test_fetch_recent_matches_403_has_clear_risk_control_hint(
         OpenDotaServiceError,
         match="可能被上游风控拦截，请检查 User-Agent/网络环境",
     ):
+        await service.fetch_recent_matches(limit=10)
+
+
+@pytest.mark.asyncio
+async def test_fetch_recent_matches_429_has_clear_rate_limit_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _TooManyRequestsAsyncClient)
+    service = OpenDotaService()
+
+    with pytest.raises(
+        OpenDotaServiceError,
+        match="daily api limit exceeded",
+    ):
+        await service.fetch_recent_matches(limit=10)
+
+
+@pytest.mark.asyncio
+async def test_fetch_recent_matches_invalid_json_is_controlled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", _InvalidJsonAsyncClient)
+    service = OpenDotaService()
+
+    with pytest.raises(OpenDotaServiceError, match="invalid JSON"):
         await service.fetch_recent_matches(limit=10)
 
 

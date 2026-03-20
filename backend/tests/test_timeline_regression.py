@@ -14,7 +14,7 @@ from routers.playback import build_time_basis, resolve_game_time, resolve_offset
 from storage.parquet_storage import ParquetStorage
 
 
-REPO_MATCH_SAMPLES = [8674716612, 8689321714]
+REPO_MATCH_SAMPLES = [8674716612, 8689321714, 8736891827]
 REPO_MATCHES_DIR = Path(__file__).resolve().parents[1] / "data" / "matches"
 
 
@@ -411,3 +411,34 @@ class TestTwoSampleTimeAxisRegression:
             assert {"replay_start_time", "replay_end_time", "game_time", "duration_seconds"}.issubset(
                 interval.keys()
             )
+
+    def test_8736891827_opening_samples_stay_in_pregame_window(self) -> None:
+        """Regression: 8736891827 should no longer start at a shifted +9:40 clock."""
+        positions_path = REPO_MATCHES_DIR / "8736891827" / "positions.parquet"
+        if not positions_path.exists():
+            pytest.skip("Sample match 8736891827 positions.parquet not found")
+
+        df = pd.read_parquet(positions_path, columns=["tick", "game_time", "hero", "level"])
+        assert not df.empty
+
+        opening_tick = int(df["tick"].min())
+        opening_rows = df[df["tick"] == opening_tick]
+        assert not opening_rows.empty
+        assert float(opening_rows["game_time"].min()) < 0.0
+        assert float(opening_rows["game_time"].max()) < 0.0
+        assert int(opening_rows["level"].max()) == 1
+
+    def test_8736891827_pause_interval_extends_into_negative_time(self) -> None:
+        """Regression: the long opening pause should be visible before 0:00 on the timeline."""
+        meta_path = REPO_MATCHES_DIR / "8736891827" / "meta.json"
+        if not meta_path.exists():
+            pytest.skip("Sample match 8736891827 meta.json not found")
+
+        with meta_path.open("r", encoding="utf-8") as f:
+            metadata = json.load(f)
+
+        pause_intervals = metadata.get("pause_intervals") or []
+        assert pause_intervals
+        first_interval = pause_intervals[0]
+        assert float(first_interval["game_time"]) < 0.0
+        assert float(first_interval["duration_seconds"]) > 600.0

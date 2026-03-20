@@ -309,7 +309,7 @@ class OpenDotaMatchStorage:
 
     def upsert_match_detail(self, detail: dict[str, Any]) -> tuple[int, int]:
         """Upsert one match detail payload from OpenDota /matches/{id}."""
-        source = self._as_text(detail.get("source")) or "pro"
+        source = self._resolve_match_source(detail)
         inserted, updated = self.upsert_recent_matches([detail], source=source)
         self._upsert_match_players(detail)
         return inserted, updated
@@ -365,6 +365,113 @@ class OpenDotaMatchStorage:
             }
             for row in rows
         ]
+
+    def search_match_player_identities_by_name(self, name: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Search cached match player identities by persona/pro name."""
+        normalized = self._normalize_search_text(name)
+        if normalized is None:
+            return []
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        seen_keys: set[tuple[int, int]] = set()
+        records: list[dict[str, Any]] = []
+        search_patterns = [
+            normalized,
+            f"{normalized}%",
+            f"%{normalized}%",
+        ]
+
+        for pattern in search_patterns:
+            if len(records) >= limit:
+                break
+
+            cursor.execute(
+                """
+                SELECT
+                    match_id,
+                    account_id,
+                    player_slot,
+                    hero_id,
+                    team_id,
+                    persona_name,
+                    pro_name,
+                    last_synced_at
+                FROM opendota_match_players
+                WHERE persona_name LIKE ? COLLATE NOCASE
+                    OR pro_name LIKE ? COLLATE NOCASE
+                ORDER BY
+                    last_synced_at DESC,
+                    match_id DESC,
+                    player_slot ASC
+                LIMIT ?
+                """,
+                (pattern, pattern, max(limit * 2, limit)),
+            )
+            for row in cursor.fetchall():
+                match_id = int(row["match_id"])
+                player_slot = int(row["player_slot"])
+                key = (match_id, player_slot)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                records.append(
+                    {
+                        "match_id": match_id,
+                        "account_id": row["account_id"],
+                        "player_slot": player_slot,
+                        "hero_id": row["hero_id"],
+                        "team_id": row["team_id"],
+                        "persona_name": row["persona_name"],
+                        "pro_name": row["pro_name"],
+                        "last_synced_at": int(row["last_synced_at"]),
+                    }
+                )
+                if len(records) >= limit:
+                    break
+
+        return records
+
+    def search_match_ids_by_league_name(self, name: str, limit: int = 20) -> list[int]:
+        """Search cached match IDs by league name."""
+        normalized = self._normalize_search_text(name)
+        if normalized is None:
+            return []
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        seen_match_ids: set[int] = set()
+        match_ids: list[int] = []
+        search_patterns = [
+            normalized,
+            f"{normalized}%",
+            f"%{normalized}%",
+        ]
+
+        for pattern in search_patterns:
+            if len(match_ids) >= limit:
+                break
+
+            cursor.execute(
+                """
+                SELECT match_id
+                FROM opendota_matches
+                WHERE league_name LIKE ? COLLATE NOCASE
+                ORDER BY last_synced_at DESC, start_time DESC, match_id DESC
+                LIMIT ?
+                """,
+                (pattern, max(limit * 2, limit)),
+            )
+            for row in cursor.fetchall():
+                match_id = int(row["match_id"])
+                if match_id in seen_match_ids:
+                    continue
+                seen_match_ids.add(match_id)
+                match_ids.append(match_id)
+                if len(match_ids) >= limit:
+                    break
+
+        return match_ids
 
     def list_recent_matches(
         self,
@@ -749,3 +856,30 @@ class OpenDotaMatchStorage:
         if not isinstance(nested, dict):
             return None
         return cls._as_text(nested.get(child_key))
+
+    @staticmethod
+    def _normalize_search_text(value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = " ".join(value.strip().split())
+        return normalized if normalized else None
+
+    def _resolve_match_source(self, detail: dict[str, Any]) -> str:
+        explicit_source = self._as_text(detail.get("source"))
+        if explicit_source in {"pro", "public"}:
+            return explicit_source
+
+        raw_match_id = self._as_int(detail.get("match_id"))
+        if raw_match_id is not None:
+            cached_match = self.get_match(raw_match_id)
+            cached_source = self._as_text(cached_match.get("source")) if cached_match else None
+            if cached_source in {"pro", "public"}:
+                return cached_source
+
+        league_id = self._as_int(detail.get("leagueid"))
+        if league_id is None:
+            league = detail.get("league")
+            if isinstance(league, dict):
+                league_id = self._as_int(league.get("leagueid") or league.get("league_id"))
+
+        return "pro" if league_id is not None and league_id > 0 else "public"

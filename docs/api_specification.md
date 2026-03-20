@@ -103,8 +103,8 @@
 
 | Method | Endpoint | 状态 | 说明 |
 |---|---|---|---|
-| GET | `/api/v1/remote/matches` | DONE | 已同步到本地镜像的远端比赛列表，支持 `include_pro/include_public/match_id/leagueid/limit/offset` |
-| GET | `/api/v1/remote/search` | DONE | 直连 OpenDota 搜索比赛候选，支持 `player_id/leagueid/limit`，并聚合本地下载/解析状态 |
+| GET | `/api/v1/remote/matches` | DONE | 已同步到本地镜像的远端比赛列表，支持 `include_pro/include_public/match_id/leagueid/limit/offset`；默认工作台态会优先返回职业局，显式 `match_id/leagueid` 时可按需放开 public |
+| GET | `/api/v1/remote/search` | DONE | 统一远端搜索/默认列表入口，支持单一 `q`（兼容 `match_id/player_id/player_name/league_id(兼容 leagueid)/league_name` 语义）以及 `limit/offset/include_pro/include_public`，并返回胜负、`hero_ids`、玩家/阵容摘要与本地下载解析状态；空搜索默认回到职业局优先的工作台视图 |
 | POST | `/api/v1/remote/sync` | DONE | 手动同步远端比赛镜像（pro/public 可选） |
 | POST | `/api/v1/remote/ingest` | DONE | 按 `match_ids` 批量触发下载 + 解析入库 |
 | GET | `/api/v1/remote/matches/{match_id}/status` | DONE | 查询单场下载任务、解析状态与本地文件存在性 |
@@ -539,19 +539,24 @@ FormData:
 
 ### 3.14 回放库远端搜索
 
-`GET /api/v1/remote/search?player_id=90001&leagueid=15475&limit=20`
+`GET /api/v1/remote/search?q=90001&limit=20`
 
 说明：
-- 当传入 `player_id` 时，后端直接请求 OpenDota `/players/{account_id}/matches`。
-- 当仅传入 `leagueid` 时，后端直接请求 OpenDota `/leagues/{league_id}/matches`。
+- 当传入 `q` 时，后端会将其作为统一搜索入口，尽量覆盖 `match_id / player_id / player_name / league_id / league_name`。
+- `q` 可直接传比赛号、玩家 ID、联赛 ID、玩家名或联赛名；纯文本会联合覆盖玩家名与联赛名命中，纯数字会按常见 ID 规则自动判断。
+- 支持中英文前缀显式指定搜索类型，例如 `比赛 8735428765`、`玩家 Ame`、`联赛 DreamLeague`、`match 8735428765`、`player 86745912`、`league 15475`。
+- 当 `q` 为空时，后端返回默认的 enriched remote feed，而不是 `422`；默认工作台态优先显示职业局，显式 `match_id/leagueid` 时可按需放开 public。
 - 命中的 `match_id` 会 best-effort 回填到本地镜像层，以便返回统一的 `download_status/local_parse_status/local_replay_path`。
-- 若 `player_id` 和 `leagueid` 都缺失，返回 `422`。
+- 单场 `match_id` detail 拉取失败时，接口会尽量降级为 `200 + empty/fallback`，避免整页报错。
+- 上游返回非 JSON 或短暂异常时，`/search` 会以 empty/fallback 方式降级，而不是把页面打成错误态。
+- 当 OpenDota 对当前 IP 返回 `429 / daily api limit exceeded` 等上游限流时，响应会额外带上 `message`，提示“本次只能返回本地已缓存结果，未缓存比赛暂时无法补抓”。
 
 响应示例：
 
 ```json
 {
   "status": "ok",
+  "message": null,
   "total": 1,
   "limit": 20,
   "offset": 0,

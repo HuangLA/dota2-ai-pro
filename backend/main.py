@@ -34,21 +34,41 @@ from storage.opendota_reference_storage import OpenDotaReferenceStorage
 logger = logging.getLogger(__name__)
 
 
+def _read_bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def _run_remote_incremental_sync(sync_service: OpenDotaSyncService) -> None:
-    """Run periodic remote mirror sync every 60 seconds."""
+    """Run periodic remote mirror sync with conservative defaults and rate-limit backoff."""
+    include_pro = _read_bool_env("REMOTE_SYNC_INCLUDE_PRO", True)
+    include_public = _read_bool_env("REMOTE_SYNC_INCLUDE_PUBLIC", False)
+    limit = max(1, min(int(os.getenv("REMOTE_SYNC_LIMIT", "50")), 200))
+    sync_reference = _read_bool_env("REMOTE_SYNC_REFERENCE", True)
+    interval_seconds = max(60, int(os.getenv("REMOTE_SYNC_INTERVAL_SECONDS", "600")))
+    rate_limited_interval_seconds = max(
+        interval_seconds,
+        int(os.getenv("REMOTE_SYNC_RATE_LIMIT_INTERVAL_SECONDS", "3600")),
+    )
+
     while True:
+        sleep_seconds = interval_seconds
         try:
             await sync_service.sync_selected_sources(
-                include_pro=True,
-                include_public=True,
-                limit=100,
-                sync_reference=True,
+                include_pro=include_pro,
+                include_public=include_public,
+                limit=limit,
+                sync_reference=sync_reference,
             )
-        except OpenDotaServiceError:
+        except OpenDotaServiceError as exc:
+            if exc.is_rate_limited:
+                sleep_seconds = rate_limited_interval_seconds
             logger.exception("Remote incremental sync failed with OpenDota error")
         except Exception:
             logger.exception("Remote incremental sync failed")
-        await asyncio.sleep(60)
+        await asyncio.sleep(sleep_seconds)
 
 
 @asynccontextmanager

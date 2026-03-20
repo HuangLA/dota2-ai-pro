@@ -34,10 +34,42 @@ export interface RemoteMatchRecord {
   download_updated_at?: number | null;
   local_parse_status?: string | null;
   local_replay_path?: string | null;
+  radiant_win?: boolean | null;
+  winner_team?: 'radiant' | 'dire' | number | string | null;
+  winner_name?: string | null;
+  winner_display_name?: string | null;
+  radiant_score?: number | null;
+  dire_score?: number | null;
+  player_id?: number | null;
+  player_name?: string | null;
+  players?: RemoteMatchPlayer[] | null;
+  radiant_players?: RemoteMatchPlayer[] | null;
+  dire_players?: RemoteMatchPlayer[] | null;
+  radiant_lineup?: Array<string | RemoteMatchPlayer> | null;
+  dire_lineup?: Array<string | RemoteMatchPlayer> | null;
+  lineup?: {
+    radiant?: Array<string | RemoteMatchPlayer> | null;
+    dire?: Array<string | RemoteMatchPlayer> | null;
+  } | null;
+}
+
+export interface RemoteMatchPlayer {
+  account_id?: number | null;
+  player_name?: string | null;
+  display_name?: string | null;
+  display_type?: string | null;
+  pro_name?: string | null;
+  persona_name?: string | null;
+  hero_id?: number | null;
+  hero_name?: string | null;
+  team?: 'radiant' | 'dire' | string | number | null;
+  team_id?: number | null;
+  player_slot?: number | null;
 }
 
 export interface RemoteMatchesResponse {
   status: string;
+  message?: string | null;
   total: number;
   limit: number;
   offset: number;
@@ -50,6 +82,18 @@ export interface RemoteMatchesParams {
   match_id?: number;
   leagueid?: number;
   player_id?: number;
+  sources?: RemoteMatchSource[];
+}
+
+export interface RemoteSearchParams {
+  q?: string;
+  limit?: number;
+  offset?: number;
+  match_id?: number;
+  leagueid?: number;
+  player_id?: number;
+  player_name?: string;
+  league_name?: string;
   sources?: RemoteMatchSource[];
 }
 
@@ -129,17 +173,36 @@ class RemoteService {
     return response.json();
   }
 
-  async searchRemoteMatches(params: Pick<RemoteMatchesParams, 'limit' | 'player_id' | 'leagueid'>): Promise<RemoteMatchesResponse> {
+  async searchRemoteMatches(params: RemoteSearchParams): Promise<RemoteMatchesResponse> {
     const queryParams = new URLSearchParams();
 
+    if (params.q !== undefined && params.q.trim()) {
+      queryParams.append('q', params.q.trim());
+    }
     if (params.limit !== undefined) {
       queryParams.append('limit', String(params.limit));
+    }
+    if (params.offset !== undefined) {
+      queryParams.append('offset', String(params.offset));
+    }
+    if (params.match_id !== undefined) {
+      queryParams.append('match_id', String(params.match_id));
     }
     if (params.player_id !== undefined) {
       queryParams.append('player_id', String(params.player_id));
     }
     if (params.leagueid !== undefined) {
       queryParams.append('leagueid', String(params.leagueid));
+    }
+    if (params.player_name !== undefined && params.player_name.trim()) {
+      queryParams.append('player_name', params.player_name.trim());
+    }
+    if (params.league_name !== undefined && params.league_name.trim()) {
+      queryParams.append('league_name', params.league_name.trim());
+    }
+    if (params.sources !== undefined) {
+      queryParams.append('include_pro', String(params.sources.includes('pro')));
+      queryParams.append('include_public', String(params.sources.includes('public')));
     }
 
     const response = await fetch(buildApiUrl(`/api/v1/remote/search?${queryParams.toString()}`), {

@@ -10,6 +10,11 @@ import httpx
 class OpenDotaServiceError(Exception):
     """Raised when OpenDota API calls fail in a controlled way."""
 
+    @property
+    def is_rate_limited(self) -> bool:
+        normalized = str(self).lower()
+        return "status 429" in normalized or "daily api limit exceeded" in normalized
+
 
 class OpenDotaService:
     """Typed async client wrapper for OpenDota API."""
@@ -66,6 +71,24 @@ class OpenDotaService:
             path=f"/players/{account_id}/matches",
             bounded_limit=bounded_limit,
             params=params,
+        )
+
+    async def search_players(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Search OpenDota player identities by persona name."""
+        normalized_query = query.strip()
+        if not normalized_query:
+            return []
+
+        bounded_limit = max(1, min(limit, 100))
+        return await self._fetch_list_endpoint(
+            path="/search",
+            bounded_limit=bounded_limit,
+            params={"q": normalized_query},
         )
 
     async def fetch_league_matches(
@@ -136,7 +159,7 @@ class OpenDotaService:
         *,
         path: str,
         bounded_limit: int,
-        params: dict[str, int] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch a list endpoint and apply shared timeout/error handling."""
 
@@ -163,6 +186,8 @@ class OpenDotaService:
             raise OpenDotaServiceError("OpenDota request timed out.") from exc
         except httpx.HTTPStatusError as exc:
             raise OpenDotaServiceError(self._http_status_error_message(exc.response.status_code)) from exc
+        except ValueError as exc:
+            raise OpenDotaServiceError("OpenDota returned invalid JSON.") from exc
         except httpx.HTTPError as exc:
             raise OpenDotaServiceError("Failed to reach OpenDota API.") from exc
 
@@ -188,6 +213,8 @@ class OpenDotaService:
             raise OpenDotaServiceError("OpenDota request timed out.") from exc
         except httpx.HTTPStatusError as exc:
             raise OpenDotaServiceError(self._http_status_error_message(exc.response.status_code)) from exc
+        except ValueError as exc:
+            raise OpenDotaServiceError("OpenDota returned invalid JSON.") from exc
         except httpx.HTTPError as exc:
             raise OpenDotaServiceError("Failed to reach OpenDota API.") from exc
 
@@ -201,6 +228,11 @@ class OpenDotaService:
             return (
                 "OpenDota request failed with status 403; "
                 "可能被上游风控拦截，请检查 User-Agent/网络环境。"
+            )
+        if status_code == 429:
+            return (
+                "OpenDota request failed with status 429; "
+                "上游提示 daily api limit exceeded，当前 IP 的每日额度已耗尽。"
             )
         return f"OpenDota request failed with status {status_code}."
 

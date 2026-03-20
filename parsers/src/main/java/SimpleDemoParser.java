@@ -41,6 +41,7 @@ public class SimpleDemoParser {
     private static final int HERO_ITEM_SLOT_PROBE_COUNT = 25;
     private static final int INVALID_ENTITY_REFERENCE = 16777215;
     private static final float FINAL_WHISTLE_EPSILON_SECONDS = 1e-3f;
+    private static final float PREGAME_ALIGNMENT_EPSILON_SECONDS = 1.0f;
     
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -411,7 +412,14 @@ public class SimpleDemoParser {
 
                 float previousClockZeroTime = clockZeroTime;
                 boolean hadClockZeroTime = hasClockZeroTime;
-                if (hasRawGameStartTime && hasPausedSecondsAtClockZero) {
+                if (rawGameStartAlreadyPauseAdjusted()) {
+                    // Some replays already expose m_flGameStartTime in the same pause-adjusted
+                    // timeline as the in-game clock. Subtracting pregame pauses again would shift
+                    // every sample forward by the entire paused duration.
+                    clockZeroTime = rawGameStartTime;
+                    hasClockZeroTime = true;
+                    clockZeroSource = "raw_game_start";
+                } else if (hasRawGameStartTime && hasPausedSecondsAtClockZero) {
                     clockZeroTime = rawGameStartTime - pausedSecondsAtClockZero;
                     hasClockZeroTime = true;
                     clockZeroSource = "raw_game_start_minus_pregame_pauses";
@@ -490,6 +498,15 @@ public class SimpleDemoParser {
             } catch (Exception ex) {
                 // Property access can fail, ignore
             }
+        }
+
+        private boolean rawGameStartAlreadyPauseAdjusted() {
+            if (!hasRawGameStartTime || !hasPreGameStartTime) {
+                return false;
+            }
+
+            float pregameToZeroDelta = rawGameStartTime - preGameStartTime;
+            return Math.abs(pregameToZeroDelta - 90.0f) <= PREGAME_ALIGNMENT_EPSILON_SECONDS;
         }
         
         @OnEntityCreated(classPattern = "CDOTA_Unit_Hero_.*")
@@ -1145,12 +1162,23 @@ public class SimpleDemoParser {
             return paused;
         }
 
+        private Float getPauseTrackingStartTime() {
+            if (hasPreGameStartTime) {
+                return preGameStartTime;
+            }
+            if (hasClockZeroTime) {
+                return clockZeroTime;
+            }
+            return null;
+        }
+
         private void updatePauseIntervals(
                 float replayTime,
                 float gameClock,
                 boolean isGamePaused,
                 float totalPausedSeconds) {
-            if (!hasClockZeroTime || replayTime < clockZeroTime) {
+            Float pauseTrackingStartTime = getPauseTrackingStartTime();
+            if (pauseTrackingStartTime == null || replayTime < pauseTrackingStartTime) {
                 if (pauseIntervalActive) {
                     pauseIntervalActive = false;
                 }
@@ -1162,8 +1190,8 @@ public class SimpleDemoParser {
                 float deltaPaused = totalPausedSeconds - previousTotalPausedSeconds;
                 if (deltaPaused > 0.25f) {
                     float replayStart = replayTime - deltaPaused;
-                    if (replayStart < clockZeroTime) {
-                        replayStart = clockZeroTime;
+                    if (replayStart < pauseTrackingStartTime) {
+                        replayStart = pauseTrackingStartTime;
                     }
                     float duration = replayTime - replayStart;
                     if (duration > 1e-3f) {

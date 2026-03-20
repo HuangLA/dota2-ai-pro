@@ -245,6 +245,57 @@ class OpenDotaReferenceStorage:
         ]
         return total, records
 
+    def search_leagues_by_name(self, name: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Search leagues by name using cached reference data."""
+        normalized = self._normalize_search_text(name)
+        if normalized is None:
+            return []
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        rows: list[dict[str, Any]] = []
+        seen_league_ids: set[int] = set()
+        patterns = [
+            normalized,
+            f"{normalized}%",
+            f"%{normalized}%",
+        ]
+
+        for pattern in patterns:
+            if len(seen_league_ids) >= limit:
+                break
+            cursor.execute(
+                """
+                SELECT leagueid, name, tier, icon_url, logo_url, image_url, banner_url, last_synced_at
+                FROM opendota_leagues
+                WHERE name LIKE ? COLLATE NOCASE
+                ORDER BY last_synced_at DESC, leagueid DESC
+                LIMIT ?
+                """,
+                (pattern, max(limit * 2, limit)),
+            )
+            for row in cursor.fetchall():
+                leagueid = int(row["leagueid"])
+                if leagueid in seen_league_ids:
+                    continue
+                seen_league_ids.add(leagueid)
+                rows.append(
+                    {
+                        "leagueid": int(row["leagueid"]),
+                        "name": row["name"],
+                        "tier": row["tier"],
+                        "icon_url": row["icon_url"],
+                        "logo_url": row["logo_url"],
+                        "image_url": row["image_url"],
+                        "banner_url": row["banner_url"],
+                        "last_synced_at": int(row["last_synced_at"]),
+                    }
+                )
+                if len(seen_league_ids) >= limit:
+                    break
+
+        return rows
+
     @staticmethod
     def _as_int(value: object) -> int | None:
         if value is None:
@@ -270,3 +321,10 @@ class OpenDotaReferenceStorage:
             normalized = value.strip()
             return normalized if normalized else None
         return str(value)
+
+    @staticmethod
+    def _normalize_search_text(value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = " ".join(value.strip().split())
+        return normalized if normalized else None

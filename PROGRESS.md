@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4/4.5 已完成 ✅ + 文档对齐更新，准备进入 Phase 5 🚀 |
-| 最后更新 | 2026-03-18 |
+| 最后更新 | 2026-03-20 |
 | 更新者 | Codex |
 
 ---
@@ -30,7 +30,94 @@
 
 ---
 
-## 当前进展摘要（2026-03-18）
+## 当前进展摘要（2026-03-20）
+
+### 最新完成任务（2026-03-21）
+**✅ 修复 8736891827 时间轴整体漂移与召唤物误入英雄回放**
+- `parsers/src/main/java/SimpleDemoParser.java` 已修正 `clock_zero` 判定：当 `m_flPreGameStartTime -> m_flGameStartTime` 仍然保持标准 `90s` 间隔时，不再重复减去 `pregame_paused_seconds`，避免像 `8736891827` 这种 replay 被整体错误平移约 `691.7s`。
+- 已使用新 parser 重新解析 `backend/data/replays/8736891827.dem`，样本现已恢复到正确的开局时基：`backend/data/matches/8736891827/positions.parquet` 首批样本回到 `-111.7s`、`wards.parquet` 首个眼位回到 `-88.6s`，`meta.json` 的 `game_start_time` 也从 `169.96674` 修正为 `861.7001`，`clock_zero_source` 更新为 `raw_game_start`。
+- `backend/routers/playback.py` 已按 `metadata.players` 过滤 playback 里的真实玩家英雄，避免 `Beastmaster_Boar` / `Beastmaster_Hawk` 这类召唤物继续混进 `/ticks`、`/heroes`、`/hud`，同时顺手修复了 `/playback/{match_id}/heroes` 在双方同英雄时只算 9 个英雄的去重问题。
+- 继续追查后发现，这场 replay 还存在一段被截断的“负时间暂停”：10 个英雄在 `-86.7s` 到 `0:00` 前后整段不动，但旧的 `pause_intervals` 只从 `0:00` 开始记录，导致前端进度条少画了约 `86s` 的橙色暂停段。现已调整 parser 的 pause 跟踪起点，从 `clock_zero` 前移到 `pregame_start_time`，重新解析后 `backend/data/matches/8736891827/meta.json` 中该段 pause 已变为 `replay_start_time=775.0 / game_time=-86.70001 / duration_seconds=691.7333`，`positions.parquet` 里对应冻结区间的 `game_time` 也已正确保持不变。
+- 本次验证：`cd backend && ./.venv/bin/python -m pytest tests/test_playback_hud_contract.py tests/test_timeline_regression.py -q` → `37 passed, 8 skipped`；并用 `TestClient` 验证 `8736891827` 的 `/ticks` 首批 `game_time=-111.70007`、`time_basis.pause_intervals[0].game_time=-86.70001`，且响应中已不再包含 `Beastmaster_Boar`。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 页头与主区栏宽再次收口**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已继续压缩下载台页头和主区布局：页头卡片在本页局部收紧了圆角与内边距，KPI 区最小宽度同步缩小；主区双栏布局的间距从 `gap-4` 收到 `gap-3`，右侧侧栏宽度也从 `340px` 收到 `320px`。
+- 这次调整不改动页面结构，只是把整体“壳层”再压紧一档，让搜索页更贴合内容本身，不会因为外围容器太宽/太厚而显得头重脚轻。
+- 本次验证：`cd frontend && npm run build` → 通过；真实 Chromium 页面验证 `workspace-header` 约 `1116x308`，主区网格约 `1116x581`，页面仍无横向溢出。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 联赛横幅头图缩尺收口**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已在不改变“纵向横幅头图”结构的前提下，继续压缩联赛区体量：头图改为居中且带 `max-width` 的横幅框，顶部标签、底部标题卡和内边距都同步缩小一档，避免联赛头图继续压过下方对阵内容。
+- 这次调整保留了 banner 作为主视觉的表达方式，但把视觉重心从“大面积占高”收回到“更紧凑的头图提示”，更适合作为比赛卡中的一段上下文信息，而不是主页面 Hero 区。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过；真实 Chromium 页面验证首张联赛区整体约 `716x353.5`，其中横幅头图约 `628x246.5`，较上一版 `682x267.6` 明显收缩，且页面仍无横向溢出。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 联赛区重规划为纵向横幅头图**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已将联赛区从“左图右信息”的分栏布局重构为真正的纵向 banner 头图区：横幅图独占上半区，联赛名/来源/联赛号直接叠在横幅上，下半区再承载赛道、数据状态、最近同步与检索标签，避免 banner 比例与右侧留白互相打架。
+- 新版横幅不再依赖把联赛图塞进固定侧栏宽度，而是让 banner 按统一的 `1024:400` 视觉比例占满整条内容列，更适合 OpenDota 常见联赛素材。
+- 回归测试已同步到 `frontend/src/renderer/pages/OpenDotaLivePage.test.tsx` 与 `frontend/src/renderer/pages/OpenDotaLivePage.richResults.test.tsx`，断言收口到新的横幅文案结构。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过；真实 Chromium 页面验证首张联赛区整体约 `716x374.6`，其中横幅头图约 `682x267.6`，下方共有 `4` 个元信息卡片，页面仍无横向溢出。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 比赛卡主轴对齐优化 + 联赛横幅信息补全**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已将比赛卡重排为统一的三列骨架：左侧勾选、中间内容主轴、右侧状态/工作流。顶部比赛摘要、联赛横幅和下方天辉/夜魇阵容现在共用同一条内容列，不再出现上中下块左右边界错位的问题。
+- 联赛横幅改为更完整的横向信息块：左侧保持宽幅 banner 预览，右侧新增赛道、联赛 ID、数据状态、最近同步等元信息，解决“联赛图右侧空间大片空白”的视觉问题。
+- 路人局比赛的对阵卡已不再回退为“未知战队”；当没有职业战队名时，会改用 `天辉 / 夜魇` 作为主标题，更符合公开匹配语义。
+- `frontend/src/renderer/pages/OpenDotaLivePage.test.tsx` 与 `frontend/src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` 已补充联赛横幅元信息与“路人局不显示未知战队”的回归。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过；真实 Chromium 页面验证首张比赛卡 `meta / badge / radiant` 左边界均为约 `420px`，联赛横幅约 `716x254`、banner 图像约 `370x112`，页面无横向溢出，且 `未知战队` 命中数为 `0`。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 联赛徽章改为横向 banner，并隐藏路人空壳**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 的联赛徽章再次上调了视觉权重，并把图片从正方形视觉改成横向 banner 预览：联赛资源现在优先选 `banner/image`，再回退 `icon/logo`，图像区域明显更宽，联赛名和副标题仍然保持层级分明。
+- 对于路人比赛且没有联赛元数据的记录，联赛徽章现在会直接返回 `null`，并且调用处也不再渲染这整行，避免在空数据场景下保留一块空壳。
+- `frontend/src/renderer/pages/OpenDotaLivePage.test.tsx` 与 `frontend/src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` 已补充“职业/联赛结果应显示徽章”和“路人无联赛信息时徽章完全隐藏”的回归。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过；真实 Chromium 页面验证 `live-league-badge` 首个徽章约 `459x122`、图像区域约 `248x96`，`public` 且无联赛元数据时徽章不存在，且页面仍无横向溢出。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 联赛徽章二次强化，提升图标权重**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已将比赛卡顶部的联赛信息从普通小胶囊继续强化为更明确的联赛徽章块：图标放大到更稳定的视觉尺寸，联赛名与副标题重新分层，职业联赛与路人来源也采用了更清晰的色彩语义。
+- 新版联赛徽章在不改变整张比赛卡信息架构的前提下，解决了“联赛图标偏小、视觉锚点不够明显”的问题，同时保持默认列表和搜索结果的一致表现。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过；真实 Chromium 页面验证 `live-league-badge` 共 `20` 个，首个徽章约 `236x70`、图标约 `48x48`，且页面仍无横向溢出。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 结果区卡片化重构，消除英雄/玩家撑表问题**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已将结果区从横向数据表彻底改为纵向“比赛卡列表”：每场比赛现在拆成顶部摘要、左右对阵阵容卡和右侧工作流卡，保留勾选、批量入库、单场入库、状态详情、下载/解析状态等功能，但不再因为英雄头像和玩家信息把整页表格横向撑爆。
+- 阵容展示已从旧版“表格单元格里嵌套长列表”改为更紧凑的 player-first 双列卡片，优先显示玩家名，再显示英雄和玩家 ID；同时保留胜方高亮、队标、击杀数和联赛/路人来源信息。
+- 结果区工具栏现在单独承载“全选当前页”和页内统计，默认页/搜索页都不再依赖 table header 承载复杂内容，桌面和中等宽度下的可读性都明显更稳定。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过；真实 Chromium 页面验证 `/#/openDotaLive` 命中 `20` 张 `live-match-card`、`0` 个 `table`，`bodyScrollWidth === innerWidth`，确认无横向溢出。
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 默认列表阵容补齐 + 对阵表信息收口**
+- `backend/routers/remote.py` 的默认 enriched list 现在不只会在队名/联赛名缺失时回填 detail；如果 `opendota_match_players` 里还没有该场比赛的玩家身份，也会触发一次 best-effort detail backfill，再重新查询列表，修复了“默认第一页职业比赛能看到对阵，但英雄和玩家经常是空的”问题。
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已去掉单独的“胜者”列，胜负只保留在天辉/夜魇对阵卡内部展示，避免和现有 UI 重复表达。
+- 同页联赛列现在对没有联赛归属的记录统一显示为“路人”，不再落成“未知联赛”，更符合公开匹配语义。
+- `backend/tests/test_remote_routes.py` 已新增默认列表缺少玩家身份时自动补抓详情的回归；`frontend/src/renderer/pages/OpenDotaLivePage.test.tsx` 与 `frontend/src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` 已补齐“胜者列移除”和“路人标签”断言。
+- 本次验证：`cd backend && ./.venv/bin/python -m pytest tests/test_remote_routes.py -q` → `18 passed`；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `8 passed`；`cd frontend && npm run build` → 通过
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 后端统一搜索/默认 feed 重构**
+- `backend/routers/remote.py` 已将 `/api/v1/remote/search` 收敛为单入口 enriched feed：支持单一 `q` 统一搜索 `match_id / player_id / player_name / league_id / league_name`，并在无查询时直接返回默认 enriched match rows。
+- `q` 现在成为前端统一搜索框的唯一主链路：支持中英文 `比赛/玩家/联赛` 与 `match/player/league` 前缀；纯文本会联合覆盖玩家名与联赛名命中，纯数字会按常见 ID 规则自动判断。
+- 路人局比赛号（例如 `8735428765`）不再误走玩家查询链路；单纯比赛 ID 查询会直接回填 match detail，避免再出现“OpenDota 搜索失败，请重试”的整页错误。
+- 显式类型前缀的无效输入（如 `比赛 abc`）现在会稳定返回空结果，不会再悄悄回退到默认列表。
+- 默认列表与空搜索现在强制回到职业局优先，不再把一堆公开路人局混进默认工作台；显式 `match_id/leagueid` 仍可按需查看 public 记录。
+- 已确认当前主机访问 OpenDota 官方接口时会收到 `429 {"error":"daily api limit exceeded"}`；`OpenDotaService` 现已将 429 明确翻译为可读错误，`remote.search` 响应新增 `message` 字段，能把“只能返回本地已缓存结果”的原因透出给前端，而不是继续沉默空结果。
+- `backend/main.py` 的后台远端镜像同步已改成更保守的默认值：只自动同步职业局、默认 10 分钟周期、命中 rate limit 后自动退避到更长间隔，避免后台循环继续把 OpenDota 日额度烧空。
+- 远端搜索已改成 best-effort：单场 `match_id` detail 拉取失败不会再把整页打成 `502`，而是尽量返回已有结果或空列表；响应中补齐 `hero_ids`、`players / radiant_players / dire_players`、胜负等摘要字段。
+- `docs/api_specification.md` 已同步更新 remote search 契约说明，`backend/tests/test_remote_routes.py` 也补上了默认 feed、`q` 搜索和公共局失败回退的回归覆盖。
+- 本次验证：`cd backend && ./.venv/bin/python -m pytest tests/test_opendota_service.py tests/test_remote_routes.py -q` → `32 passed`；`cd backend && ./.venv/bin/python -m pytest -q` → `205 passed, 9 skipped`
+
+### 最新完成任务（2026-03-20）
+**✅ OpenDota Live 前端搜索分流收口**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已收口为单输入统一搜索台，不再暴露职业 / 路人区分。
+- 默认列表已改回职业比赛优先，只在搜索态使用职业 + 路人的全量统一搜索；自动同步与手动同步也回到职业源，避免默认页混入一堆公开路人局。
+- 搜索框现在默认鼓励直接输入比赛号、玩家名、联赛名，也支持 `比赛/玩家/联赛` 与 `match/player/league` 前缀显式指定；搜索请求已重新收口为只发送原始 `q`，不再把 `q` 与结构化参数混发后导致名字搜索被交集打空。
+- 默认列表和搜索结果都改为更富的英雄 + 玩家展示，包含双方阵容、玩家名/ID 与胜者信息，方便在下载前直接筛选录像。
+- `OpenDotaLivePage.test.tsx` 已新增默认职业列表、显式无效前缀输入和统一搜索请求回归，`OpenDotaLivePage.richResults.test.tsx` 覆盖富结果展示。
+- 页面现在会展示上游限流提示：当 `DreamLeague`、`8735428765` 这类查询因为 OpenDota 日限额无法补抓时，界面会明确说明“当前只能返回本地已缓存结果”，不再只剩下模糊的失败或空白。
+- 浏览器级验证已通过：在真实 Chromium 页面里拦截 `/api/v1/remote/matches` 与 `/api/v1/remote/search`，确认初始请求 `include_public=false`、搜索 `Ame` 时实际请求为 `.../remote/search?q=Ame&...include_public=true`、搜索 `8735428765` 时请求为 `.../remote/search?q=8735428765&...include_public=true`，`DreamLeague` 与 `8735428765` 两个搜索都会显示 `daily api limit exceeded` 提示与空结果态，而不再出现 `OpenDota 搜索失败，请重试。`
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx --reporter=verbose` → `7 passed`；`cd frontend && npm run build` → 通过
 
 ### 最新完成任务（2026-03-18）
 **✅ Replay HUD 玩家名默认态改为金色高亮**
@@ -661,6 +748,7 @@ print(f"Kill events: {len(result.kills)}")
 
 | 日期 | 更新内容 | 更新者 |
 |------|----------|--------|
+| 2026-03-20 | **OpenDota Live 搜索台全面升级**: ① `OpenDotaLivePage` 升级为实时镜像 + 直连搜索双模式，支持 `match_id / player_id / player_name / leagueid / league_name` 多字段搜索 ② 结果表新增胜者 badge、天辉/夜魇阵容卡片、玩家 `ID / 名字` 展示，保留下载并入库 / 状态详情 / 批量入库主流程 ③ `/api/v1/remote/search` 升级为统一远端搜索入口，补齐公共局搜索、玩家/联赛名称解析与 richer match summary ④ 修复 OpenDota match detail 回写时公共局来源被误判为职业局的问题，并补充联赛名/玩家名检索索引与回归测试；本次验证为后端 `39 passed`、前端 `6 passed`、`npm run build` 通过。 | Codex |
 | 2026-03-18 | **T-007 Zustand 状态管理实现完成**: ① 创建 `matchStore.ts` - 管理比赛选择和回放上下文 ② 创建 `navigationStore.ts` - 管理页面导航状态 ③ 重构 `App.tsx` - 从 163 LOC 简化为 88 LOC，移除所有 useState 和回调 props ④ 更新导航测试 - 使用 Zustand store 替代 props 传递 ⑤ 所有 106 个测试通过 ⑥ 构建成功通过 | Codex |
 | 2026-03-18 | **Replay Workspace 桌面化重构 + 远端搜索/物品提示闭环**: ① `RealMatchViewer` 重构为地图优先的桌面分析台，header/对阵区压缩为工具栏，地图时间信息移到主地图标题区 ② 英雄 HUD 与地图工作台改为默认折叠，热力图/路径分析支持更清晰的聚焦模式与浮窗交互 ③ `ReplayLibraryPage` 新增按 `player_id/leagueid` 直连 OpenDota 的远端搜索链路，可直接下载并入库或打开本地已就绪回放 ④ 新增 `/api/v1/assets/items/{item_name}.png` 物品图标代理与本地缓存，前端补齐物品别名、中文 tooltip 与中立物品附魔说明 ⑤ OpenDota Live / Replay Library / Match Database / Team Profile 同步收口为统一桌面端布局；当前验证为后端 `176 passed, 8 skipped`、前端 `98 passed`、`npm run build` 通过。 | Codex |
 | 2026-03-16 | **Phase 4 尾项收口 + HUD 真实指标完成**: ① 修复 OpenDota 比赛归一化中的 team_id 标量兼容问题，恢复战队筛选和名称回填 ② `admin` replay task 契约补齐 `progress`，下载链与测试文档统一到 `prepared/downloading/parsing/completed` 语义 ③ `matches` / `visualization` 路由统一为 backend-root 相对路径，避免启动目录变化导致读取失败 ④ `RealMatchViewer` 完成热力图和路径分析真接线，支持时间范围、英雄筛选、轨迹简化与主地图渲染 ⑤ Java parser / Python parser / Parquet / playback HUD 全链路接入真实 `items/net_worth/gpm/xpm`，内置样本可直接返回真实 HUD 指标。 | OpenCode |

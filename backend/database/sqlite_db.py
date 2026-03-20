@@ -300,8 +300,20 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_opendota_match_players_account_id ON opendota_match_players(account_id)"
     )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_opendota_match_players_persona_name_nocase "
+        "ON opendota_match_players(persona_name COLLATE NOCASE)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_opendota_match_players_pro_name_nocase "
+        "ON opendota_match_players(pro_name COLLATE NOCASE)"
+    )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_teams_name ON opendota_teams(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opendota_leagues_name ON opendota_leagues(name)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_opendota_leagues_name_nocase "
+        "ON opendota_leagues(name COLLATE NOCASE)"
+    )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_replay_download_tasks_status ON replay_download_tasks(status)")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_replay_download_tasks_created_at ON replay_download_tasks(created_at DESC)"

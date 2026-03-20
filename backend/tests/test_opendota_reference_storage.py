@@ -62,3 +62,18 @@ def test_list_teams_and_leagues_pagination() -> None:
     assert [row["team_id"] for row in team_records] == [20, 30]
     assert league_total == 2
     assert [row["leagueid"] for row in league_records] == [11]
+
+
+def test_search_leagues_by_name_uses_cached_reference_rows() -> None:
+    storage = OpenDotaReferenceStorage()
+    storage.upsert_leagues(
+        [
+            {"leagueid": 15475, "name": "DreamLeague Season 26", "tier": "professional"},
+            {"leagueid": 20001, "name": "Elite League", "tier": "premium"},
+        ]
+    )
+
+    matches = storage.search_leagues_by_name("dreamleague")
+
+    assert [row["leagueid"] for row in matches] == [15475]
+    assert matches[0]["name"] == "DreamLeague Season 26"
