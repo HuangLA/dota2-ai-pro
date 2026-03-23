@@ -379,6 +379,7 @@ class ClarityParser:
                 victim=k.get("victim", ""),
                 x=k.get("x"),
                 y=k.get("y"),
+                game_time=k.get("game_time"),
                 assist_players=k.get("assist_players"),
             ))
         
@@ -393,7 +394,15 @@ class ClarityParser:
                 x=w.get("x"),
                 y=w.get("y"),
                 team=w.get("team"),
-                game_time=w.get("game_time")
+                game_time=w.get("game_time"),
+                destroy_reason=w.get("destroy_reason"),
+                destroyer_name=w.get("destroyer_name"),
+                destroyer_kind=w.get("destroyer_kind"),
+                destroyer_is_hero=w.get("destroyer_is_hero"),
+                destroyer_team=w.get("destroyer_team"),
+                placer_name=w.get("placer_name"),
+                placer_handle=w.get("placer_handle"),
+                placer_team=w.get("placer_team"),
             ))
         
 

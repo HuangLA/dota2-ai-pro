@@ -47,11 +47,30 @@ export interface HeroPosition {
  * Ward placement data
  */
 export interface Ward {
+  instanceKey?: string;
   type: 'observer' | 'sentry';
   team: 'radiant' | 'dire';
   x: number;
   y: number;
   placed: boolean;
+  handle?: number;
+  placedSourceTime?: number;
+  placedGameTime?: number;
+  removalSourceTime?: number;
+  removalGameTime?: number;
+  removalKind?: 'destroyed' | 'expired';
+  destroyerName?: string;
+  destroyerKind?: 'hero' | 'hero_summon' | 'lane_creep' | 'neutral_creep' | 'unit';
+  destroyerTeam?: number;
+  destroyerLabel?: string;
+  lifetimeSeconds?: number;
+  activeAtCurrentTime?: boolean;
+}
+
+export interface WardInteractionPayload {
+  wards: Ward[];
+  localX: number;
+  localY: number;
 }
 
 /**
@@ -152,6 +171,12 @@ export class DotaMapRenderer {
     sentry: { radiant: undefined, dire: undefined },
   };
   private coordinateMapper: MapCoordinateMapper;
+  private currentWards: Ward[] = [];
+  private selectedWardKeys: Set<string> = new Set();
+  private onWardSelectionChange?: (wards: Ward[]) => void;
+  private onWardHoverChange?: (payload: WardInteractionPayload | null) => void;
+  private onWardClick?: (payload: WardInteractionPayload | null) => void;
+  private hoveredWardSignature = '';
   
   private config: Required<RendererConfig>;
   private initialized = false;
@@ -159,6 +184,38 @@ export class DotaMapRenderer {
   
   // 动画插值参数
   private readonly LERP_SPEED = 0.15; // 插值速度，越大越快
+  private readonly WARD_SELECTION_RADIUS_PX = 18;
+  private readonly handleWardPointerTap = (event: PIXI.FederatedPointerEvent) => {
+    if (!this.onWardClick) {
+      return;
+    }
+
+    const localPos = event.getLocalPosition(this.app.stage);
+    const wards = this.getWardsAtLocalPosition(localPos.x, localPos.y);
+    this.onWardClick({
+      wards,
+      localX: localPos.x,
+      localY: localPos.y,
+    });
+  };
+  private readonly handleWardPointerMove = (event: PIXI.FederatedPointerEvent) => {
+    if (!this.onWardSelectionChange && !this.onWardHoverChange) {
+      return;
+    }
+
+    const localPos = event.getLocalPosition(this.app.stage);
+    const selectedWards = this.getWardsAtLocalPosition(localPos.x, localPos.y);
+    this.emitWardSelection(selectedWards);
+    this.onWardHoverChange?.({
+      wards: selectedWards,
+      localX: localPos.x,
+      localY: localPos.y,
+    });
+  };
+  private readonly handleWardPointerLeave = () => {
+    this.emitWardSelection([]);
+    this.onWardHoverChange?.(null);
+  };
 
   constructor(config: RendererConfig) {
     this.config = {
@@ -217,6 +274,10 @@ export class DotaMapRenderer {
     this.app.stage.addChild(this.pathsContainer);
     this.app.stage.addChild(this.killsContainer);
     this.app.stage.addChild(this.heroesContainer);
+    this.app.stage.eventMode = 'static';
+    this.app.stage.on('pointermove', this.handleWardPointerMove);
+    this.app.stage.on('pointertap', this.handleWardPointerTap);
+    this.app.canvas.addEventListener('pointerleave', this.handleWardPointerLeave);
 
     if (this.config.mapImageUrl) {
       await this.loadMapBackground(this.config.mapImageUrl);
@@ -1330,6 +1391,14 @@ export class DotaMapRenderer {
     return container;
   }
 
+  private createWardSelectionRing(wardSize: number): PIXI.Graphics {
+    const ring = new PIXI.Graphics();
+    ring.circle(0, 0, wardSize * 0.68);
+    ring.stroke({ width: 3, color: 0xf8fafc, alpha: 0.92 });
+    ring.filters = [new PIXI.BlurFilter(1.5)];
+    return ring;
+  }
+
   /**
    * 创建眼位柔和辉光，增强在复杂背景上的识别度
    */
@@ -1354,17 +1423,50 @@ export class DotaMapRenderer {
       return;
     }
     
+    this.currentWards = wards;
+    if (wards.length === 0) {
+      this.emitWardSelection([]);
+    }
     this.destroyContainerChildren(this.wardsContainer);
 
     for (const ward of wards) {
       const screenPos = this.gameToScreen(ward.x, ward.y);
       const wardContainer = this.createWardContainer(ward.type, ward.team);
+      const isSelected = ward.instanceKey ? this.selectedWardKeys.has(ward.instanceKey) : false;
       
       wardContainer.x = screenPos.x;
       wardContainer.y = screenPos.y;
       wardContainer.alpha = ward.placed ? 1.0 : 0.5;
+      if (isSelected) {
+        wardContainer.addChildAt(this.createWardSelectionRing(this.config.wardIconSize), 0);
+      }
       
       this.wardsContainer.addChild(wardContainer);
+    }
+  }
+
+  setWardSelectionHandler(handler?: (wards: Ward[]) => void): void {
+    this.onWardSelectionChange = handler;
+    if (!handler) {
+      this.hoveredWardSignature = '';
+    }
+  }
+
+  setWardHoverHandler(handler?: (payload: WardInteractionPayload | null) => void): void {
+    this.onWardHoverChange = handler;
+  }
+
+  setWardClickHandler(handler?: (payload: WardInteractionPayload | null) => void): void {
+    this.onWardClick = handler;
+  }
+
+  setSelectedWardKeys(instanceKeys: string[]): void {
+    this.selectedWardKeys = new Set(
+      instanceKeys.filter((instanceKey) => typeof instanceKey === 'string' && instanceKey.length > 0)
+    );
+
+    if (this.initialized) {
+      this.renderWards(this.currentWards);
     }
   }
 
@@ -1678,6 +1780,9 @@ export class DotaMapRenderer {
     this.initialized = false;
     this.clear();
     if (this.app) {
+      this.app.stage.off('pointermove', this.handleWardPointerMove);
+      this.app.stage.off('pointertap', this.handleWardPointerTap);
+      this.app.canvas.removeEventListener('pointerleave', this.handleWardPointerLeave);
       this.app.ticker.remove(this.animateTick);
       this.app.ticker.stop();
       this.app.destroy(true, { children: true });
@@ -1688,7 +1793,51 @@ export class DotaMapRenderer {
     this.wardTextures.observer.dire = undefined;
     this.wardTextures.sentry.radiant = undefined;
     this.wardTextures.sentry.dire = undefined;
+    this.currentWards = [];
+    this.selectedWardKeys.clear();
+    this.onWardSelectionChange = undefined;
+    this.onWardHoverChange = undefined;
+    this.onWardClick = undefined;
+    this.hoveredWardSignature = '';
     this.texturesLoaded = false;
+  }
+
+  private getWardsAtLocalPosition(localX: number, localY: number): Ward[] {
+    if (this.currentWards.length === 0) {
+      return [];
+    }
+
+    const hitRadius = Math.max(this.WARD_SELECTION_RADIUS_PX, this.config.wardIconSize * 0.95);
+
+    return this.currentWards
+      .map((ward) => {
+        const screenPos = this.gameToScreen(ward.x, ward.y);
+        const distance = Math.hypot(screenPos.x - localX, screenPos.y - localY);
+        return {
+          ward,
+          distance,
+        };
+      })
+      .filter(({ distance }) => distance <= hitRadius)
+      .sort((left, right) => left.distance - right.distance)
+      .map(({ ward }) => ward);
+  }
+
+  private emitWardSelection(wards: Ward[]): void {
+    if (!this.onWardSelectionChange) {
+      return;
+    }
+
+    const signature = wards
+      .map((ward) => ward.instanceKey ?? `${ward.handle ?? 'unknown'}:${ward.type}:${Math.round(ward.x)}:${Math.round(ward.y)}`)
+      .join('|');
+
+    if (signature === this.hoveredWardSignature) {
+      return;
+    }
+
+    this.hoveredWardSignature = signature;
+    this.onWardSelectionChange(wards);
   }
 
   /**

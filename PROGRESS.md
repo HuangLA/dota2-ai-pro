@@ -32,6 +32,93 @@
 
 ## 当前进展摘要（2026-03-20）
 
+### 最新完成任务（2026-03-23）
+**✅ 调整回放页头部辅助徽章位置，弱化标题区拥挤感**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将原本位于标题第一行右侧的辅助上下文徽章组，从头部主标题行中移出，改为放在对阵信息下方，与 `replay 文件名 / 解析状态 / 最近解析时间` 同属元信息区。
+- 这组徽章仍保留 `回放来源 / 回退时间基准 / 比赛类型 / 重解析进度` 等信息，但不再与标题和胜者信息共享同一行，头部主层级更清晰，也减少了首屏横向拥挤。
+- 本次验证：`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-23）
+**✅ 重排主地图头部工具条，降低分析工作台展开时的横向挤压**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将主地图标题区从单个 `flex-wrap + justify-between` 的混合工具条，重排为更接近桌面应用的两层结构：上层承载“标题说明 + 地图浮窗操作”，下层承载“时钟/状态/时长 + 当前视图状态”。
+- 工作台展开时，该区域现在不再让标题、状态条、视图条和浮窗按钮同时在同一横向流里抢空间；浮窗按钮被提升到上层独立操作区，`map-status-strip` 与 `map-view-strip` 则收敛到下层，整体换行更可控。
+- 同时为标题说明增加了 `max-w-2xl` 限制，避免说明文案在宽屏下无限扩张，进一步压缩右侧操作区域。
+- 本次验证：`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-23）
+**✅ 放宽地图主工作区整体宽度，缓解分析工作台展开后的页面挤压**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将录像主工作区的外层容器从 `max-w-[1660px]` 放宽到 `max-w-[1820px]`，让地图、HUD 与分析工作台在桌面宽屏下拥有更充裕的横向空间。
+- 同一文件也同步放宽了两个关键侧栏骨架：顶部比赛选择区从 `320px` 提升到 `360px`，分析工作台展开时的左侧控制栏从 `320px` 提升到 `360px`。这样在打开工作台时，地图主体不会因为侧栏占比过紧而明显被挤压变形。
+- 本次变更保持为纯布局调整，没有改动视野分析、热力图、路径或 HUD 的业务逻辑。
+- 本次验证：`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-23）
+**✅ 通过 ward 实体 owner 信息补出精确插眼英雄，减少前端“疑似”归属**
+- `parsers/src/main/java/SimpleDemoParser.java` 现已不再只依赖前端按站位猜测插眼者，而是在 ward 实体创建/删除时直接读取 `m_nPlayerOwnerID / m_hOwnerEntity / m_hOwnerNPC`，再结合 hero 侧缓存的 `m_iPlayerID / m_nPlayerOwnerID / m_hOwnerEntity` 做反查，输出精确的 `placer_name / placer_handle / placer_team`。
+- 同一 parser 已为 hero 建立 `playerId / playerOwnerId / ownerEntityRef` 三组索引表，并在 hero 删除时同步清理；视野眼位创建和销毁事件现在都会尝试挂载 `placer_*`，因此即便某些 replay 在创建瞬间拿不到 owner，删除瞬间也还有补救机会。
+- `backend/parsers/models.py`、`backend/parsers/clarity_parser.py`、`backend/storage/parquet_storage.py`、`backend/routers/playback.py` 已把 `placer_name / placer_handle / placer_team` 串通到 Python 数据模型、Parquet 存储和播放接口返回。`frontend/src/renderer/pages/RealMatchViewer.tsx` 也补了一个小兜底：若 placed 事件没有 `placer_*`，但 matched destroy 事件上有，就继续按 parser 精确归属展示，不再退回“疑似插眼英雄”。
+- 已重新构建 parser 并重新解析本地 `backend/data/replays/` 下的 5 场比赛。抽样结果显示精确插眼者已能稳定落盘，例如：`8729115809` 有 `86` 个 placed ward 带 `placer_name`，`8731134498` 有 `68` 个，`8736891827` 有 `54` 个，`8739045863` 有 `41` 个；样例已包含 `npc_dota_hero_storm_spirit / tiny / phoenix / batrider / jakiro / lion / warlock / dark_willow / zuus / disruptor` 等真实插眼者。
+- 本次验证：`gradle -p parsers shadowJar` → 通过；本地批量重解析 5 场 replay → 通过；`backend/.venv/bin/python -m py_compile backend/parsers/models.py backend/parsers/clarity_parser.py backend/storage/parquet_storage.py backend/routers/playback.py` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `16 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-23）
+**✅ 继续重构 ward 销毁解析链路，修复 signal 时间漂移并显著压低未知来源**
+- `parsers/src/main/java/SimpleDemoParser.java` 已继续重构 ward 销毁归因：combat log 的 ward target 现在只接收真正的 `observer / sentry / truesight`，不再把 `shadow_shaman_ward` 这类非视野单位误当成真眼/假眼信号；同时 destroyer 候选优先级调整为 `attacker -> damageSource -> inflictor -> targetSource`，因此当实际击杀单位是 `warlock_golem / shadow_shaman_ward / lane creep` 时，会优先保留“召唤物 / 小兵”而不是被 `damageSource` 覆盖成英雄本体。
+- 同一 parser 现已把 `wardDestroySignals` 纳入统一时间重算链路：`recordWardDestroySignal()` 会像 ward/position/economy 一样保存 timing snapshot，后续如果 `clock_zero_time` 从 `combatlog_game_state_5` 切换到 `raw_game_start`，signals 也会同步 `recalculateGameTimes()`。这修掉了部分 replay 中 signal 和 ward delete 事件相差 `8s+`、导致明明有 combat log 却匹配不上的核心问题。
+- 匹配阶段还新增了 `destroyer_team != ward.team` 的队伍约束，避免把同时间附近的错误信号配到己方眼位上，进一步减少错配。
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已同步把 `hero_summon` 文案调整为“`被 某英雄 的召唤物排掉`”，不再只显示笼统的“召唤物”。
+- 已重新构建 parser JAR，并重新解析本地 `backend/data/replays/` 下的 5 场比赛。刷新后这 5 场合计 `281` 个 ward 销毁事件里，`destroyed=128 / expired=124 / unknown=29`，相比上一轮约 `unknown=50` 继续下降；其中 `8731134498` 从 `24` 个未知来源降到 `12`，`8739045863` 已清零，`8729115809` 也只剩 `3` 个未知来源。
+- 仍残留的 `29` 个 unknown 主要集中在 `8736891827` 与 `8731134498` 的少数事件。抽样 probe 显示其中一部分 replay 在这些时点根本没有对应的 ward combat-log death signal，因此后续若要继续压低未知来源，需要补一条实体级/游戏事件级的额外归因通道，而不是继续堆前端兜底。
+- 本次验证：`gradle -p parsers shadowJar` → 通过；本地批量重解析 5 场 replay → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `16 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-23）
+**✅ 视野销毁来源归因加强，并批量刷新本地 replay 产物**
+- `parsers/src/main/java/SimpleDemoParser.java` 已继续加强 ward 销毁归因：combat log 的 ward destroy signal 现已写入与 ward 删除事件相同口径的 `game_time`，匹配窗口从 `±2.5s` 放宽到 `±5s`；在匹配前还会用已知的插眼事件为销毁事件回填 `x/y/team`，避免删除时拿不到实体坐标导致距离约束完全失效。
+- 同一 parser 现已在 `enrichWardDestroyEvents()` 内显式区分 `destroyed / expired / unknown`：对于未匹配到销毁者、但寿命接近该类型眼位自然寿命的事件，会直接标记为 `expired`，不再混进“来源未明”的排眼统计里。
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 与 `frontend/src/renderer/api/backend.ts` 已同步消费新的 `destroy_reason='expired'`，并把假眼/真眼的生命周期口径拆分为 `observer=360s / sentry=420s`；页面现在会把这类事件展示成“自然到时”，不再误写成“被排掉（来源未明）”。另外守卫类单位来源也补了中文显示，不再出现 `observer wards / sentry wards` 这种内部名。
+- 已用新的 parser JAR 重新解析本地 `backend/data/replays/` 下的 5 场比赛：`8729115809 / 8731134498 / 8732912726 / 8736891827 / 8739045863`。刷新后这 5 场合计 `281` 个销毁事件里，`149` 个已经带明确 `destroyer_name`，`82` 个被识别成 `expired`，不再落入未知来源。
+- 抽样结果：`8729115809` 从原先几乎全是 `unknown`，提升到 `76` 个销毁事件里 `62` 个带明确来源、`14` 个识别为自然到时。
+- 本次验证：`gradle -p parsers shadowJar` → 通过；本地批量重解析 5 场 replay → 通过；`backend/.venv/bin/python -m py_compile backend/parsers/models.py backend/parsers/clarity_parser.py backend/storage/parquet_storage.py backend/routers/playback.py` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx src/renderer/api/backend.test.ts --reporter=verbose` → `18 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-23）
+**✅ 修复单场击杀 / 死亡热力图显示异常，并兼容旧 replay 数据**
+- `backend/analyzers/heatmap_analyzer.py` 已修复 kill/death 热力图的时间过滤口径：优先使用稳定的 `game_time`，旧 `kills.parquet` 没有该字段时会回退到 `time - game_start_time`，不再把 combat log 原始时间直接拿来和前端比赛时钟比较。
+- 同一分析器现已补上旧数据坐标回填：当历史 kill 事件缺少 `x/y` 时，会按受害者优先、击杀者兜底，从 `positions.parquet` 里回填最接近击杀时刻的死亡点位；英雄短名与 `npc_dota_hero_*` 内部名也已统一归一化，因此像 `8729115809` 这类历史比赛现在能重新生成 kill/death 热力格子。
+- `backend/parsers/models.py`、`backend/parsers/clarity_parser.py`、`backend/storage/parquet_storage.py` 和 `parsers/src/main/java/SimpleDemoParser.java` 已把 kill 事件的 `game_time` 字段串通到 parser -> JSON -> Parquet，后续新解析的比赛不再依赖兼容回推。
+- `frontend/src/renderer/api/backend.ts` 已把单场热力图请求的 `hero` 参数收口为单英雄契约，不再向仅支持单英雄的后端端点重复发送多个 `hero` 查询参数；`frontend/src/renderer/api/backend.test.ts` 已补回归，同时确认 paths 仍保留多英雄查询。
+- 本次验证：`cd backend && ./.venv/bin/python -m pytest tests/test_heatmap_analyzer.py -q` → `4 passed`；`gradle -p parsers compileJava` → 通过；`backend/.venv/bin/python -m py_compile backend/parsers/models.py backend/parsers/clarity_parser.py backend/storage/parquet_storage.py backend/analyzers/heatmap_analyzer.py backend/routers/visualization.py` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/api/backend.test.ts --reporter=verbose` → `2 passed`；`cd frontend && npm run build` → 通过。额外抽样 `8729115809` 时，analyzer 已能返回 `kill 47 samples / 46 cells` 与 `death 47 samples / 46 cells`。
+
+### 最新完成任务（2026-03-23）
+**✅ 统一单场视野分析与热力图/路径的主模式按钮逻辑**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已把单场视野分析的主模式切换从“下拉 + 快捷按钮”收敛为和热力图一致的按钮组：`当前存活 / 所选区间 / 整场` 现在直接作为主模式按钮展示，交互层级与热力图模式切换保持一致。
+- 地图工作台顶部摘要条也补上了 `视野` 状态，折叠和展开时都会和 `热力图 / 时间范围 / 路径` 一起显示，避免视野状态只出现在局部区域、造成显示逻辑不一致。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已同步调整回归，覆盖新的视野模式按钮切换逻辑。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `16 passed`
+
+### 最新完成任务（2026-03-23）
+**✅ 单场视野分析与实时视野解耦，并补回插眼英雄归属信息**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 现已把地图上的“实时视野”和“单场视野分析”彻底拆开：当视野地图切到 `整场` 或 `所选区间` 时，主地图会自动进入 ward focus，只保留眼位本身，临时隐藏英雄头像、热力图、路径和死亡爆点；右侧实时视野统计仍继续按当前时间轴更新，不再互相干扰。
+- hover / pinned 眼位详情、最近视野变化、整场全部眼位、整场排眼记录现在都会额外显示“插眼归属”。当前版本优先消费未来可能存在的 parser `placer_*` 字段；若 replay 数据链路还没有该字段，则会根据插眼时刻附近的同队英雄站位做 best-effort 匹配，并明确标注为“疑似插眼英雄”。
+- 已复核 parser/backend 现状：当前 ward API 仍只有 `destroyer_*` 精确字段，没有现成的 `placer_*` 字段，因此这次“插眼英雄”属于前端推断能力；如果后续 parser 增加 owner 归属，前端可以直接无缝切到精确展示。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已补回归，覆盖 ward focus 进入后 hero 图层自动清空、整场/区间视野仍正常展示，以及 hover 详情中的插眼英雄信息。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `16 passed`
+
+### 最新完成任务（2026-03-23）
+**✅ 单场视野分析补回整场全部眼位与排眼记录**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已把“整场全部眼位”和“整场排眼记录”重新补回单场视野分析面板，并新增“一键查看整场全部眼位”快捷入口；这两块列表尊重当前队伍与真假眼筛选，但不再受时间区间限制，方便直接核对全场插眼与排眼。
+- 视野面板现在会把整场排眼来源按 `英雄 / 召唤物 / 小兵 / 中立 / 其他单位 / 未知` 分组计数，并在列表中展示每个眼位的插下时间、被排时间与排眼来源文案，恢复了之前解析器重构带来的来源信息消费链路。
+- 已复核 parser/backend 链路仍然保留 `destroyer_name / destroyer_kind / destroyer_team / destroyer_is_hero` 字段；如果旧比赛仍显示来源未明，需要重新解析对应录像以刷新历史产物。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已补充回归，覆盖“整场全部眼位”“整场排眼记录”和“一键查看整场全部眼位”入口。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `16 passed`
+
+### 最新完成任务（2026-03-22）
+**✅ 单场视野分析补齐 hover / 点击固定，并把工作台重排为左侧分析栏**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已把 replay 地图区改成“左侧 sticky 分析栏 + 右侧主地图舞台”的工作区结构；控制项不再堆在地图上方，地图尺寸会随工作台展开状态继续放大，减少了查看视野时的纵向滚动。
+- 视野数据现已从 `WardsResponse` 统一构造成单场 ward 生命周期记录，前端按 `6:00` 口径补齐自然到时、被排时间、持续时长与销毁来源，并修正了当 tick 样本稀疏时视野区间被错误压扁的问题。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 与 `frontend/src/renderer/components/map/MapViewer.tsx` 已补上 ward hover / click 交互事件；地图 hover 会在鼠标旁弹出详情浮窗，点击后可固定窗口，再点地图空白即可取消固定。
+- 重叠 ward 现在会在同一个浮窗里并排展示，详情卡会同时显示插下时间、持续时间、消失/被排时间和排眼来源；主地图也会同步高亮当前 hover 或 pinned 的 ward。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已更新并补回归，覆盖新的视野工作台统计、hover 多眼位详情和点击固定交互。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `16 passed`
+
 ### 最新完成任务（2026-03-21）
 **✅ 修复 8736891827 时间轴整体漂移与召唤物误入英雄回放**
 - `parsers/src/main/java/SimpleDemoParser.java` 已修正 `clock_zero` 判定：当 `m_flPreGameStartTime -> m_flGameStartTime` 仍然保持标准 `90s` 间隔时，不再重复减去 `pregame_paused_seconds`，避免像 `8736891827` 这种 replay 被整体错误平移约 `691.7s`。

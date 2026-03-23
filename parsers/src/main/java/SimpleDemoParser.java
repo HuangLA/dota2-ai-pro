@@ -42,6 +42,39 @@ public class SimpleDemoParser {
     private static final int INVALID_ENTITY_REFERENCE = 16777215;
     private static final float FINAL_WHISTLE_EPSILON_SECONDS = 1e-3f;
     private static final float PREGAME_ALIGNMENT_EPSILON_SECONDS = 1.0f;
+    private static final float WARD_DESTROY_SIGNAL_MATCH_WINDOW_SECONDS = 5.0f;
+    private static final float WARD_DESTROY_SIGNAL_FALLBACK_MATCH_WINDOW_SECONDS = 12.0f;
+    private static final float WARD_DESTROY_SIGNAL_MATCH_DISTANCE = 450.0f;
+    private static final float OBSERVER_WARD_LIFETIME_SECONDS = 360.0f;
+    private static final float SENTRY_WARD_LIFETIME_SECONDS = 420.0f;
+    private static final float WARD_NATURAL_EXPIRATION_TOLERANCE_SECONDS = 15.0f;
+    private static final Map<String, String> SUMMON_OWNER_PATTERNS = createSummonOwnerPatterns();
+
+    private static Map<String, String> createSummonOwnerPatterns() {
+        Map<String, String> patterns = new LinkedHashMap<>();
+        patterns.put("beastmaster_boar", "npc_dota_hero_beastmaster");
+        patterns.put("beastmaster_hawk", "npc_dota_hero_beastmaster");
+        patterns.put("lone_druid_bear", "npc_dota_hero_lone_druid");
+        patterns.put("venomancer_plagueward", "npc_dota_hero_venomancer");
+        patterns.put("furion_treant", "npc_dota_hero_furion");
+        patterns.put("enigma_eidolon", "npc_dota_hero_enigma");
+        patterns.put("invoker_forged_spirit", "npc_dota_hero_invoker");
+        patterns.put("lycan_wolf", "npc_dota_hero_lycan");
+        patterns.put("broodmother_spiderling", "npc_dota_hero_broodmother");
+        patterns.put("broodmother_spiderite", "npc_dota_hero_broodmother");
+        patterns.put("warlock_golem", "npc_dota_hero_warlock");
+        patterns.put("visage_familiar", "npc_dota_hero_visage");
+        patterns.put("shadow_shaman_ward", "npc_dota_hero_shadow_shaman");
+        patterns.put("witch_doctor_death_ward", "npc_dota_hero_witch_doctor");
+        patterns.put("weaver_swarm", "npc_dota_hero_weaver");
+        patterns.put("undying_zombie", "npc_dota_hero_undying");
+        patterns.put("phoenix_sun", "npc_dota_hero_phoenix");
+        patterns.put("brewmaster_earth", "npc_dota_hero_brewmaster");
+        patterns.put("brewmaster_storm", "npc_dota_hero_brewmaster");
+        patterns.put("brewmaster_fire", "npc_dota_hero_brewmaster");
+        patterns.put("brewmaster_void", "npc_dota_hero_brewmaster");
+        return patterns;
+    }
     
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -283,6 +316,7 @@ public class SimpleDemoParser {
         private List<Map<String, Object>> positionSamples = new ArrayList<>();
         private List<Map<String, Object>> killEvents = new ArrayList<>();
         private List<Map<String, Object>> wardEvents = new ArrayList<>();
+        private List<Map<String, Object>> wardDestroySignals = new ArrayList<>();
         private List<Map<String, Object>> economySamples = new ArrayList<>();
         private Map<Integer, String> heroMapping = new HashMap<>();
 
@@ -292,6 +326,9 @@ public class SimpleDemoParser {
         
         // Track known heroes by entity handle
         private Map<Integer, HeroState> trackedHeroes = new HashMap<>();
+        private Map<Integer, HeroState> heroesByPlayerId = new HashMap<>();
+        private Map<Integer, HeroState> heroesByPlayerOwnerId = new HashMap<>();
+        private Map<Integer, HeroState> heroesByOwnerEntityRef = new HashMap<>();
 
         // Cache item slot field names per hero DT class once discovered.
         private Map<String, List<String>> heroItemSlotProperties = new HashMap<>();
@@ -445,6 +482,7 @@ public class SimpleDemoParser {
                     if (firstClockZeroTimeSeen || clockZeroTimeChanged) {
                         recalculateGameTimes(positionSamples);
                         recalculateGameTimes(wardEvents);
+                        recalculateGameTimes(wardDestroySignals);
                         recalculateGameTimes(economySamples);
                     }
                 }
@@ -543,9 +581,23 @@ public class SimpleDemoParser {
             // Store hero state
             HeroState state = new HeroState();
             state.heroName = heroName;
+            state.heroEntityName = toNpcHeroEntityName(heroName);
             state.team = team;
             state.handle = handle;
+            state.playerId = toIntOrNull(getPropertySafe(hero, "m_iPlayerID"));
+            state.playerOwnerId = toIntOrNull(getPropertySafe(hero, "m_nPlayerOwnerID"));
+            state.ownerEntityRef = toEntityReferenceOrNull(getPropertySafe(hero, "m_hOwnerEntity"));
             trackedHeroes.put(handle, state);
+
+            if (state.playerId != null) {
+                heroesByPlayerId.put(state.playerId, state);
+            }
+            if (state.playerOwnerId != null) {
+                heroesByPlayerOwnerId.put(state.playerOwnerId, state);
+            }
+            if (state.ownerEntityRef != null) {
+                heroesByOwnerEntityRef.put(state.ownerEntityRef, state);
+            }
             
             // Build hero mapping
             heroMapping.put(handle, heroName);
@@ -556,7 +608,18 @@ public class SimpleDemoParser {
         @OnEntityDeleted(classPattern = "CDOTA_Unit_Hero_.*")
         public void onHeroDeleted(Context ctx, Entity hero) {
             if (hero != null) {
-                trackedHeroes.remove(hero.getHandle());
+                HeroState state = trackedHeroes.remove(hero.getHandle());
+                if (state != null) {
+                    if (state.playerId != null) {
+                        heroesByPlayerId.remove(state.playerId);
+                    }
+                    if (state.playerOwnerId != null) {
+                        heroesByPlayerOwnerId.remove(state.playerOwnerId);
+                    }
+                    if (state.ownerEntityRef != null) {
+                        heroesByOwnerEntityRef.remove(state.ownerEntityRef);
+                    }
+                }
             }
         }
         
@@ -588,6 +651,8 @@ public class SimpleDemoParser {
             if (teamObj != null) {
                 wardEvent.put("team", ((Number) teamObj).intValue());
             }
+
+            attachWardPlacer(wardEvent, ward);
             
             wardEvents.add(wardEvent);
         }
@@ -606,6 +671,19 @@ public class SimpleDemoParser {
             wardEvent.put("game_time", getCurrentGameClock(ctx.getTick(), currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused));
             wardEvent.put("handle", ward.getHandle());
             snapshotTimingState(wardEvent, currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused);
+
+            float[] pos = getEntityPosition(ward);
+            if (pos != null) {
+                wardEvent.put("x", pos[0]);
+                wardEvent.put("y", pos[1]);
+            }
+
+            Object teamObj = getPropertySafe(ward, "m_iTeamNum");
+            if (teamObj != null) {
+                wardEvent.put("team", ((Number) teamObj).intValue());
+            }
+
+            attachWardPlacer(wardEvent, ward);
             
             wardEvents.add(wardEvent);
         }
@@ -623,6 +701,12 @@ public class SimpleDemoParser {
                         Map<String, Object> killEvent = new HashMap<>();
                         killEvent.put("type", "kill");
                         killEvent.put("time", cle.getTimestamp());
+                        killEvent.put("game_time", getCurrentGameClock(
+                                totalTicks,
+                                currentGameRulesTime,
+                                currentTotalPausedSeconds,
+                                currentGamePaused
+                        ));
                         killEvent.put("killer", cle.getAttackerName());
                         killEvent.put("victim", cle.getTargetName());
                         
@@ -638,6 +722,8 @@ public class SimpleDemoParser {
                         }
                         
                         killEvents.add(killEvent);
+                    } else if (isWardCombatLogTarget(cle)) {
+                        recordWardDestroySignal(cle);
                     }
                 }
 
@@ -661,6 +747,7 @@ public class SimpleDemoParser {
                             || Float.compare(previousClockZeroTime, clockZeroTime) != 0) {
                         recalculateGameTimes(positionSamples);
                         recalculateGameTimes(wardEvents);
+                        recalculateGameTimes(wardDestroySignals);
                         recalculateGameTimes(economySamples);
                     }
                 }
@@ -844,6 +931,662 @@ public class SimpleDemoParser {
                 return ((Number) value).intValue();
             }
             return 0;
+        }
+
+        private Float toFloatOrNull(Object value) {
+            if (value instanceof Number) {
+                return ((Number) value).floatValue();
+            }
+            return null;
+        }
+
+        private Integer toIntOrNull(Object value) {
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            return null;
+        }
+
+        private Integer toEntityReferenceOrNull(Object value) {
+            Integer reference = toIntOrNull(value);
+            if (reference == null || reference <= 0 || reference == INVALID_ENTITY_REFERENCE) {
+                return null;
+            }
+            return reference;
+        }
+
+        private String toNpcHeroEntityName(String heroName) {
+            if (heroName == null || heroName.isEmpty()) {
+                return null;
+            }
+
+            StringBuilder builder = new StringBuilder("npc_dota_hero_");
+            for (int i = 0; i < heroName.length(); i++) {
+                char current = heroName.charAt(i);
+                if (current == '-' || current == ' ') {
+                    if (builder.charAt(builder.length() - 1) != '_') {
+                        builder.append('_');
+                    }
+                    continue;
+                }
+                if (Character.isUpperCase(current) && i > 0) {
+                    char previous = heroName.charAt(i - 1);
+                    boolean nextIsLower = (i + 1) < heroName.length() && Character.isLowerCase(heroName.charAt(i + 1));
+                    if (Character.isLowerCase(previous) || Character.isDigit(previous) || nextIsLower) {
+                        if (builder.charAt(builder.length() - 1) != '_') {
+                            builder.append('_');
+                        }
+                    }
+                }
+                builder.append(Character.toLowerCase(current));
+            }
+            return builder.toString();
+        }
+
+        private HeroState resolveHeroStateFromReference(Integer reference) {
+            if (reference == null) {
+                return null;
+            }
+
+            HeroState directOwnerMatch = heroesByOwnerEntityRef.get(reference);
+            if (directOwnerMatch != null) {
+                return directOwnerMatch;
+            }
+
+            Entity resolved = resolveEntityReference(reference);
+            if (resolved == null || resolved.getDtClass() == null) {
+                return null;
+            }
+
+            HeroState tracked = trackedHeroes.get(resolved.getHandle());
+            if (tracked != null) {
+                return tracked;
+            }
+
+            Integer playerId = toIntOrNull(getPropertySafe(resolved, "m_iPlayerID"));
+            if (playerId != null && heroesByPlayerId.containsKey(playerId)) {
+                return heroesByPlayerId.get(playerId);
+            }
+
+            Integer playerOwnerId = toIntOrNull(getPropertySafe(resolved, "m_nPlayerOwnerID"));
+            if (playerOwnerId != null && heroesByPlayerOwnerId.containsKey(playerOwnerId)) {
+                return heroesByPlayerOwnerId.get(playerOwnerId);
+            }
+
+            Integer ownerEntityRef = toEntityReferenceOrNull(getPropertySafe(resolved, "m_hOwnerEntity"));
+            if (ownerEntityRef != null && heroesByOwnerEntityRef.containsKey(ownerEntityRef)) {
+                return heroesByOwnerEntityRef.get(ownerEntityRef);
+            }
+
+            return null;
+        }
+
+        private HeroState resolveWardPlacer(Entity ward) {
+            if (ward == null) {
+                return null;
+            }
+
+            Integer playerOwnerId = toIntOrNull(getPropertySafe(ward, "m_nPlayerOwnerID"));
+            if (playerOwnerId != null) {
+                HeroState heroByPlayerId = heroesByPlayerId.get(playerOwnerId);
+                if (heroByPlayerId != null) {
+                    return heroByPlayerId;
+                }
+
+                HeroState heroByPlayerOwnerId = heroesByPlayerOwnerId.get(playerOwnerId);
+                if (heroByPlayerOwnerId != null) {
+                    return heroByPlayerOwnerId;
+                }
+            }
+
+            HeroState heroByOwnerEntity = resolveHeroStateFromReference(
+                    toEntityReferenceOrNull(getPropertySafe(ward, "m_hOwnerEntity"))
+            );
+            if (heroByOwnerEntity != null) {
+                return heroByOwnerEntity;
+            }
+
+            HeroState heroByOwnerNpc = resolveHeroStateFromReference(
+                    toEntityReferenceOrNull(getPropertySafe(ward, "m_hOwnerNPC"))
+            );
+            if (heroByOwnerNpc != null) {
+                return heroByOwnerNpc;
+            }
+
+            return null;
+        }
+
+        private void attachWardPlacer(Map<String, Object> wardEvent, Entity ward) {
+            HeroState placer = resolveWardPlacer(ward);
+            if (placer == null) {
+                return;
+            }
+
+            if (placer.heroEntityName != null) {
+                wardEvent.put("placer_name", placer.heroEntityName);
+            }
+            wardEvent.put("placer_handle", placer.handle);
+            wardEvent.put("placer_team", placer.team);
+        }
+
+        private boolean isObserverWardEntityName(String normalizedName) {
+            return normalizedName != null
+                    && (normalizedName.contains("observer_ward") || normalizedName.contains("observer_wards"));
+        }
+
+        private boolean isSentryWardEntityName(String normalizedName) {
+            return normalizedName != null
+                    && (normalizedName.contains("sentry_ward")
+                    || normalizedName.contains("sentry_wards")
+                    || normalizedName.contains("truesight"));
+        }
+
+        private boolean isWardCombatLogTarget(CombatLogEntry cle) {
+            if (!cle.hasTargetName()) {
+                return false;
+            }
+
+            return inferWardTypeFromTargetName(cle.getTargetName()) != null;
+        }
+
+        private String inferWardTypeFromTargetName(String targetName) {
+            String normalized = normalizeCombatLogEntityName(targetName);
+            if (normalized == null || normalized.isEmpty()) {
+                return null;
+            }
+
+            if (isSentryWardEntityName(normalized)) {
+                return "sentry";
+            }
+            if (isObserverWardEntityName(normalized)) {
+                return "observer";
+            }
+            return null;
+        }
+
+        private String normalizeCombatLogEntityName(String entityName) {
+            if (entityName == null || entityName.isEmpty()) {
+                return null;
+            }
+
+            String normalized = entityName.trim().toLowerCase(Locale.ROOT)
+                    .replace('-', '_')
+                    .replace(' ', '_');
+            while (normalized.contains("__")) {
+                normalized = normalized.replace("__", "_");
+            }
+            if (normalized.startsWith("cdota_unit_")) {
+                normalized = "npc_dota_" + normalized.substring("cdota_unit_".length());
+            } else if (normalized.startsWith("dota_")) {
+                normalized = "npc_" + normalized;
+            } else if (normalized.startsWith("hero_")) {
+                normalized = "npc_dota_" + normalized;
+            }
+            return normalized;
+        }
+
+        private String normalizeHeroDestroyerName(String attackerName) {
+            String normalized = normalizeCombatLogEntityName(attackerName);
+            if (normalized == null || normalized.isEmpty()) {
+                return attackerName;
+            }
+            if (normalized.startsWith("npc_dota_hero_")) {
+                return normalized;
+            }
+            if (normalized.startsWith("npc_hero_")) {
+                return normalized.replaceFirst("^npc_hero_", "npc_dota_hero_");
+            }
+            if (!normalized.contains("creep") && !normalized.contains("ward") && !normalized.contains("courier")) {
+                return "npc_dota_hero_" + normalized.replaceFirst("^npc_dota_", "");
+            }
+            return normalized;
+        }
+
+        private boolean isWardUtilityEntityName(String normalizedName) {
+            if (normalizedName == null || normalizedName.isEmpty()) {
+                return false;
+            }
+
+            return normalizedName.contains("observer_ward")
+                    || normalizedName.contains("observer_wards")
+                    || normalizedName.contains("sentry_ward")
+                    || normalizedName.contains("sentry_wards")
+                    || normalizedName.contains("truesight")
+                    || normalizedName.contains("ward_dispenser")
+                    || normalizedName.contains("ward_observer")
+                    || normalizedName.contains("ward_sentry");
+        }
+
+        private boolean isInformativeDestroyerEntityName(String normalizedName) {
+            if (normalizedName == null || normalizedName.isEmpty()) {
+                return false;
+            }
+            if (isWardUtilityEntityName(normalizedName)) {
+                return false;
+            }
+            if (normalizedName.startsWith("modifier_") || normalizedName.startsWith("item_")) {
+                return false;
+            }
+            return normalizedName.startsWith("npc_")
+                    || normalizedName.startsWith("hero_")
+                    || normalizedName.startsWith("dota_")
+                    || normalizedName.contains("creep");
+        }
+
+        private Integer resolveHeroTeam(String normalizedHeroName) {
+            if (normalizedHeroName == null || normalizedHeroName.isEmpty()) {
+                return null;
+            }
+
+            for (HeroState heroState : trackedHeroes.values()) {
+                String trackedHeroName = normalizeHeroDestroyerName(heroState.heroName);
+                if (normalizedHeroName.equals(trackedHeroName)) {
+                    return heroState.team;
+                }
+            }
+
+            return null;
+        }
+
+        private Integer resolveCombatLogEntityTeam(String normalizedName) {
+            if (normalizedName == null || normalizedName.isEmpty()) {
+                return null;
+            }
+
+            if (normalizedName.startsWith("npc_dota_hero_") || normalizedName.startsWith("npc_hero_")) {
+                return resolveHeroTeam(normalizeHeroDestroyerName(normalizedName));
+            }
+
+            String summonOwnerHero = inferSummonOwnerHero(normalizedName);
+            if (summonOwnerHero != null) {
+                return resolveHeroTeam(summonOwnerHero);
+            }
+
+            if (normalizedName.contains("goodguys")) {
+                return 2;
+            }
+            if (normalizedName.contains("badguys")) {
+                return 3;
+            }
+
+            return null;
+        }
+
+        private Map<String, Object> classifyWardDestroyerEntity(
+                String rawEntityName,
+                String normalizedEntityName,
+                Integer destroyerTeam
+        ) {
+            Map<String, Object> destroyer = new HashMap<>();
+            if (!isInformativeDestroyerEntityName(normalizedEntityName)) {
+                return destroyer;
+            }
+
+            String summonOwnerHero = inferSummonOwnerHero(normalizedEntityName);
+            if (summonOwnerHero != null) {
+                destroyer.put("destroyer_name", summonOwnerHero);
+                destroyer.put("destroyer_kind", "hero_summon");
+                destroyer.put("destroyer_is_hero", true);
+            } else if (normalizedEntityName.startsWith("npc_dota_hero_") || normalizedEntityName.startsWith("npc_hero_")) {
+                destroyer.put("destroyer_name", normalizeHeroDestroyerName(rawEntityName));
+                destroyer.put("destroyer_kind", "hero");
+                destroyer.put("destroyer_is_hero", true);
+            } else if (isLaneCreepAttacker(normalizedEntityName)) {
+                destroyer.put("destroyer_name", normalizedEntityName);
+                destroyer.put("destroyer_kind", "lane_creep");
+                destroyer.put("destroyer_is_hero", false);
+            } else if (isNeutralCreepAttacker(normalizedEntityName)) {
+                destroyer.put("destroyer_name", normalizedEntityName);
+                destroyer.put("destroyer_kind", "neutral_creep");
+                destroyer.put("destroyer_is_hero", false);
+            } else {
+                destroyer.put("destroyer_name", normalizedEntityName != null ? normalizedEntityName : rawEntityName);
+                destroyer.put("destroyer_kind", "unit");
+                destroyer.put("destroyer_is_hero", false);
+            }
+
+            Integer resolvedTeam = destroyerTeam != null ? destroyerTeam : resolveCombatLogEntityTeam(normalizedEntityName);
+            if (resolvedTeam != null) {
+                destroyer.put("destroyer_team", resolvedTeam);
+            }
+
+            return destroyer;
+        }
+
+        private Map<String, Object> describeWardDestroyerFromCandidate(
+                String rawEntityName,
+                Integer destroyerTeam
+        ) {
+            if (rawEntityName == null || rawEntityName.isEmpty()) {
+                return Collections.emptyMap();
+            }
+
+            String normalizedEntityName = normalizeCombatLogEntityName(rawEntityName);
+            return classifyWardDestroyerEntity(rawEntityName, normalizedEntityName, destroyerTeam);
+        }
+
+        private boolean isLaneCreepAttacker(String normalizedName) {
+            if (normalizedName == null) {
+                return false;
+            }
+            return normalizedName.contains("creep_goodguys")
+                    || normalizedName.contains("creep_badguys")
+                    || normalizedName.contains("goodguys_siege")
+                    || normalizedName.contains("badguys_siege");
+        }
+
+        private boolean isNeutralCreepAttacker(String normalizedName) {
+            return normalizedName != null && normalizedName.contains("neutral");
+        }
+
+        private String inferSummonOwnerHero(String normalizedName) {
+            if (normalizedName == null || normalizedName.isEmpty()) {
+                return null;
+            }
+
+            for (Map.Entry<String, String> entry : SUMMON_OWNER_PATTERNS.entrySet()) {
+                if (normalizedName.contains(entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
+            return null;
+        }
+
+        private Map<String, Object> describeWardDestroyer(CombatLogEntry cle) {
+            if (cle.hasAttackerName()) {
+                Integer attackerTeam = cle.hasAttackerTeam() ? cle.getAttackerTeam() : null;
+                Map<String, Object> destroyer = describeWardDestroyerFromCandidate(cle.getAttackerName(), attackerTeam);
+                if (!destroyer.isEmpty()) {
+                    return destroyer;
+                }
+            }
+
+            if (cle.hasDamageSourceName()) {
+                Map<String, Object> destroyer = describeWardDestroyerFromCandidate(cle.getDamageSourceName(), null);
+                if (!destroyer.isEmpty()) {
+                    return destroyer;
+                }
+            }
+
+            if (cle.hasInflictorName()) {
+                Map<String, Object> destroyer = describeWardDestroyerFromCandidate(cle.getInflictorName(), null);
+                if (!destroyer.isEmpty()) {
+                    return destroyer;
+                }
+            }
+
+            if (cle.hasTargetSourceName()) {
+                Integer targetSourceTeam = resolveCombatLogEntityTeam(normalizeCombatLogEntityName(cle.getTargetSourceName()));
+                if (!cle.hasTargetTeam() || targetSourceTeam == null || targetSourceTeam.intValue() != cle.getTargetTeam()) {
+                    Map<String, Object> destroyer = describeWardDestroyerFromCandidate(cle.getTargetSourceName(), targetSourceTeam);
+                    if (!destroyer.isEmpty()) {
+                        return destroyer;
+                    }
+                }
+            }
+
+            return Collections.emptyMap();
+        }
+
+        private void recordWardDestroySignal(CombatLogEntry cle) {
+            Map<String, Object> signal = new HashMap<>();
+            signal.put("timestamp", cle.getTimestamp());
+            signal.put("game_time", getGameClockForReplayTime(
+                    cle.getTimestamp(),
+                    currentTotalPausedSeconds,
+                    currentGamePaused
+            ));
+            snapshotTimingState(signal, currentGameRulesTime, currentTotalPausedSeconds, currentGamePaused);
+
+            if (cle.hasTargetName()) {
+                signal.put("target_name", cle.getTargetName());
+                String wardType = inferWardTypeFromTargetName(cle.getTargetName());
+                if (wardType != null) {
+                    signal.put("ward_type", wardType);
+                }
+            }
+            signal.putAll(describeWardDestroyer(cle));
+            if (cle.hasLocationX()) {
+                signal.put("x", cle.getLocationX());
+            }
+            if (cle.hasLocationY()) {
+                signal.put("y", cle.getLocationY());
+            }
+
+            wardDestroySignals.add(signal);
+        }
+
+        private float getExpectedWardLifetimeSeconds(String wardType) {
+            if ("sentry".equals(wardType)) {
+                return SENTRY_WARD_LIFETIME_SECONDS;
+            }
+            return OBSERVER_WARD_LIFETIME_SECONDS;
+        }
+
+        private boolean isLikelyNaturalWardExpiration(
+                Map<String, Object> placedWardEvent,
+                Map<String, Object> destroyedWardEvent
+        ) {
+            if (placedWardEvent == null || destroyedWardEvent == null) {
+                return false;
+            }
+
+            Float placedTime = toFloatOrNull(placedWardEvent.get("game_time"));
+            Float destroyedTime = toFloatOrNull(destroyedWardEvent.get("game_time"));
+            if (placedTime == null || destroyedTime == null || destroyedTime < placedTime) {
+                return false;
+            }
+
+            String wardType = destroyedWardEvent.get("ward_type") instanceof String
+                    ? (String) destroyedWardEvent.get("ward_type")
+                    : placedWardEvent.get("ward_type") instanceof String
+                            ? (String) placedWardEvent.get("ward_type")
+                            : "observer";
+            float expectedLifetime = getExpectedWardLifetimeSeconds(wardType);
+            float actualLifetime = destroyedTime - placedTime;
+            return actualLifetime + WARD_NATURAL_EXPIRATION_TOLERANCE_SECONDS >= expectedLifetime;
+        }
+
+        private float computeWardDestroySignalScore(
+                Map<String, Object> wardEvent,
+                Map<String, Object> signal,
+                Float wardEventTime,
+                Float signalTime
+        ) {
+            float score = Math.abs(signalTime - wardEventTime);
+            Float wardX = toFloatOrNull(wardEvent.get("x"));
+            Float wardY = toFloatOrNull(wardEvent.get("y"));
+            Float signalX = toFloatOrNull(signal.get("x"));
+            Float signalY = toFloatOrNull(signal.get("y"));
+
+            if (wardX != null && wardY != null && signalX != null && signalY != null) {
+                float dx = wardX - signalX;
+                float dy = wardY - signalY;
+                score += (float) Math.sqrt(dx * dx + dy * dy) / WARD_DESTROY_SIGNAL_MATCH_DISTANCE;
+            }
+
+            return score;
+        }
+
+        private int findBestWardDestroySignalIndex(
+                Map<String, Object> wardEvent,
+                String wardType,
+                Float wardEventTime,
+                boolean[] usedSignals,
+                float maxTimeDeltaSeconds
+        ) {
+            int bestSignalIndex = -1;
+            float bestScore = Float.MAX_VALUE;
+
+            for (int signalIndex = 0; signalIndex < wardDestroySignals.size(); signalIndex++) {
+                if (usedSignals[signalIndex]) {
+                    continue;
+                }
+
+                Map<String, Object> signal = wardDestroySignals.get(signalIndex);
+                Float signalTime = toFloatOrNull(signal.get("game_time"));
+                if (signalTime == null) {
+                    signalTime = toFloatOrNull(signal.get("timestamp"));
+                }
+                if (signalTime == null) {
+                    continue;
+                }
+
+                if (Math.abs(signalTime - wardEventTime) > maxTimeDeltaSeconds) {
+                    continue;
+                }
+
+                String signalWardType = signal.get("ward_type") instanceof String
+                        ? (String) signal.get("ward_type")
+                        : null;
+                if (wardType != null && signalWardType != null && !wardType.equals(signalWardType)) {
+                    continue;
+                }
+
+                Integer wardTeam = toIntOrNull(wardEvent.get("team"));
+                Integer signalDestroyerTeam = toIntOrNull(signal.get("destroyer_team"));
+                if (wardTeam != null && signalDestroyerTeam != null && wardTeam.intValue() == signalDestroyerTeam.intValue()) {
+                    continue;
+                }
+
+                Float wardX = toFloatOrNull(wardEvent.get("x"));
+                Float wardY = toFloatOrNull(wardEvent.get("y"));
+                Float signalX = toFloatOrNull(signal.get("x"));
+                Float signalY = toFloatOrNull(signal.get("y"));
+                if (wardX != null && wardY != null && signalX != null && signalY != null) {
+                    float dx = wardX - signalX;
+                    float dy = wardY - signalY;
+                    float distance = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (distance > WARD_DESTROY_SIGNAL_MATCH_DISTANCE) {
+                        continue;
+                    }
+                }
+
+                float score = computeWardDestroySignalScore(wardEvent, signal, wardEventTime, signalTime);
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestSignalIndex = signalIndex;
+                }
+            }
+
+            return bestSignalIndex;
+        }
+
+        private void applyWardDestroySignalMatch(
+                Map<String, Object> wardEvent,
+                boolean[] usedSignals,
+                int signalIndex
+        ) {
+            Map<String, Object> signal = wardDestroySignals.get(signalIndex);
+            usedSignals[signalIndex] = true;
+            wardEvent.put("destroy_reason", "destroyed");
+
+            if (signal.containsKey("destroyer_name")) {
+                wardEvent.put("destroyer_name", signal.get("destroyer_name"));
+            }
+            if (signal.containsKey("destroyer_kind")) {
+                wardEvent.put("destroyer_kind", signal.get("destroyer_kind"));
+            }
+            if (signal.containsKey("destroyer_is_hero")) {
+                wardEvent.put("destroyer_is_hero", signal.get("destroyer_is_hero"));
+            }
+            if (signal.containsKey("destroyer_team")) {
+                wardEvent.put("destroyer_team", signal.get("destroyer_team"));
+            }
+        }
+
+        private void enrichWardDestroyEvents() {
+            if (wardEvents.isEmpty()) {
+                return;
+            }
+
+            boolean[] usedSignals = new boolean[wardDestroySignals.size()];
+            Map<Integer, Map<String, Object>> activeWardPlacements = new HashMap<>();
+            List<Map<String, Object>> fallbackDestroyedWardEvents = new ArrayList<>();
+            IdentityHashMap<Map<String, Object>, Map<String, Object>> fallbackPlacedWardEvents = new IdentityHashMap<>();
+
+            for (Map<String, Object> wardEvent : wardEvents) {
+                if ("placed".equals(wardEvent.get("type"))) {
+                    Object handleObj = wardEvent.get("handle");
+                    if (handleObj instanceof Number) {
+                        activeWardPlacements.put(((Number) handleObj).intValue(), wardEvent);
+                    }
+                    continue;
+                }
+
+                if (!"destroyed".equals(wardEvent.get("type"))) {
+                    continue;
+                }
+
+                Float wardEventTime = toFloatOrNull(wardEvent.get("game_time"));
+                Map<String, Object> placedWardEvent = null;
+                Object handleObj = wardEvent.get("handle");
+                if (handleObj instanceof Number) {
+                    placedWardEvent = activeWardPlacements.remove(((Number) handleObj).intValue());
+                }
+
+                if (placedWardEvent != null) {
+                    if (!wardEvent.containsKey("x") && placedWardEvent.containsKey("x")) {
+                        wardEvent.put("x", placedWardEvent.get("x"));
+                    }
+                    if (!wardEvent.containsKey("y") && placedWardEvent.containsKey("y")) {
+                        wardEvent.put("y", placedWardEvent.get("y"));
+                    }
+                    if (!wardEvent.containsKey("team") && placedWardEvent.containsKey("team")) {
+                        wardEvent.put("team", placedWardEvent.get("team"));
+                    }
+                }
+
+                if (wardEventTime == null) {
+                    wardEvent.put("destroy_reason", isLikelyNaturalWardExpiration(placedWardEvent, wardEvent) ? "expired" : "unknown");
+                    continue;
+                }
+
+                String wardType = wardEvent.get("ward_type") instanceof String
+                        ? (String) wardEvent.get("ward_type")
+                        : null;
+
+                int bestSignalIndex = findBestWardDestroySignalIndex(
+                        wardEvent,
+                        wardType,
+                        wardEventTime,
+                        usedSignals,
+                        WARD_DESTROY_SIGNAL_MATCH_WINDOW_SECONDS
+                );
+                if (bestSignalIndex >= 0) {
+                    applyWardDestroySignalMatch(wardEvent, usedSignals, bestSignalIndex);
+                    continue;
+                }
+
+                fallbackDestroyedWardEvents.add(wardEvent);
+                fallbackPlacedWardEvents.put(wardEvent, placedWardEvent);
+            }
+
+            for (Map<String, Object> wardEvent : fallbackDestroyedWardEvents) {
+                Float wardEventTime = toFloatOrNull(wardEvent.get("game_time"));
+                Map<String, Object> placedWardEvent = fallbackPlacedWardEvents.get(wardEvent);
+                if (wardEventTime == null) {
+                    wardEvent.put("destroy_reason", isLikelyNaturalWardExpiration(placedWardEvent, wardEvent) ? "expired" : "unknown");
+                    continue;
+                }
+
+                String wardType = wardEvent.get("ward_type") instanceof String
+                        ? (String) wardEvent.get("ward_type")
+                        : null;
+                int bestSignalIndex = findBestWardDestroySignalIndex(
+                        wardEvent,
+                        wardType,
+                        wardEventTime,
+                        usedSignals,
+                        WARD_DESTROY_SIGNAL_FALLBACK_MATCH_WINDOW_SECONDS
+                );
+                if (bestSignalIndex >= 0) {
+                    applyWardDestroySignalMatch(wardEvent, usedSignals, bestSignalIndex);
+                    continue;
+                }
+
+                wardEvent.put("destroy_reason", isLikelyNaturalWardExpiration(placedWardEvent, wardEvent) ? "expired" : "unknown");
+            }
         }
 
         private List<String> extractHeroItems(Entity hero) {
@@ -1095,6 +1838,13 @@ public class SimpleDemoParser {
                 float totalPausedSecondsSnapshot,
                 boolean gamePausedSnapshot) {
             float replayTime = getReplayTime(tick, gameRulesTimeSnapshot);
+            return getGameClockForReplayTime(replayTime, totalPausedSecondsSnapshot, gamePausedSnapshot);
+        }
+
+        private float getGameClockForReplayTime(
+                float replayTime,
+                float totalPausedSecondsSnapshot,
+                boolean gamePausedSnapshot) {
             if (hasClockZeroTime) {
                 float postGamePausedSeconds = getPausedDurationAtReplayTime(replayTime);
                 if (gamePausedSnapshot && pauseIntervalActive && replayTime > pauseIntervalStartReplayTime) {
@@ -1354,6 +2104,7 @@ public class SimpleDemoParser {
         }
         public List<Map<String, Object>> getWardEvents() {
             trimPostGameSamples();
+            enrichWardDestroyEvents();
             return wardEvents;
         }
         public List<Map<String, Object>> getEconomySamples() {
@@ -1368,7 +2119,11 @@ public class SimpleDemoParser {
      */
     private static class HeroState {
         String heroName;
+        String heroEntityName;
         int team;
         int handle;
+        Integer playerId;
+        Integer playerOwnerId;
+        Integer ownerEntityRef;
     }
 }

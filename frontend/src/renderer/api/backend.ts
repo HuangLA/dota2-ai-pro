@@ -98,6 +98,13 @@ export interface WardData {
   y?: number;
   team?: number;
   team_name?: string;
+  destroy_reason?: 'destroyed' | 'expired' | 'unknown';
+  destroyer_name?: string;
+  destroyer_kind?: 'hero' | 'hero_summon' | 'lane_creep' | 'neutral_creep' | 'unit';
+  destroyer_is_hero?: boolean;
+  destroyer_team?: number;
+  placer_name?: string;
+  placer_handle?: number;
 }
 
 export interface WardsResponse {
@@ -558,14 +565,15 @@ class BackendAPI {
       query.set('heatmap_type', params.heatmapType);
       query.set('grid_size', String(params.gridSize ?? 64));
 
-      if (Array.isArray(params.heroes) && params.heroes.length > 0) {
-        params.heroes.forEach((hero) => {
-          if (hero) {
-            query.append('hero', hero);
-          }
-        });
-      } else if (params.hero) {
-        query.set('hero', params.hero);
+      const heroFilter =
+        typeof params.hero === 'string' && params.hero.trim()
+          ? params.hero.trim()
+          : Array.isArray(params.heroes)
+            ? params.heroes.find((hero) => typeof hero === 'string' && hero.trim())?.trim()
+            : undefined;
+
+      if (heroFilter) {
+        query.set('hero', heroFilter);
       }
       if (typeof params.team === 'number' && Number.isFinite(params.team)) {
         query.set('team', String(params.team));

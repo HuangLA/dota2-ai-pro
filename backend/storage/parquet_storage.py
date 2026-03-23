@@ -147,7 +147,7 @@ class ParquetStorage:
     def _save_kills(self, match_dir: Path, kills: list[KillEvent]) -> None:
         """Save kill events to Parquet."""
         if not kills:
-            df = pd.DataFrame(columns=["time", "killer", "victim", "x", "y", "assist_players"])
+            df = pd.DataFrame(columns=["time", "killer", "victim", "x", "y", "game_time", "assist_players"])
         else:
             data = []
             for kill in kills:
@@ -159,6 +159,7 @@ class ParquetStorage:
                     "victim": kill.victim,
                     "x": kill.x,
                     "y": kill.y,
+                    "game_time": getattr(kill, "game_time", None),
                     "assist_players": ap,
                 })
             df = pd.DataFrame(data)
@@ -174,7 +175,8 @@ class ParquetStorage:
         """Save ward events to Parquet."""
         if not wards:
             df = pd.DataFrame(columns=[
-                "type", "ward_type", "tick", "handle", "x", "y", "team", "game_time"
+                "type", "ward_type", "tick", "handle", "x", "y", "team", "game_time",
+                "destroy_reason", "destroyer_name", "destroyer_kind", "destroyer_is_hero", "destroyer_team",
             ])
         else:
             data = []
@@ -187,7 +189,15 @@ class ParquetStorage:
                     "x": ward.x,
                     "y": ward.y,
                     "team": ward.team,
-                    "game_time": getattr(ward, "game_time", None)
+                    "game_time": getattr(ward, "game_time", None),
+                    "destroy_reason": getattr(ward, "destroy_reason", None),
+                    "destroyer_name": getattr(ward, "destroyer_name", None),
+                    "destroyer_kind": getattr(ward, "destroyer_kind", None),
+                    "destroyer_is_hero": getattr(ward, "destroyer_is_hero", None),
+                    "destroyer_team": getattr(ward, "destroyer_team", None),
+                    "placer_name": getattr(ward, "placer_name", None),
+                    "placer_handle": getattr(ward, "placer_handle", None),
+                    "placer_team": getattr(ward, "placer_team", None),
                 })
             df = pd.DataFrame(data)
         
@@ -424,8 +434,27 @@ class ParquetStorage:
         
         if not parquet_path.exists():
             return pd.DataFrame()
-        
-        return pq.read_table(parquet_path).to_pandas()
+
+        df = pq.read_table(parquet_path).to_pandas()
+        if df.empty:
+            if "game_time" not in df.columns:
+                df["game_time"] = pd.Series(dtype="float64")
+            return df
+
+        if "game_time" not in df.columns:
+            df["game_time"] = pd.NA
+        if "assist_players" not in df.columns:
+            df["assist_players"] = pd.NA
+
+        resolved_game_time = pd.to_numeric(df["game_time"], errors="coerce")
+        metadata = self.get_metadata(match_id) or {}
+        game_start_time = _coerce_float(metadata.get("game_start_time"))
+        if game_start_time is not None and "time" in df.columns:
+            inferred_game_time = pd.to_numeric(df["time"], errors="coerce") - game_start_time
+            resolved_game_time = resolved_game_time.fillna(inferred_game_time)
+
+        df["game_time"] = resolved_game_time
+        return df
     
     def get_wards(
         self, 
@@ -455,6 +484,16 @@ class ParquetStorage:
 
         if "game_time" not in df.columns:
             df["game_time"] = pd.NA
+        if "destroy_reason" not in df.columns:
+            df["destroy_reason"] = pd.NA
+        if "destroyer_name" not in df.columns:
+            df["destroyer_name"] = pd.NA
+        if "destroyer_kind" not in df.columns:
+            df["destroyer_kind"] = pd.NA
+        if "destroyer_is_hero" not in df.columns:
+            df["destroyer_is_hero"] = pd.NA
+        if "destroyer_team" not in df.columns:
+            df["destroyer_team"] = pd.NA
         
         return df
     

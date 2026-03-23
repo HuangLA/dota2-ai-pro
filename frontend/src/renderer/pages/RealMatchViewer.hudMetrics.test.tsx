@@ -13,10 +13,18 @@ vi.mock('../components/map/MapViewer', () => ({
     heroPositions = [],
     wards = [],
     killMarkers = [],
+    selectedWardKeys = [],
+    onWardSelectionChange,
+    onWardHoverChange,
+    onWardClick,
   }: {
     heroPositions?: Array<{ hero_name: string }>;
-    wards?: unknown[];
+    wards?: Array<{ instanceKey?: string }>;
     killMarkers?: unknown[];
+    selectedWardKeys?: string[];
+    onWardSelectionChange?: (wards: Array<{ instanceKey?: string }>) => void;
+    onWardHoverChange?: (payload: { wards: Array<{ instanceKey?: string }>; localX: number; localY: number } | null) => void;
+    onWardClick?: (payload: { wards: Array<{ instanceKey?: string }>; localX: number; localY: number } | null) => void;
   }) => (
     <div
       data-testid="map-viewer"
@@ -24,8 +32,51 @@ vi.mock('../components/map/MapViewer', () => ({
       data-hero-count={heroPositions.length}
       data-ward-count={wards.length}
       data-kill-count={killMarkers.length}
+      data-selected-ward-count={selectedWardKeys.length}
     >
       Mock Map
+      <button
+        type="button"
+        data-testid="map-viewer-select-first-two"
+        onClick={() => onWardSelectionChange?.(wards.slice(0, 2))}
+      >
+        Select First Two
+      </button>
+      <button
+        type="button"
+        data-testid="map-viewer-clear-selection"
+        onClick={() => onWardSelectionChange?.([])}
+      >
+        Clear Selection
+      </button>
+      <button
+        type="button"
+        data-testid="map-viewer-hover-first-two"
+        onClick={() => onWardHoverChange?.({ wards: wards.slice(0, 2), localX: 220, localY: 180 })}
+      >
+        Hover First Two
+      </button>
+      <button
+        type="button"
+        data-testid="map-viewer-click-first-two"
+        onClick={() => onWardClick?.({ wards: wards.slice(0, 2), localX: 220, localY: 180 })}
+      >
+        Click First Two
+      </button>
+      <button
+        type="button"
+        data-testid="map-viewer-clear-hover"
+        onClick={() => onWardHoverChange?.(null)}
+      >
+        Clear Hover
+      </button>
+      <button
+        type="button"
+        data-testid="map-viewer-click-empty"
+        onClick={() => onWardClick?.({ wards: [], localX: 40, localY: 40 })}
+      >
+        Click Empty
+      </button>
     </div>
   ),
 }));
@@ -318,6 +369,289 @@ describe('RealMatchViewer HUD metrics panel', () => {
     expect(screen.getByTestId('replay-viewer-header').className).toContain('2xl:grid-cols-[minmax(0,1fr)_320px]');
     expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:max-w-[320px]');
     expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:justify-self-end');
+  });
+
+  it('splits realtime ward status from the detailed vision workbench and no longer requires scrubbing to the end', async () => {
+    vi.spyOn(backendAPI, 'getHeroPositions').mockResolvedValue({
+      ...BASE_TICKS_RESPONSE,
+      ticks: BASE_TICKS_RESPONSE.ticks.map((tick) => ({
+        ...tick,
+        time: tick.game_time,
+      })),
+    });
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+      ],
+    });
+    vi.spyOn(backendAPI, 'getWards').mockResolvedValue({
+      match_id: 8674716612,
+      wards: [
+        {
+          type: 'placed',
+          ward_type: 'observer',
+          tick: 100,
+          time: -80,
+          game_time: -80,
+          handle: 91,
+          x: 12000,
+          y: 13500,
+          team: 2,
+        },
+        {
+          type: 'placed',
+          ward_type: 'sentry',
+          tick: 200,
+          time: -20,
+          game_time: -20,
+          handle: 92,
+          x: 18000,
+          y: 17500,
+          team: 3,
+        },
+        {
+          type: 'placed',
+          ward_type: 'observer',
+          tick: 150,
+          time: -40,
+          game_time: -40,
+          handle: 93,
+          x: 14000,
+          y: 15000,
+          team: 2,
+        },
+        {
+          type: 'destroyed',
+          ward_type: 'observer',
+          tick: 300,
+          time: 30,
+          game_time: 30,
+          handle: 93,
+          team: 3,
+          destroyer_name: 'npc_dota_hero_beastmaster',
+          destroyer_kind: 'hero_summon',
+          destroyer_is_hero: true,
+        },
+      ],
+      summary: {
+        total: 4,
+        placed: 3,
+        destroyed: 1,
+        observers_placed: 2,
+        sentries_placed: 1,
+      },
+    });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    fireEvent.click(await screen.findByTestId('timeline-scrub'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('2');
+    });
+
+    fireEvent.click(screen.getByTestId('toggle-map-workbench'));
+
+    expect(await screen.findByTestId('ward-analysis-panel')).toBeTruthy();
+    expect(screen.getByTestId('ward-analysis-total').textContent).toBe('3');
+    expect(screen.getByTestId('ward-analysis-active').textContent).toBe('0');
+    expect(screen.getByTestId('ward-realtime-active').textContent).toBe('2');
+    expect(screen.getByTestId('ward-analysis-dewarded').textContent).toBe('1');
+    expect(screen.getByTestId('ward-analysis-expired').textContent).toBe('2');
+    expect(screen.getByTestId('ward-analysis-average-lifetime').textContent).toBe('4:43');
+    expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('2');
+    expect(screen.getByTestId('map-viewer').getAttribute('data-hero-count')).toBe('2');
+    expect(screen.getByText('整场全部眼位')).toBeTruthy();
+    expect(screen.getByText('整场排眼记录')).toBeTruthy();
+    expect(screen.getByText('召唤物 1')).toBeTruthy();
+    expect(screen.getByText((content) => (
+      content.includes('插于 -0:40') && content.includes('被 兽王 的召唤物排掉')
+    ))).toBeTruthy();
+    expect(screen.getAllByText(/疑似插眼英雄：Ame/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/疑似插眼英雄：Somnus/).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByTestId('vision-range-select'), {
+      target: { value: 'custom' },
+    });
+    fireEvent.change(screen.getByTestId('vision-range-start'), {
+      target: { value: '-0:50' },
+    });
+    fireEvent.change(screen.getByTestId('vision-range-end'), {
+      target: { value: '-0:10' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ward-analysis-total').textContent).toBe('2');
+    });
+    expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('2');
+    expect(screen.getByTestId('ward-analysis-active').textContent).toBe('2');
+
+    fireEvent.click(screen.getByTestId('vision-map-mode-full'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('3');
+      expect(screen.getByTestId('map-viewer').getAttribute('data-hero-count')).toBe('0');
+    });
+
+    fireEvent.click(screen.getByTestId('vision-map-mode-current'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('2');
+      expect(screen.getByTestId('map-viewer').getAttribute('data-hero-count')).toBe('2');
+    });
+
+    fireEvent.change(screen.getByTestId('vision-team-select'), {
+      target: { value: 'dire' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ward-analysis-total').textContent).toBe('1');
+    });
+    expect(screen.getByTestId('ward-analysis-active').textContent).toBe('1');
+    expect(screen.getByTestId('ward-analysis-dewarded').textContent).toBe('0');
+    expect(screen.getByTestId('ward-analysis-expired').textContent).toBe('0');
+    expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('1');
+
+    fireEvent.change(screen.getByTestId('vision-type-select'), {
+      target: { value: 'observer' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ward-analysis-total').textContent).toBe('0');
+    });
+    expect(screen.getByTestId('ward-analysis-active').textContent).toBe('0');
+    expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('0');
+  });
+
+  it('lets users inspect multiple hovered wards from the map when vision focus is active', async () => {
+    vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
+      status: 'ok',
+      match_id: 8674716612,
+      game_time: -90,
+      tick: 100,
+      heroes: [
+        {
+          hero: 'npc_dota_hero_axe',
+          team: 'radiant',
+          level: 8,
+          kills: 2,
+          deaths: 1,
+          assists: 3,
+          net_worth: 5420,
+          gpm: 420,
+          xpm: 510,
+          items: [],
+        },
+      ],
+    });
+    vi.spyOn(backendAPI, 'getWards').mockResolvedValue({
+      match_id: 8674716612,
+      wards: [
+        {
+          type: 'placed',
+          ward_type: 'observer',
+          tick: 100,
+          time: -80,
+          game_time: -80,
+          handle: 91,
+          x: 12000,
+          y: 13500,
+          team: 2,
+        },
+        {
+          type: 'placed',
+          ward_type: 'sentry',
+          tick: 200,
+          time: -20,
+          game_time: -20,
+          handle: 92,
+          x: 18000,
+          y: 17500,
+          team: 3,
+        },
+        {
+          type: 'placed',
+          ward_type: 'observer',
+          tick: 150,
+          time: -40,
+          game_time: -40,
+          handle: 93,
+          x: 14000,
+          y: 15000,
+          team: 2,
+        },
+        {
+          type: 'destroyed',
+          ward_type: 'observer',
+          tick: 300,
+          time: 30,
+          game_time: 30,
+          handle: 93,
+          team: 3,
+          destroyer_name: 'npc_dota_hero_beastmaster',
+          destroyer_kind: 'hero_summon',
+          destroyer_is_hero: true,
+        },
+      ],
+      summary: {
+        total: 4,
+        placed: 3,
+        destroyed: 1,
+        observers_placed: 2,
+        sentries_placed: 1,
+      },
+    });
+
+    render(<RealMatchViewer initialMatchId={8674716612} />);
+
+    fireEvent.click(await screen.findByTestId('timeline-scrub'));
+    fireEvent.click(screen.getByTestId('toggle-map-workbench'));
+
+    expect(await screen.findByTestId('ward-analysis-panel')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('vision-map-mode-full'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-viewer').getAttribute('data-ward-count')).toBe('3');
+    });
+
+    fireEvent.click(screen.getByTestId('map-viewer-hover-first-two'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-viewer').getAttribute('data-selected-ward-count')).toBe('2');
+    });
+    expect(document.querySelectorAll('[data-testid^="selected-ward-card-"]')).toHaveLength(2);
+    const wardDetailCards = Array.from(document.querySelectorAll('[data-testid^="selected-ward-card-"]'));
+    expect(wardDetailCards.some((card) => card.textContent?.includes('0:30'))).toBe(true);
+    expect(wardDetailCards.some((card) => card.textContent?.includes('被 兽王 的召唤物排掉'))).toBe(true);
+    expect(wardDetailCards.some((card) => card.textContent?.includes('疑似插眼英雄'))).toBe(true);
+    expect(wardDetailCards.some((card) => card.textContent?.includes('Ame'))).toBe(true);
+
+    fireEvent.click(screen.getByTestId('map-viewer-click-first-two'));
+
+    await waitFor(() => {
+      expect(screen.getByText('已固定眼位详情')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByTestId('map-viewer-click-empty'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-viewer').getAttribute('data-selected-ward-count')).toBe('0');
+    });
   });
 
   it('lets users expand and collapse a HUD hero by clicking the full card', async () => {

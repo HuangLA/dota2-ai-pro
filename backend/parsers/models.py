@@ -67,11 +67,12 @@ class PositionSample:
 @dataclass
 class KillEvent:
     """A kill event in the match."""
-    time: float  # Game time in seconds
+    time: float  # Raw combat-log timestamp in seconds
     killer: str  # Killer hero/unit name (e.g., "npc_dota_hero_invoker")
     victim: str  # Victim hero name
     x: Optional[float] = None
     y: Optional[float] = None
+    game_time: Optional[float] = None  # In-game clock seconds (creep spawn is 0)
     assist_players: Optional[list[int]] = None  # Player slot indices (0-9) who assisted
     
     @property
@@ -120,6 +121,14 @@ class WardEvent:
     y: Optional[float] = None
     team: Optional[int] = None  # 2=Radiant, 3=Dire
     game_time: Optional[float] = None  # In-game clock seconds (creep spawn is 0)
+    destroy_reason: Optional[str] = None  # "destroyed", "unknown"
+    destroyer_name: Optional[str] = None
+    destroyer_kind: Optional[str] = None
+    destroyer_is_hero: Optional[bool] = None
+    destroyer_team: Optional[int] = None
+    placer_name: Optional[str] = None
+    placer_handle: Optional[int] = None
+    placer_team: Optional[int] = None
     
     @property
     def team_name(self) -> Optional[str]:

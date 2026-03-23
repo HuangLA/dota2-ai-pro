@@ -62,6 +62,99 @@ def _build_storage(tmp_path) -> tuple[ParquetStorage, int]:
     return ParquetStorage(str(tmp_path)), match_id
 
 
+def _build_legacy_kill_storage(tmp_path) -> tuple[ParquetStorage, int]:
+    match_id = 999002
+    match_dir = tmp_path / str(match_id)
+    match_dir.mkdir(parents=True, exist_ok=True)
+
+    kills = pd.DataFrame(
+        [
+            {
+                "time": 160.0,
+                "killer": "npc_dota_hero_axe",
+                "victim": "npc_dota_hero_lion",
+                "x": None,
+                "y": None,
+            },
+            {
+                "time": 190.0,
+                "killer": "npc_dota_hero_axe",
+                "victim": "npc_dota_hero_tiny",
+                "x": None,
+                "y": None,
+            },
+            {
+                "time": 220.0,
+                "killer": "npc_dota_hero_lina",
+                "victim": "npc_dota_hero_axe",
+                "x": None,
+                "y": None,
+            },
+            {
+                "time": 280.0,
+                "killer": "npc_dota_hero_slark",
+                "victim": "npc_dota_hero_crystal_maiden",
+                "x": None,
+                "y": None,
+            },
+        ]
+    )
+    kills.to_parquet(match_dir / "kills.parquet")
+
+    positions = pd.DataFrame(
+        [
+            {
+                "tick": 1800,
+                "hero": "npc_dota_hero_lion",
+                "team": 3,
+                "x": 10000.0,
+                "y": 10000.0,
+                "game_time": 60.0,
+            },
+            {
+                "tick": 2700,
+                "hero": "npc_dota_hero_tiny",
+                "team": 3,
+                "x": 11000.0,
+                "y": 11000.0,
+                "game_time": 90.0,
+            },
+            {
+                "tick": 3600,
+                "hero": "npc_dota_hero_axe",
+                "team": 2,
+                "x": 20000.0,
+                "y": 20000.0,
+                "game_time": 120.0,
+            },
+            {
+                "tick": 5400,
+                "hero": "npc_dota_hero_crystal_maiden",
+                "team": 2,
+                "x": 21000.0,
+                "y": 21000.0,
+                "game_time": 180.0,
+            },
+        ]
+    )
+    positions.to_parquet(match_dir / "positions.parquet")
+
+    metadata = {
+        "game_start_time": 100.0,
+        "players": [
+            {"hero_name": "npc_dota_hero_axe", "game_team": 2},
+            {"hero_name": "npc_dota_hero_lina", "game_team": 2},
+            {"hero_name": "npc_dota_hero_crystal_maiden", "game_team": 2},
+            {"hero_name": "npc_dota_hero_lion", "game_team": 3},
+            {"hero_name": "npc_dota_hero_tiny", "game_team": 3},
+            {"hero_name": "npc_dota_hero_slark", "game_team": 3},
+        ]
+    }
+    (match_dir / "meta.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    return ParquetStorage(str(tmp_path)), match_id
+
+
 def test_generate_kill_heatmap_filters_by_killer_team_hero_and_time_range(tmp_path) -> None:
     storage, match_id = _build_storage(tmp_path)
     analyzer = HeatmapAnalyzer(storage)
@@ -101,5 +194,42 @@ def test_generate_death_heatmap_filters_by_victim_team_hero_and_time_range(tmp_p
     assert result.hero == "npc_dota_hero_axe"
     assert result.team == 2
     assert result.time_range == (100, 130)
+    assert result.total_samples == 1
+    assert len(result.cells) == 1
+
+
+def test_generate_kill_heatmap_uses_legacy_game_start_time_and_position_backfill(tmp_path) -> None:
+    storage, match_id = _build_legacy_kill_storage(tmp_path)
+    analyzer = HeatmapAnalyzer(storage)
+
+    result = analyzer.generate_kill_heatmap(
+        match_id=match_id,
+        grid_size=8,
+        hero="npc_dota_hero_axe",
+        team=2,
+        start_time=50,
+        end_time=95,
+    )
+
+    assert result.heatmap_type == "kill"
+    assert result.total_samples == 2
+    assert len(result.cells) == 1
+    assert result.max_density == 2
+
+
+def test_generate_death_heatmap_uses_legacy_backfilled_coordinates(tmp_path) -> None:
+    storage, match_id = _build_legacy_kill_storage(tmp_path)
+    analyzer = HeatmapAnalyzer(storage)
+
+    result = analyzer.generate_death_heatmap(
+        match_id=match_id,
+        grid_size=8,
+        hero="npc_dota_hero_axe",
+        team=2,
+        start_time=115,
+        end_time=125,
+    )
+
+    assert result.heatmap_type == "death"
     assert result.total_samples == 1
     assert len(result.cells) == 1

@@ -1015,6 +1015,22 @@ async def get_wards(
             if "team" in row.index and pd.notna(row["team"]):
                 ward["team"] = int(row["team"])
                 ward["team_name"] = "Radiant" if row["team"] == 2 else "Dire"
+            if "destroy_reason" in row.index and pd.notna(row["destroy_reason"]):
+                ward["destroy_reason"] = str(row["destroy_reason"])
+            if "destroyer_name" in row.index and pd.notna(row["destroyer_name"]):
+                ward["destroyer_name"] = str(row["destroyer_name"])
+            if "destroyer_kind" in row.index and pd.notna(row["destroyer_kind"]):
+                ward["destroyer_kind"] = str(row["destroyer_kind"])
+            if "destroyer_is_hero" in row.index and pd.notna(row["destroyer_is_hero"]):
+                ward["destroyer_is_hero"] = bool(row["destroyer_is_hero"])
+            if "destroyer_team" in row.index and pd.notna(row["destroyer_team"]):
+                ward["destroyer_team"] = int(cast(int, row["destroyer_team"]))
+            if "placer_name" in row.index and pd.notna(row["placer_name"]):
+                ward["placer_name"] = str(row["placer_name"])
+            if "placer_handle" in row.index and pd.notna(row["placer_handle"]):
+                ward["placer_handle"] = int(cast(int, row["placer_handle"]))
+            if "placer_team" in row.index and pd.notna(row["placer_team"]):
+                ward["placer_team"] = int(cast(int, row["placer_team"]))
             
             wards.append(ward)
     

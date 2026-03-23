@@ -7,6 +7,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -20,6 +21,7 @@ import {
   KillMarkerData,
   PathOverlay,
   Ward,
+  WardInteractionPayload,
 } from '../components/map/DotaMapRenderer';
 import { Timeline } from '../components/timeline';
 import AdvantageChart from '../components/charts/AdvantageChart';
@@ -32,6 +34,7 @@ import backendAPI, {
   MovementPathsResponse,
   PlaybackTimeBasis,
   TickData,
+  WardData,
   WardsResponse,
 } from '../api/backend';
 import { ParseTask, replayService } from '../api/replayService';
@@ -65,8 +68,45 @@ const HUD_VISIBLE_ROW_COUNT = 10;
 const DEFAULT_HEATMAP_GRID_SIZE = 64;
 const PARSE_TASK_POLLING_INTERVAL_MS = 2000;
 const LEGACY_ITEM_SLOT_WARNING_SNIPPET = '旧版物品槽契约';
+const OBSERVER_WARD_LIFETIME_SECONDS = 360;
+const SENTRY_WARD_LIFETIME_SECONDS = 420;
+const WARD_TOOLTIP_OFFSET_PX = 16;
 
 type VisualizationRangePreset = 'full' | 'opening5' | 'opening10' | 'opening15' | 'midgame15to25' | 'custom';
+type WardTeamFilter = 'all' | 'radiant' | 'dire';
+type WardTypeFilter = 'all' | 'observer' | 'sentry';
+type WardMapMode = 'current' | 'range' | 'full';
+
+interface WardPlacementRecord {
+  instanceKey: string;
+  handle: number;
+  type: 'observer' | 'sentry';
+  team: 'radiant' | 'dire';
+  x: number;
+  y: number;
+  placedSourceTime: number;
+  placedGameTime: number;
+  naturalExpireSourceTime: number;
+  naturalExpireGameTime: number;
+  removalSourceTime: number;
+  removalGameTime: number;
+  removalKind: 'destroyed' | 'expired';
+  destroyerName?: string;
+  destroyerKind?: 'hero' | 'hero_summon' | 'lane_creep' | 'neutral_creep' | 'unit';
+  destroyerTeam?: number;
+  destroyerLabel: string;
+  lifetimeSeconds: number;
+  placerHeroName?: string;
+  placerHandle?: number;
+  placerSource?: 'parser' | 'inferred';
+  placerDistance?: number;
+}
+
+interface WardPopoverState {
+  wards: WardPlacementRecord[];
+  anchorX: number;
+  anchorY: number;
+}
 
 interface CustomVisualizationRange {
   start: string;
@@ -333,6 +373,379 @@ function formatSelectedHeroesLabel(
   }
 
   return `${labels.slice(0, 2).join('、')} +${labels.length - 2}`;
+}
+
+function formatDurationLabel(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return '--';
+  }
+
+  const rounded = Math.round(seconds);
+  const minutes = Math.floor(rounded / 60);
+  const remainder = rounded % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
+function formatWardEntityName(entityName?: string | null): string {
+  const trimmed = entityName?.trim();
+  if (!trimmed) {
+    return '未知来源';
+  }
+
+  const normalized = trimmed.toLowerCase();
+  if (normalized.includes('sentry_ward') || normalized.includes('sentry_wards') || normalized.includes('truesight')) {
+    return '真眼';
+  }
+  if (normalized.includes('observer_ward') || normalized.includes('observer_wards')) {
+    return '假眼';
+  }
+
+  const heroData = getHeroByName(trimmed);
+  if (heroData?.chineseName) {
+    return heroData.chineseName;
+  }
+
+  return trimmed
+    .replace(/^npc_dota_hero_/, '')
+    .replace(/^npc_dota_/, '')
+    .replace(/^npc_/, '')
+    .replace(/_/g, ' ')
+    .trim() || trimmed;
+}
+
+function getWardDestroyerLabel(event?: WardData | null): string {
+  if (!event) {
+    return '自然到时';
+  }
+
+  if (event.destroy_reason === 'expired') {
+    return '自然到时';
+  }
+
+  const sourceName = formatWardEntityName(event.destroyer_name);
+  if (event.destroyer_kind === 'hero') {
+    return `被 ${sourceName} 排掉`;
+  }
+  if (event.destroyer_kind === 'hero_summon') {
+    return sourceName === '未知来源' ? '被召唤物排掉' : `被 ${sourceName} 的召唤物排掉`;
+  }
+  if (event.destroyer_kind === 'lane_creep') {
+    return sourceName === '未知来源' ? '被小兵打掉' : `被 ${sourceName} 打掉（小兵）`;
+  }
+  if (event.destroyer_kind === 'neutral_creep') {
+    return sourceName === '未知来源' ? '被中立生物打掉' : `被 ${sourceName} 打掉（中立生物）`;
+  }
+  if (event.destroyer_kind === 'unit') {
+    return sourceName === '未知来源' ? '被单位打掉' : `被 ${sourceName} 打掉`;
+  }
+  if (event.destroy_reason === 'destroyed') {
+    return sourceName === '未知来源' ? '被排掉（来源未明）' : `被 ${sourceName} 排掉`;
+  }
+  return '被排掉（来源未明）';
+}
+
+function getWardLifetimeSeconds(wardType: WardData['ward_type'] | WardPlacementRecord['type']): number {
+  return wardType === 'sentry' ? SENTRY_WARD_LIFETIME_SECONDS : OBSERVER_WARD_LIFETIME_SECONDS;
+}
+
+function buildWardPlacementRecords(
+  wardsResponse: WardsResponse | null,
+  mapper: GameClockMapper
+): WardPlacementRecord[] {
+  if (!wardsResponse?.wards?.length) {
+    return [];
+  }
+
+  const destroyedQueues = new Map<string, WardData[]>();
+  for (const wardEvent of wardsResponse.wards) {
+    if (wardEvent.type !== 'destroyed') {
+      continue;
+    }
+    const queueKey = `${wardEvent.handle}:${wardEvent.ward_type}`;
+    const queue = destroyedQueues.get(queueKey) ?? [];
+    queue.push(wardEvent);
+    destroyedQueues.set(queueKey, queue);
+  }
+
+  for (const queue of destroyedQueues.values()) {
+    queue.sort((left, right) => mapper.getSourceTime(left) - mapper.getSourceTime(right));
+  }
+
+  return wardsResponse.wards
+    .filter((wardEvent) => (
+      wardEvent.type === 'placed' &&
+      wardEvent.x !== undefined &&
+      wardEvent.y !== undefined &&
+      wardEvent.team !== undefined
+    ))
+    .sort((left, right) => mapper.getSourceTime(left) - mapper.getSourceTime(right))
+    .map((placedWard) => {
+      const placedSourceTime = mapper.getSourceTime(placedWard);
+      const naturalExpireSourceTime = placedSourceTime + getWardLifetimeSeconds(placedWard.ward_type);
+      const queueKey = `${placedWard.handle}:${placedWard.ward_type}`;
+      const queue = destroyedQueues.get(queueKey) ?? [];
+      let matchedDestroy: WardData | undefined;
+
+      while (queue.length > 0) {
+        const candidate = queue[0];
+        const candidateSourceTime = mapper.getSourceTime(candidate);
+        if (candidateSourceTime < placedSourceTime) {
+          queue.shift();
+          continue;
+        }
+        matchedDestroy = queue.shift();
+        break;
+      }
+
+      const matchedDestroySourceTime = matchedDestroy ? mapper.getSourceTime(matchedDestroy) : Number.POSITIVE_INFINITY;
+      const removalKind =
+        matchedDestroy && matchedDestroy.destroy_reason !== 'expired' && matchedDestroySourceTime <= naturalExpireSourceTime
+          ? 'destroyed'
+          : 'expired';
+      const removalSourceTime =
+        removalKind === 'destroyed'
+          ? matchedDestroySourceTime
+          : naturalExpireSourceTime;
+      const placedGameTime =
+        typeof placedWard.game_time === 'number' && Number.isFinite(placedWard.game_time)
+          ? placedWard.game_time
+          : mapper.sourceToGameClock(placedSourceTime);
+      const naturalExpireGameTime = mapper.sourceToGameClock(naturalExpireSourceTime);
+      const removalGameTime =
+        removalKind === 'destroyed' && matchedDestroy && typeof matchedDestroy.game_time === 'number' && Number.isFinite(matchedDestroy.game_time)
+          ? matchedDestroy.game_time
+          : mapper.sourceToGameClock(removalSourceTime);
+
+      return {
+        instanceKey: `${placedWard.handle}:${placedWard.tick}:${placedSourceTime}:${placedWard.ward_type}`,
+        handle: placedWard.handle,
+        type: placedWard.ward_type,
+        team: placedWard.team === 2 ? 'radiant' : 'dire',
+        x: placedWard.x ?? 0,
+        y: placedWard.y ?? 0,
+        placedSourceTime,
+        placedGameTime,
+        naturalExpireSourceTime,
+        naturalExpireGameTime,
+        removalSourceTime,
+        removalGameTime,
+        removalKind,
+        destroyerName: matchedDestroy?.destroyer_name,
+        destroyerKind: matchedDestroy?.destroyer_kind,
+        destroyerTeam: matchedDestroy?.destroyer_team,
+        destroyerLabel: removalKind === 'destroyed' ? getWardDestroyerLabel(matchedDestroy) : '自然到时',
+        lifetimeSeconds: Math.max(0, removalSourceTime - placedSourceTime),
+        placerHeroName:
+          ('placer_name' in placedWard && typeof placedWard.placer_name === 'string'
+            ? placedWard.placer_name
+            : undefined)
+          ?? ('placer_name' in (matchedDestroy ?? {}) && typeof matchedDestroy?.placer_name === 'string'
+            ? matchedDestroy?.placer_name
+            : undefined),
+        placerHandle:
+          ('placer_handle' in placedWard && typeof placedWard.placer_handle === 'number'
+            ? placedWard.placer_handle
+            : undefined)
+          ?? ('placer_handle' in (matchedDestroy ?? {}) && typeof matchedDestroy?.placer_handle === 'number'
+            ? matchedDestroy?.placer_handle
+            : undefined),
+        placerSource:
+          (('placer_name' in placedWard && typeof placedWard.placer_name === 'string')
+            || ('placer_name' in (matchedDestroy ?? {}) && typeof matchedDestroy?.placer_name === 'string'))
+            ? 'parser'
+            : undefined,
+      };
+    });
+}
+
+function findTicksForSourceTime(
+  ticks: TickData[],
+  mapper: Pick<GameClockMapper, 'getSourceTime'>,
+  sourceTime: number
+): { prev: TickData | null; next: TickData | null; t: number } {
+  if (ticks.length === 0) {
+    return { prev: null, next: null, t: 0 };
+  }
+
+  if (sourceTime <= mapper.getSourceTime(ticks[0])) {
+    return { prev: ticks[0], next: ticks[0], t: 0 };
+  }
+
+  if (sourceTime >= mapper.getSourceTime(ticks[ticks.length - 1])) {
+    return { prev: ticks[ticks.length - 1], next: ticks[ticks.length - 1], t: 0 };
+  }
+
+  let left = 0;
+  let right = ticks.length - 1;
+
+  while (left < right) {
+    const mid = Math.floor((left + right + 1) / 2);
+    if (mapper.getSourceTime(ticks[mid]) <= sourceTime) {
+      left = mid;
+    } else {
+      right = mid - 1;
+    }
+  }
+
+  const prevTick = ticks[left];
+  const nextTick = ticks[Math.min(left + 1, ticks.length - 1)];
+  const prevTime = mapper.getSourceTime(prevTick);
+  const nextTime = mapper.getSourceTime(nextTick);
+  const timeDiff = nextTime - prevTime;
+
+  return {
+    prev: prevTick,
+    next: nextTick,
+    t: timeDiff > 0 ? (sourceTime - prevTime) / timeDiff : 0,
+  };
+}
+
+function inferWardPlacer(
+  record: WardPlacementRecord,
+  ticks: TickData[],
+  mapper: Pick<GameClockMapper, 'getSourceTime'>
+): Pick<WardPlacementRecord, 'placerHeroName' | 'placerHandle' | 'placerSource' | 'placerDistance'> | null {
+  const { prev, next, t } = findTicksForSourceTime(ticks, mapper, record.placedSourceTime);
+  if (!prev) {
+    return null;
+  }
+
+  const candidates = prev.heroes
+    .filter((hero) => (
+      (hero.team === 2 ? 'radiant' : hero.team === 3 ? 'dire' : null) === record.team
+    ))
+    .map((prevHero) => {
+      const nextHero = next?.heroes.find((hero) => hero.handle === prevHero.handle) ?? prevHero;
+      const x = prev === next ? prevHero.x : lerp(prevHero.x, nextHero.x, t);
+      const y = prev === next ? prevHero.y : lerp(prevHero.y, nextHero.y, t);
+      const hp = prev === next
+        ? (prevHero.hp ?? 0)
+        : lerp(prevHero.hp ?? 0, nextHero.hp ?? 0, t);
+      const dx = x - record.x;
+      const dy = y - record.y;
+
+      return {
+        handle: prevHero.handle,
+        heroName: prevHero.hero,
+        distance: Math.sqrt(dx * dx + dy * dy),
+        hp,
+      };
+    })
+    .filter((candidate) => candidate.hp > 0)
+    .sort((left, right) => left.distance - right.distance);
+
+  const bestCandidate = candidates[0];
+  if (!bestCandidate) {
+    return null;
+  }
+
+  return {
+    placerHeroName: bestCandidate.heroName,
+    placerHandle: bestCandidate.handle,
+    placerSource: 'inferred',
+    placerDistance: bestCandidate.distance,
+  };
+}
+
+function enrichWardPlacementRecordsWithPlacers(
+  records: WardPlacementRecord[],
+  ticks: TickData[],
+  mapper: Pick<GameClockMapper, 'getSourceTime'>
+): WardPlacementRecord[] {
+  return records.map((record) => {
+    if (record.placerHeroName) {
+      return record;
+    }
+
+    const inferredPlacer = inferWardPlacer(record, ticks, mapper);
+    return inferredPlacer ? { ...record, ...inferredPlacer } : record;
+  });
+}
+
+function isWardActiveAtTime(record: WardPlacementRecord, sourceTime: number): boolean {
+  return sourceTime >= record.placedSourceTime && sourceTime < record.removalSourceTime;
+}
+
+function getWardPlacementLabel(record: Pick<WardPlacementRecord, 'team' | 'type'>): string {
+  const teamLabel = record.team === 'radiant' ? '天辉' : '夜魇';
+  const wardLabel = record.type === 'observer' ? '假眼' : '真眼';
+  return `${teamLabel}${wardLabel}`;
+}
+
+function getWardCoordinateLabel(record: Pick<WardPlacementRecord, 'x' | 'y'>): string {
+  return `${Math.round(record.x)}, ${Math.round(record.y)}`;
+}
+
+function getWardRemovalLabel(record: WardPlacementRecord): string {
+  if (record.removalKind === 'expired') {
+    return `${formatGameClockTime(record.removalGameTime)} 自然到时`;
+  }
+  return `${formatGameClockTime(record.removalGameTime)} ${record.destroyerLabel}`;
+}
+
+function toMapWard(record: WardPlacementRecord, currentSourceTime: number): Ward {
+  const isActive = isWardActiveAtTime(record, currentSourceTime);
+  return {
+    instanceKey: record.instanceKey,
+    type: record.type,
+    team: record.team,
+    x: record.x,
+    y: record.y,
+    handle: record.handle,
+    placed: isActive,
+    placedSourceTime: record.placedSourceTime,
+    placedGameTime: record.placedGameTime,
+    removalSourceTime: record.removalSourceTime,
+    removalGameTime: record.removalGameTime,
+    removalKind: record.removalKind,
+    destroyerName: record.destroyerName,
+    destroyerKind: record.destroyerKind,
+    destroyerTeam: record.destroyerTeam,
+    destroyerLabel: record.destroyerLabel,
+    lifetimeSeconds: record.lifetimeSeconds,
+    activeAtCurrentTime: isActive,
+  };
+}
+
+function getWardPopoverPosition(anchorX: number, anchorY: number, wardCount: number): {
+  left: number;
+  top: number;
+  placeAbove: boolean;
+  alignRight: boolean;
+  maxWidth: number;
+} {
+  if (typeof window === 'undefined') {
+    return {
+      left: anchorX,
+      top: anchorY,
+      placeAbove: false,
+      alignRight: false,
+      maxWidth: 360,
+    };
+  }
+
+  const viewportPadding = 16;
+  const estimatedWidth = Math.min(
+    wardCount > 1 ? 780 : 360,
+    Math.max(320, window.innerWidth - viewportPadding * 2)
+  );
+  const estimatedHeight = wardCount > 1 ? 380 : 320;
+  const placeAbove = anchorY + estimatedHeight + WARD_TOOLTIP_OFFSET_PX > window.innerHeight - viewportPadding;
+  const alignRight = anchorX + estimatedWidth + WARD_TOOLTIP_OFFSET_PX > window.innerWidth - viewportPadding;
+  const left = alignRight
+    ? clamp(anchorX - estimatedWidth - WARD_TOOLTIP_OFFSET_PX, viewportPadding, window.innerWidth - estimatedWidth - viewportPadding)
+    : clamp(anchorX + WARD_TOOLTIP_OFFSET_PX, viewportPadding, window.innerWidth - estimatedWidth - viewportPadding);
+  const top = placeAbove
+    ? clamp(anchorY - WARD_TOOLTIP_OFFSET_PX, estimatedHeight + viewportPadding, window.innerHeight - viewportPadding)
+    : clamp(anchorY + WARD_TOOLTIP_OFFSET_PX, viewportPadding, window.innerHeight - estimatedHeight - viewportPadding);
+
+  return {
+    left,
+    top,
+    placeAbove,
+    alignRight,
+    maxWidth: estimatedWidth,
+  };
 }
 
 function getPreferredPlayerDisplayName(
@@ -1191,7 +1604,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const { selectedMatch, setSelectedMatch, currentTime, setCurrentTime, currentDisplayGameTime, setCurrentDisplayGameTime, isPauseActive, setIsPauseActive, loading, setLoading, error, setError } = usePlaybackStore();
 
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
-  const [wards, setWards] = useState<Ward[]>([]);
+  const [wardsResponse, setWardsResponse] = useState<WardsResponse | null>(null);
   const [activeKillMarkers, setActiveKillMarkers] = useState<KillMarkerData[]>([]);
   const [showPaths, setShowPaths] = useState(false);
 
@@ -1232,6 +1645,13 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const [pathSummary, setPathSummary] = useState<PathSummary | null>(null);
   const [pathLoading, setPathLoading] = useState(false);
   const [pathError, setPathError] = useState<string | null>(null);
+  const [visionRangePreset, setVisionRangePreset] = useState<VisualizationRangePreset>('full');
+  const [visionCustomRange, setVisionCustomRange] = useState<CustomVisualizationRange>({ start: '-1:30', end: '10:00' });
+  const [visionTeamFilter, setVisionTeamFilter] = useState<WardTeamFilter>('all');
+  const [visionWardTypeFilter, setVisionWardTypeFilter] = useState<WardTypeFilter>('all');
+  const [visionMapMode, setVisionMapMode] = useState<WardMapMode>('current');
+  const [hoveredWardPreview, setHoveredWardPreview] = useState<WardPopoverState | null>(null);
+  const [pinnedWardPreview, setPinnedWardPreview] = useState<WardPopoverState | null>(null);
   const [cleanMapForHeroFocus, setCleanMapForHeroFocus] = useState(true);
   const [expandedHudHeroes, setExpandedHudHeroes] = useState<Record<number, boolean>>({});
   const [mapWorkbenchExpanded, setMapWorkbenchExpanded] = useState(false);
@@ -1500,6 +1920,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     setHudMetricsError(null);
     setHudMetricsWarnings([]);
     setHudMetricsLoading(false);
+    setWardsResponse(null);
+    setHoveredWardPreview(null);
+    setPinnedWardPreview(null);
     hasHudMetricsDataRef.current = false;
     clearPendingHudRequest();
     allTicksRef.current = [];
@@ -1540,6 +1963,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
       const wardsData = await backendAPI.getWards(matchId);
       allWardsRef.current = wardsData;
+      setWardsResponse(wardsData);
 
       const resolveTimeBasis = (
         ticksBasis?: PlaybackTimeBasis,
@@ -1570,9 +1994,17 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       setTimeBasisOffsetSeconds(mapper.offsetSeconds);
 
       if (allTicksRef.current.length > 0) {
-        const tickTimes = allTicksRef.current.map((tick) => mapper.getSourceTime(tick));
-        const rawMinSourceTime = Math.min(...tickTimes);
-        const maxSourceTime = Math.max(...tickTimes);
+        const combinedTimePoints = mapperRecords
+          .map((record) => mapper.getSourceTime(record))
+          .filter((value) => Number.isFinite(value));
+        const rawMinSourceTime = combinedTimePoints.length > 0
+          ? Math.min(...combinedTimePoints)
+          : mapper.gameClockToSource(DEFAULT_INITIAL_GAME_CLOCK_SECONDS);
+        const matchDurationSourceTime = mapper.gameClockToSource(duration);
+        const maxSourceTime = Math.max(
+          combinedTimePoints.length > 0 ? Math.max(...combinedTimePoints) : rawMinSourceTime,
+          Number.isFinite(matchDurationSourceTime) ? matchDurationSourceTime : rawMinSourceTime
+        );
         const minSourceTime = mapper.timeBasisSource === 'game_time'
           ? Math.max(rawMinSourceTime, DEFAULT_INITIAL_GAME_CLOCK_SECONDS)
           : rawMinSourceTime;
@@ -1829,33 +2261,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
       setHeroPositions(alivePositions);
     }
 
-    // 眼位不需要插值，直接过滤
-    const roundedTime = Math.floor(time);
-    const wardsData = allWardsRef.current;
-    if (wardsData?.wards) {
-      const activeWards = wardsData.wards
-        .filter((ward) => {
-          if (ward.type !== 'placed' || !ward.x || !ward.y) return false;
-          if (mapper.getSourceTime(ward) > roundedTime) return false;
-          return true;
-        })
-        .filter((placedWard) => {
-          const destroyedEvent = wardsData.wards.find(
-            (w) => w.type === 'destroyed' && w.handle === placedWard.handle
-          );
-          return !destroyedEvent || mapper.getSourceTime(destroyedEvent) > roundedTime;
-        })
-        .map((ward) => ({
-          type: ward.ward_type as 'observer' | 'sentry',
-          team: ward.team === 2 ? 'radiant' as const : 'dire' as const,
-          x: ward.x!,
-          y: ward.y!,
-          placed: true,
-        }));
-
-      setWards(activeWards);
-    }
-
     const resolveGameClockAtSourceTime = (sourceTime: number): number => {
       const { prev: clockPrev, next: clockNext, t: clockT } = findTicksForInterpolation(sourceTime);
       if (!clockPrev) {
@@ -1989,6 +2394,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
     setHeatmapCustomRange(defaultRange);
     setPathCustomRange(defaultRange);
+    setVisionCustomRange(defaultRange);
   }, [selectedMatch, timelineMaxTime, timelineMinTime]);
 
   // Fetch heatmap data when type changes
@@ -2224,13 +2630,13 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
   const mapViewportSize = (() => {
     if (viewportWidth >= 1600) {
-      return 820;
+      return mapWorkbenchExpanded ? 820 : 920;
     }
     if (viewportWidth >= 1400) {
-      return 760;
+      return mapWorkbenchExpanded ? 760 : 860;
     }
     if (viewportWidth >= 1200) {
-      return 700;
+      return mapWorkbenchExpanded ? 700 : 780;
     }
     if (viewportWidth >= 1024) {
       return 620;
@@ -2238,6 +2644,175 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     return Math.max(320, Math.min(680, viewportWidth - 48));
   })();
   const floatingOverlayEnabled = viewportWidth >= 1024;
+
+  const wardPlacementRecords = useMemo(
+    () => enrichWardPlacementRecordsWithPlacers(
+      buildWardPlacementRecords(wardsResponse, gameClockMapperRef.current),
+      allTicksRef.current,
+      gameClockMapperRef.current
+    ),
+    [selectedMatch, teamLineups, timeBasisOffsetSeconds, timelineMaxTime, timelineMinTime, wardsResponse]
+  );
+  const visionTimeRange = useMemo(
+    () => resolveVisualizationTimeRange(
+      visionRangePreset,
+      timelineMinTime,
+      timelineMaxTime,
+      gameClockMapperRef.current,
+      visionCustomRange
+    ),
+    [timelineMaxTime, timelineMinTime, visionCustomRange, visionRangePreset]
+  );
+  const allVisionPlacements = useMemo(
+    () => wardPlacementRecords.filter((record) => {
+      if (visionTeamFilter !== 'all' && record.team !== visionTeamFilter) {
+        return false;
+      }
+      if (visionWardTypeFilter !== 'all' && record.type !== visionWardTypeFilter) {
+        return false;
+      }
+      return true;
+    }),
+    [visionTeamFilter, visionWardTypeFilter, wardPlacementRecords]
+  );
+  const filteredWardPlacements = useMemo(() => {
+    if (visionTimeRange.error) {
+      return [];
+    }
+
+    return allVisionPlacements.filter((record) => (
+      record.placedSourceTime >= visionTimeRange.startTime &&
+      record.placedSourceTime <= visionTimeRange.endTime
+    ));
+  }, [allVisionPlacements, visionTimeRange]);
+  const currentTimelineWardPlacements = useMemo(
+    () => allVisionPlacements.filter((record) => isWardActiveAtTime(record, currentTime)),
+    [allVisionPlacements, currentTime]
+  );
+  const survivingWardPlacementsAtRangeEnd = useMemo(() => {
+    if (visionTimeRange.error) {
+      return [];
+    }
+
+    return filteredWardPlacements.filter((record) => isWardActiveAtTime(record, visionTimeRange.endTime));
+  }, [filteredWardPlacements, visionTimeRange]);
+  const destroyedWardPlacements = useMemo(() => {
+    if (visionTimeRange.error) {
+      return [];
+    }
+
+    return filteredWardPlacements.filter((record) => (
+      record.removalKind === 'destroyed' &&
+      record.removalSourceTime >= visionTimeRange.startTime &&
+      record.removalSourceTime <= visionTimeRange.endTime
+    ));
+  }, [filteredWardPlacements, visionTimeRange]);
+  const expiredWardPlacements = useMemo(() => {
+    if (visionTimeRange.error) {
+      return [];
+    }
+
+    return filteredWardPlacements.filter((record) => (
+      record.removalKind === 'expired' &&
+      record.removalSourceTime >= visionTimeRange.startTime &&
+      record.removalSourceTime <= visionTimeRange.endTime
+    ));
+  }, [filteredWardPlacements, visionTimeRange]);
+  const recentWardEvents = useMemo(
+    () => [...filteredWardPlacements]
+      .sort((left, right) => right.removalSourceTime - left.removalSourceTime)
+      .slice(0, 6),
+    [filteredWardPlacements]
+  );
+  const averageWardLifetimeSeconds = useMemo(() => {
+    if (filteredWardPlacements.length === 0) {
+      return 0;
+    }
+    const total = filteredWardPlacements.reduce((sum, record) => sum + record.lifetimeSeconds, 0);
+    return total / filteredWardPlacements.length;
+  }, [filteredWardPlacements]);
+  const allDestroyedWardPlacements = useMemo(
+    () => allVisionPlacements.filter((record) => record.removalKind === 'destroyed'),
+    [allVisionPlacements]
+  );
+  const fullMatchWardPlacementsSorted = useMemo(
+    () => [...allVisionPlacements].sort((left, right) => left.placedSourceTime - right.placedSourceTime),
+    [allVisionPlacements]
+  );
+  const fullMatchDestroyedPlacementsSorted = useMemo(
+    () => [...allDestroyedWardPlacements].sort((left, right) => right.removalSourceTime - left.removalSourceTime),
+    [allDestroyedWardPlacements]
+  );
+  const destroyedByHeroCount = allDestroyedWardPlacements.filter((record) => record.destroyerKind === 'hero').length;
+  const destroyedBySummonCount = allDestroyedWardPlacements.filter((record) => record.destroyerKind === 'hero_summon').length;
+  const destroyedByLaneCreepCount = allDestroyedWardPlacements.filter((record) => record.destroyerKind === 'lane_creep').length;
+  const destroyedByNeutralCount = allDestroyedWardPlacements.filter((record) => record.destroyerKind === 'neutral_creep').length;
+  const destroyedByUnitCount = allDestroyedWardPlacements.filter((record) => record.destroyerKind === 'unit').length;
+  const destroyedUnknownCount = allDestroyedWardPlacements.filter((record) => (
+    !record.destroyerKind || record.destroyerLabel.includes('未明') || record.destroyerLabel.includes('未知')
+  )).length;
+  const currentRealtimeObserverWardCount = currentTimelineWardPlacements.filter((record) => record.type === 'observer').length;
+  const currentRealtimeSentryWardCount = currentTimelineWardPlacements.filter((record) => record.type === 'sentry').length;
+  const visionMapRecords = useMemo(() => {
+    if (visionMapMode === 'current') {
+      return currentTimelineWardPlacements;
+    }
+    if (visionMapMode === 'range') {
+      return filteredWardPlacements;
+    }
+    return allVisionPlacements;
+  }, [allVisionPlacements, currentTimelineWardPlacements, filteredWardPlacements, visionMapMode]);
+  const activeWardPreview = pinnedWardPreview ?? hoveredWardPreview;
+  const selectedWardKeys = activeWardPreview?.wards.map((record) => record.instanceKey) ?? [];
+
+  const resolveWardPopoverAnchor = useCallback((payload: WardInteractionPayload | null) => {
+    if (!payload) {
+      return null;
+    }
+
+    const containerRect = mapOverlayContainerRef.current?.getBoundingClientRect();
+    if (!containerRect) {
+      return null;
+    }
+
+    return {
+      wards: payload.wards
+        .map((ward) => wardPlacementRecords.find((record) => record.instanceKey === ward.instanceKey))
+        .filter((record): record is WardPlacementRecord => Boolean(record)),
+      anchorX: containerRect.left + payload.localX,
+      anchorY: containerRect.top + payload.localY,
+    };
+  }, [wardPlacementRecords]);
+
+  const handleWardHoverChange = useCallback((payload: WardInteractionPayload | null) => {
+    if (pinnedWardPreview) {
+      return;
+    }
+
+    const nextPreview = resolveWardPopoverAnchor(payload);
+    if (!nextPreview || nextPreview.wards.length === 0) {
+      setHoveredWardPreview(null);
+      return;
+    }
+
+    setHoveredWardPreview(nextPreview);
+  }, [pinnedWardPreview, resolveWardPopoverAnchor]);
+
+  const handleWardClick = useCallback((payload: WardInteractionPayload | null) => {
+    const nextPreview = resolveWardPopoverAnchor(payload);
+    if (!nextPreview || nextPreview.wards.length === 0) {
+      setPinnedWardPreview(null);
+      setHoveredWardPreview(null);
+      return;
+    }
+
+    setPinnedWardPreview(nextPreview);
+    setHoveredWardPreview(null);
+  }, [resolveWardPopoverAnchor]);
+
+  const handleUnpinWardPreview = useCallback(() => {
+    setPinnedWardPreview(null);
+  }, []);
 
   const radiantTeamName =
     selectedMatchDetail?.radiant_team_name ||
@@ -2260,6 +2835,40 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     selectedMatchDetail?.is_professional ?? selectedMatchRecord?.is_professional
   );
   const matchSourceLabel = selectedMatchDetail?.source ?? selectedMatchRecord?.source ?? null;
+  const lineupHeroLookup = useMemo(() => {
+    const lookup = new Map<string, TeamHeroPortrait>();
+
+    for (const hero of [...teamLineups.radiant, ...teamLineups.dire]) {
+      lookup.set(getTeamHeroKey(hero.team, hero.heroName), hero);
+    }
+
+    return lookup;
+  }, [teamLineups]);
+  const getWardPlacerFieldLabel = useCallback((record: WardPlacementRecord): string => {
+    if (record.placerSource === 'parser') {
+      return '插眼英雄';
+    }
+    if (record.placerSource === 'inferred') {
+      return '疑似插眼英雄';
+    }
+    return '插眼归属';
+  }, []);
+  const getWardPlacerDisplayName = useCallback((record: WardPlacementRecord): string => {
+    if (!record.placerHeroName) {
+      return '待确认';
+    }
+
+    const lineupHero = lineupHeroLookup.get(getTeamHeroKey(record.team, record.placerHeroName));
+    const heroLabel = formatWardEntityName(record.placerHeroName);
+    const playerDisplayName = lineupHero
+      ? getPreferredPlayerDisplayName(lineupHero, isProfessionalMatch)
+      : null;
+
+    return playerDisplayName ? `${playerDisplayName} · ${heroLabel}` : heroLabel;
+  }, [isProfessionalMatch, lineupHeroLookup]);
+  const getWardPlacerSummary = useCallback((record: WardPlacementRecord): string => (
+    `${getWardPlacerFieldLabel(record)}：${getWardPlacerDisplayName(record)}`
+  ), [getWardPlacerDisplayName, getWardPlacerFieldLabel]);
 
   useEffect(() => {
     const defaultPanels = createDefaultMapOverlayPanels(mapViewportSize);
@@ -2808,6 +3417,16 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     heatmapRangePreset === 'custom'
       ? `${heatmapCustomRange.start} 到 ${heatmapCustomRange.end}`
       : visualizationRangeOptions.find((option) => option.value === heatmapRangePreset)?.label ?? '整场';
+  const visionRangeLabel =
+    visionRangePreset === 'custom'
+      ? `${visionCustomRange.start} 到 ${visionCustomRange.end}`
+      : visualizationRangeOptions.find((option) => option.value === visionRangePreset)?.label ?? '整场';
+  const visionMapModeLabel =
+    visionMapMode === 'current'
+      ? '当前存活'
+      : visionMapMode === 'range'
+        ? '所选区间'
+        : '整场';
 
   const pathHeroOptions: HeroSelectionOption[] = [...teamLineups.radiant, ...teamLineups.dire].map((hero) => ({
     value: hero.heroName,
@@ -2859,14 +3478,22 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const mapFocusSourceLabel =
     activePathHeroes.length > 0 ? '路径分析' : activeHeatmapHeroes.length > 0 ? '热力图' : null;
   const isAnalysisOverlayActive = heatmapType !== 'none' || showPaths;
-  const isMapDeclutterActive = cleanMapForHeroFocus && isAnalysisOverlayActive;
+  const isVisionAnalysisFocusMode = mapWorkbenchExpanded && visionMapMode !== 'current';
+  const isOverlayDeclutterActive = cleanMapForHeroFocus && isAnalysisOverlayActive && !isVisionAnalysisFocusMode;
+  const isMapDeclutterActive = isOverlayDeclutterActive || isVisionAnalysisFocusMode;
   const visibleHeroPositions = isMapDeclutterActive ? [] : heroPositions;
-  const visibleWards = isMapDeclutterActive ? [] : wards;
+  const visibleWards = isOverlayDeclutterActive
+    ? []
+    : visionMapRecords.map((record) => toMapWard(record, currentTime));
   const visibleKillMarkers = isMapDeclutterActive ? [] : activeKillMarkers;
+  const visibleHeatmapGrid = isVisionAnalysisFocusMode ? null : heatmapGrid;
+  const visibleHeatmapBounds = isVisionAnalysisFocusMode ? null : heatmapBounds;
+  const visiblePathOverlays = isVisionAnalysisFocusMode ? null : pathOverlays;
+  const visiblePathTraceState = isVisionAnalysisFocusMode ? false : showPaths;
   const anyMapOverlayOpen = mapOverlayPanels.insight.open || mapOverlayPanels.legend.open;
 
   const renderMapIntegratedOverlay = () => {
-    if (!floatingOverlayEnabled) {
+    if (!floatingOverlayEnabled || isVisionAnalysisFocusMode) {
       return null;
     }
 
@@ -3028,13 +3655,117 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     );
   };
 
+  const renderWardPreviewPopover = () => {
+    if (!activeWardPreview || typeof document === 'undefined') {
+      return null;
+    }
+
+    const position = getWardPopoverPosition(
+      activeWardPreview.anchorX,
+      activeWardPreview.anchorY,
+      activeWardPreview.wards.length
+    );
+
+    return createPortal(
+      <div
+        data-testid="ward-detail-popover"
+        className={`fixed z-[220] ${pinnedWardPreview ? 'pointer-events-auto' : 'pointer-events-none'}`}
+        style={{
+          left: position.left,
+          top: position.top,
+          width: position.maxWidth,
+          transform: position.placeAbove ? 'translateY(-100%)' : undefined,
+        }}
+      >
+        <div className="rounded-3xl border border-cyan-500/20 bg-slate-950/96 p-3 shadow-[0_26px_60px_rgba(2,6,23,0.6)] backdrop-blur-md">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300/80">
+                {pinnedWardPreview ? '已固定眼位详情' : '眼位详情'}
+              </p>
+              <p className="mt-1 text-xs text-slate-300">
+                {pinnedWardPreview ? '点击地图空白处可取消固定。' : '悬停查看，点击地图即可固定当前窗口。'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2.5 py-1 text-[10px] text-slate-300">
+                {formatHudValue(activeWardPreview.wards.length)} 个眼位
+              </span>
+              {pinnedWardPreview && (
+                <button
+                  type="button"
+                  onClick={handleUnpinWardPreview}
+                  className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-[10px] font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+                >
+                  取消固定
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-3">
+            {activeWardPreview.wards.map((record) => (
+              <div
+                key={record.instanceKey}
+                data-testid={`selected-ward-card-${record.instanceKey}`}
+                className="min-w-[250px] flex-1 rounded-2xl border border-slate-800/80 bg-slate-900/70 p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">{getWardPlacementLabel(record)}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      坐标 {getWardCoordinateLabel(record)}
+                    </p>
+                  </div>
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] ${
+                    record.type === 'observer'
+                      ? 'border-amber-500/35 bg-amber-500/10 text-amber-100'
+                      : 'border-violet-500/35 bg-violet-500/10 text-violet-100'
+                  }`}>
+                    {record.type === 'observer' ? '假眼' : '真眼'}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
+                    <p className="text-slate-500">插下时间</p>
+                    <p className="mt-1 font-semibold text-slate-100">
+                      {formatGameClockTime(record.placedGameTime)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
+                    <p className="text-slate-500">持续时间</p>
+                    <p className="mt-1 font-semibold text-slate-100">
+                      {formatDurationLabel(record.lifetimeSeconds)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
+                  <p className="text-[11px] text-slate-500">{getWardPlacerFieldLabel(record)}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-100">{getWardPlacerDisplayName(record)}</p>
+                </div>
+
+                <div className="mt-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
+                  <p className="text-[11px] text-slate-500">消失方式</p>
+                  <p className="mt-1 text-sm font-medium text-slate-100">{getWardRemovalLabel(record)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div className="min-h-screen bg-dota-bg px-4 py-4 lg:px-6">
-      <div className="mx-auto max-w-[1660px] space-y-3">
+      <div className="mx-auto max-w-[1820px] space-y-3">
         <div className="rounded-3xl border border-slate-800/90 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.92),_rgba(7,10,21,0.98))] p-2.5 shadow-[0_18px_42px_rgba(2,6,23,0.38)]">
           <div
             data-testid="replay-viewer-header"
-            className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:items-center"
+            className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_360px] 2xl:items-center"
           >
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3059,37 +3790,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       </span>
                     )}
                   </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 text-[10px]">
-                  {(replayEntryContext?.source === 'match_database' || replayEntryContext?.source === 'replay_library') && (
-                    <span
-                      className={`rounded-full border px-2 py-0.5 ${
-                        replayEntryContext?.source === 'match_database'
-                          ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
-                          : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                      }`}
-                    >
-                      {replayEntryContext?.source === 'match_database'
-                        ? `比赛数据库${replaySourceStatusText ? ` · ${replaySourceStatusText}` : ''}`
-                        : '本地回放库'}
-                    </span>
-                  )}
-                  {timeBasisSource === 'fallback' && (
-                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-200">
-                      回退时间基准
-                    </span>
-                  )}
-                  {matchSourceLabel && (
-                    <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2 py-0.5 text-slate-300">
-                      {isProfessionalMatch ? '职业比赛' : '路人比赛'} · {matchSourceLabel}
-                    </span>
-                  )}
-                  {isReparseTaskActive && reparseTask && (
-                    <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">
-                      重新解析 {Math.round(reparseTask.progress ?? 0)}%
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -3125,6 +3825,37 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 </div>
               )}
 
+              <div className="flex flex-wrap gap-1.5 text-[10px]">
+                {(replayEntryContext?.source === 'match_database' || replayEntryContext?.source === 'replay_library') && (
+                  <span
+                    className={`rounded-full border px-2 py-0.5 ${
+                      replayEntryContext?.source === 'match_database'
+                        ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
+                        : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                    }`}
+                  >
+                    {replayEntryContext?.source === 'match_database'
+                      ? `比赛数据库${replaySourceStatusText ? ` · ${replaySourceStatusText}` : ''}`
+                      : '本地回放库'}
+                  </span>
+                )}
+                {timeBasisSource === 'fallback' && (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-200">
+                    回退时间基准
+                  </span>
+                )}
+                {matchSourceLabel && (
+                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2 py-0.5 text-slate-300">
+                    {isProfessionalMatch ? '职业比赛' : '路人比赛'} · {matchSourceLabel}
+                  </span>
+                )}
+                {isReparseTaskActive && reparseTask && (
+                  <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">
+                    重新解析 {Math.round(reparseTask.progress ?? 0)}%
+                  </span>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                 {selectedReplayFileName && (
                   <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
@@ -3149,7 +3880,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
             <div
               data-testid="replay-viewer-header-selection"
-              className="w-full 2xl:max-w-[320px] 2xl:justify-self-end"
+              className="w-full 2xl:max-w-[360px] 2xl:justify-self-end"
             >
               <div className="rounded-xl border border-slate-700/80 bg-slate-950/70 p-2">
                 {matches.length === 0 ? (
@@ -3275,6 +4006,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
               路径 {showPaths ? '开启' : '关闭'}
             </span>
+            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
+              视野 {visionMapModeLabel}
+            </span>
             {selectedMatch && !mapWorkbenchExpanded && (
               <span className="text-slate-500">
                 当前已折叠地图控制区，保持主地图优先。
@@ -3316,9 +4050,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             )}
           </div>
 
+          <div className={mapWorkbenchExpanded ? 'xl:grid xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start xl:gap-4' : ''}>
           {selectedMatch && mapWorkbenchExpanded && (
-            <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(280px,0.9fr)]">
-              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+            <div className="mb-3 space-y-3 xl:mb-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-10rem)] xl:overflow-y-auto xl:pr-1">
+              <div data-testid="ward-analysis-panel" className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">热力图层</p>
@@ -3548,6 +4283,265 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">单场视野分析</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      hover 在鼠标旁查看，点击固定；切到整场或区间地图时会自动进入视野专注模式。
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-[11px] text-slate-300">
+                    {visionMapModeLabel}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: 'current' as const, label: '当前存活' },
+                      { key: 'range' as const, label: '所选区间' },
+                      { key: 'full' as const, label: '整场' },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        data-testid={`vision-map-mode-${option.key}`}
+                        onClick={() => setVisionMapMode(option.key)}
+                        className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                          visionMapMode === option.key
+                            ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-200'
+                            : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <select
+                    data-testid="vision-range-select"
+                    value={visionRangePreset}
+                    onChange={(event) => setVisionRangePreset(event.target.value as VisualizationRangePreset)}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                  >
+                    {visualizationRangeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        视野范围：{option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <select
+                      data-testid="vision-team-select"
+                      value={visionTeamFilter}
+                      onChange={(event) => setVisionTeamFilter(event.target.value as WardTeamFilter)}
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                    >
+                      <option value="all">全部队伍</option>
+                      <option value="radiant">天辉</option>
+                      <option value="dire">夜魇</option>
+                    </select>
+                    <select
+                      data-testid="vision-type-select"
+                      value={visionWardTypeFilter}
+                      onChange={(event) => setVisionWardTypeFilter(event.target.value as WardTypeFilter)}
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-slate-200"
+                    >
+                      <option value="all">假眼 + 真眼</option>
+                      <option value="observer">仅假眼</option>
+                      <option value="sentry">仅真眼</option>
+                    </select>
+                  </div>
+                </div>
+
+                {visionRangePreset === 'custom' && (
+                  <div className="mt-3 grid gap-2">
+                    <label className="rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-200">
+                      <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-slate-500">视野开始</span>
+                      <input
+                        type="text"
+                        data-testid="vision-range-start"
+                        value={visionCustomRange.start}
+                        onChange={(event) => setVisionCustomRange((current) => ({ ...current, start: event.target.value }))}
+                        placeholder="-1:30"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                      />
+                    </label>
+                    <label className="rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-200">
+                      <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-slate-500">视野结束</span>
+                      <input
+                        type="text"
+                        data-testid="vision-range-end"
+                        value={visionCustomRange.end}
+                        onChange={(event) => setVisionCustomRange((current) => ({ ...current, end: event.target.value }))}
+                        placeholder="12:00"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {visionTimeRange.error && (
+                  <p className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                    {visionTimeRange.error}
+                  </p>
+                )}
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+                    <p className="text-[11px] text-slate-500">范围覆盖</p>
+                    <p data-testid="ward-analysis-total" className="mt-1 text-lg font-semibold text-slate-100">{formatHudValue(filteredWardPlacements.length)}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+                    <p className="text-[11px] text-slate-500">范围末仍存活</p>
+                    <p data-testid="ward-analysis-active" className="mt-1 text-lg font-semibold text-cyan-100">{formatHudValue(survivingWardPlacementsAtRangeEnd.length)}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+                    <p className="text-[11px] text-slate-500">当前活跃</p>
+                    <p data-testid="ward-realtime-active" className="mt-1 text-lg font-semibold text-emerald-200">{formatHudValue(currentTimelineWardPlacements.length)}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+                    <p className="text-[11px] text-slate-500">已被排</p>
+                    <p data-testid="ward-analysis-dewarded" className="mt-1 text-lg font-semibold text-rose-200">{formatHudValue(destroyedWardPlacements.length)}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+                    <p className="text-[11px] text-slate-500">自然到时</p>
+                    <p data-testid="ward-analysis-expired" className="mt-1 text-lg font-semibold text-amber-200">{formatHudValue(expiredWardPlacements.length)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                    实时假眼 {formatHudValue(currentRealtimeObserverWardCount)}
+                  </span>
+                  <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                    实时真眼 {formatHudValue(currentRealtimeSentryWardCount)}
+                  </span>
+                  <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                    平均存活 <span data-testid="ward-analysis-average-lifetime">{formatDurationLabel(averageWardLifetimeSeconds)}</span>
+                  </span>
+                  <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                    区间 {visionRangeLabel}
+                  </span>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">最近视野变化</p>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300">
+                      {formatHudValue(recentWardEvents.length)}
+                    </span>
+                  </div>
+                  <div className="mt-3 max-h-[220px] space-y-2 overflow-y-auto">
+                    {recentWardEvents.length === 0 ? (
+                      <p className="text-sm text-slate-500">当前筛选范围还没有视野变化。</p>
+                    ) : (
+                      recentWardEvents.map((record) => (
+                        <div key={`recent-ward-${record.instanceKey}`} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-100">{getWardPlacementLabel(record)}</p>
+                            <span className="text-xs text-slate-300">{formatDurationLabel(record.lifetimeSeconds)}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {getWardPlacerSummary(record)} · {getWardRemovalLabel(record)}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">整场全部眼位</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        尊重当前队伍与真假眼筛选，但不受上面的时间区间限制。
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300">
+                      {formatHudValue(fullMatchWardPlacementsSorted.length)}
+                    </span>
+                  </div>
+                  <div className="mt-3 max-h-[280px] space-y-2 overflow-y-auto">
+                    {fullMatchWardPlacementsSorted.length === 0 ? (
+                      <p className="text-sm text-slate-500">当前筛选下整场没有眼位数据。</p>
+                    ) : (
+                      fullMatchWardPlacementsSorted.map((record) => (
+                        <div key={`all-ward-${record.instanceKey}`} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-100">{getWardPlacementLabel(record)}</p>
+                            <span className="text-xs text-slate-300">
+                              插于 {formatGameClockTime(record.placedGameTime)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-400">
+                            坐标 {getWardCoordinateLabel(record)} · {getWardPlacerSummary(record)} · {getWardRemovalLabel(record)}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">整场排眼记录</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        这里会直接列出所有被排掉的眼位和排眼来源，方便核对解析器输出。
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] text-rose-100">
+                      {formatHudValue(fullMatchDestroyedPlacementsSorted.length)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      英雄 {formatHudValue(destroyedByHeroCount)}
+                    </span>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      召唤物 {formatHudValue(destroyedBySummonCount)}
+                    </span>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      小兵 {formatHudValue(destroyedByLaneCreepCount)}
+                    </span>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      中立 {formatHudValue(destroyedByNeutralCount)}
+                    </span>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      其他单位 {formatHudValue(destroyedByUnitCount)}
+                    </span>
+                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
+                      未知 {formatHudValue(destroyedUnknownCount)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 max-h-[280px] space-y-2 overflow-y-auto">
+                    {fullMatchDestroyedPlacementsSorted.length === 0 ? (
+                      <p className="text-sm text-slate-500">当前筛选下整场没有排眼记录。</p>
+                    ) : (
+                      fullMatchDestroyedPlacementsSorted.map((record) => (
+                        <div key={`destroyed-ward-${record.instanceKey}`} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-100">{getWardPlacementLabel(record)}</p>
+                            <span className="text-xs text-rose-200">
+                              被排于 {formatGameClockTime(record.removalGameTime)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-400">
+                            插于 {formatGameClockTime(record.placedGameTime)} · {getWardPlacerSummary(record)} · {record.destroyerLabel}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">状态与提醒</p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
                       在这里执行刷新、重新解析，并检查当前加载状态。
@@ -3622,6 +4616,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             </div>
           )}
 
+          <div className="min-w-0">
           <div
             className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-[248px_minmax(0,1fr)_248px]"
             data-testid="hud-metrics-panel"
@@ -3632,63 +4627,37 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
             <div className="order-1 xl:col-span-2 2xl:col-span-1 2xl:order-2 space-y-4">
               <div className="rounded-3xl border border-slate-800/80 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.48),_rgba(2,6,23,0.96))] p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">主地图</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-100">
-                      {selectedMatch ? `比赛 ${selectedMatch} 分析视图` : '等待选择比赛'}
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-400">{activeOverlayMeta.description}</p>
-                  </div>
-                  <div className="flex max-w-full flex-col items-end gap-2">
-                    <div
-                      data-testid="map-status-strip"
-                      className="flex max-w-full flex-wrap justify-end gap-2 text-[11px]"
-                    >
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-cyan-50">
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/80">时钟</span>
-                        <span className="font-mono">{currentGameClockLabel}</span>
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 ${
-                          isPauseActive
-                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
-                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
-                        }`}
-                      >
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-current/70">状态</span>
-                        <span>{isPauseActive ? '暂停区间' : '进行中'}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">时长</span>
-                        <span className="font-mono text-slate-100">{matchDurationClockLabel}</span>
-                      </span>
-                    </div>
-
-                    <div
-                      data-testid="map-view-strip"
-                      className="flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-2xl border border-slate-800/80 bg-slate-950/65 px-2 py-1.5 text-[11px]"
-                    >
-                      <span className="px-1 text-slate-500">主视图</span>
-                      <span className="rounded-xl bg-slate-900/85 px-2.5 py-1 text-slate-100">
-                        {activeOverlayMeta.title}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        热力 {activeHeatmapLabel}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        范围 {activeRangeLabel}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        路径 {showPaths ? '开启' : '关闭'}
-                      </span>
+                <div className="mb-3 space-y-2.5">
+                  <div
+                    className={`grid gap-2.5 ${
+                      mapWorkbenchExpanded
+                        ? '2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start'
+                        : 'xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">主地图</p>
+                      <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                        {selectedMatch ? `比赛 ${selectedMatch} 分析视图` : '等待选择比赛'}
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-xs text-slate-400">
+                        {activeOverlayMeta.description} 眼位支持 hover 跟随详情与点击固定。
+                      </p>
                     </div>
 
                     {floatingOverlayEnabled && (
-                      <div className="flex max-w-full flex-col items-end gap-1">
+                      <div
+                        className={`flex max-w-full flex-col gap-1 ${
+                          mapWorkbenchExpanded ? 'items-start' : 'items-start xl:items-end'
+                        }`}
+                      >
                         <div
                           data-testid="map-overlay-toolbar"
-                          className="flex max-w-full flex-wrap items-center justify-end gap-1.5 text-[11px]"
+                          className={`flex max-w-full flex-wrap items-center gap-1.5 text-[11px] ${
+                            mapWorkbenchExpanded
+                              ? 'rounded-2xl border border-slate-800/80 bg-slate-950/55 px-2.5 py-2'
+                              : 'xl:justify-end'
+                          }`}
                         >
                           <button
                             type="button"
@@ -3736,9 +4705,63 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                             重置位置
                           </button>
                         </div>
-                        <span className="text-[10px] text-slate-500/80">Esc 可快速清空浮窗</span>
+                        <span className="px-1 text-[10px] text-slate-500/80">Esc 可快速清空浮窗</span>
                       </div>
                     )}
+                  </div>
+
+                  <div
+                    className={
+                      mapWorkbenchExpanded
+                        ? 'flex flex-col gap-2'
+                        : 'flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between'
+                    }
+                  >
+                    <div
+                      data-testid="map-status-strip"
+                      className="flex max-w-full flex-wrap gap-2 text-[11px]"
+                    >
+                      <span className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-cyan-50">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/80">时钟</span>
+                        <span className="font-mono">{currentGameClockLabel}</span>
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 ${
+                          isPauseActive
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
+                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
+                        }`}
+                      >
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-current/70">状态</span>
+                        <span>{isPauseActive ? '暂停区间' : '进行中'}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">时长</span>
+                        <span className="font-mono text-slate-100">{matchDurationClockLabel}</span>
+                      </span>
+                    </div>
+
+                    <div
+                      data-testid="map-view-strip"
+                      className="flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-slate-800/80 bg-slate-950/65 px-2 py-1.5 text-[11px]"
+                    >
+                      <span className="px-1 text-slate-500">主视图</span>
+                      <span className="rounded-xl bg-slate-900/85 px-2.5 py-1 text-slate-100">
+                        {activeOverlayMeta.title}
+                      </span>
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        热力 {activeHeatmapLabel}
+                      </span>
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        范围 {activeRangeLabel}
+                      </span>
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        路径 {showPaths ? '开启' : '关闭'}
+                      </span>
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        视野 {visionMapModeLabel}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -3749,20 +4772,30 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-200/80">分析视图净化</p>
                           <p className="mt-1 font-medium text-amber-50">
-                            {mapFocusHeroLabel
-                              ? `${mapFocusSourceLabel} · ${mapFocusHeroLabel}`
-                              : `${showPaths ? '路径分析' : activeOverlayMeta.title} · 已清理干扰元素`}
+                            {isVisionAnalysisFocusMode
+                              ? `单场视野分析 · ${visionMapModeLabel}`
+                              : mapFocusHeroLabel
+                                ? `${mapFocusSourceLabel} · ${mapFocusHeroLabel}`
+                                : `${showPaths ? '路径分析' : activeOverlayMeta.title} · 已清理干扰元素`}
                           </p>
                           <p className="mt-1 text-xs leading-5 text-amber-100/80">
-                            主地图已临时隐藏英雄头像、眼位和死亡爆点，只保留当前分析图层需要的内容。
+                            {isVisionAnalysisFocusMode
+                              ? '主地图已临时隐藏英雄头像、热力图、路径和死亡爆点，只保留当前眼位分析需要的内容；实时视野统计仍会继续更新。'
+                              : '主地图已临时隐藏英雄头像、眼位和死亡爆点，只保留当前分析图层需要的内容。'}
                           </p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => setCleanMapForHeroFocus(false)}
+                          onClick={() => {
+                            if (isVisionAnalysisFocusMode) {
+                              setVisionMapMode('current');
+                              return;
+                            }
+                            setCleanMapForHeroFocus(false);
+                          }}
                           className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 transition hover:border-amber-300/60"
                         >
-                          恢复全部图层
+                          {isVisionAnalysisFocusMode ? '回到实时视野' : '恢复全部图层'}
                         </button>
                       </div>
                     )}
@@ -3782,10 +4815,13 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                           killMarkers={visibleKillMarkers}
                           currentGameTime={currentDisplayGameTime}
                           showCalibrationMarkers={showCalibration}
-                          heatmapGrid={heatmapGrid}
-                          heatmapBounds={heatmapBounds}
-                          pathOverlays={pathOverlays}
-                          showPaths={showPaths}
+                          heatmapGrid={visibleHeatmapGrid}
+                          heatmapBounds={visibleHeatmapBounds}
+                          pathOverlays={visiblePathOverlays}
+                          showPaths={visiblePathTraceState}
+                          selectedWardKeys={selectedWardKeys}
+                          onWardHoverChange={handleWardHoverChange}
+                          onWardClick={handleWardClick}
                         />
                         {renderMapIntegratedOverlay()}
                       </div>
@@ -3856,12 +4892,15 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               {renderHudLane('dire')}
             </div>
           </div>
+          </div>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
           快捷键：空格播放/暂停，← → 调整时间，↑ ↓ 调整速度，Home/End 跳到开头或结尾。热力图和路径分析已经直接叠加到主地图，不需要在页面下方额外找模块。
         </div>
       </div>
+      {renderWardPreviewPopover()}
     </div>
   );
 }

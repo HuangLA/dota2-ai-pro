@@ -10,6 +10,7 @@ import DotaMapRenderer, {
   KillMarkerData,
   PathOverlay,
   Ward,
+  WardInteractionPayload,
 } from './DotaMapRenderer';
 
 export interface MapViewerProps {
@@ -36,6 +37,14 @@ export interface MapViewerProps {
   heatmapBounds?: HeatmapBounds | null;
   /** 后端路径分析生成的静态轨迹 */
   pathOverlays?: PathOverlay[] | null;
+  /** 当前选中的眼位实例 key */
+  selectedWardKeys?: string[];
+  /** 眼位悬停选择回调 */
+  onWardSelectionChange?: (wards: Ward[]) => void;
+  /** 眼位悬停详情回调 */
+  onWardHoverChange?: (payload: WardInteractionPayload | null) => void;
+  /** 点击眼位时的固定详情回调 */
+  onWardClick?: (payload: WardInteractionPayload | null) => void;
 }
 
 export function MapViewer({
@@ -53,6 +62,10 @@ export function MapViewer({
   heatmapGrid = null,
   heatmapBounds = null,
   pathOverlays = null,
+  selectedWardKeys = [],
+  onWardSelectionChange,
+  onWardHoverChange,
+  onWardClick,
 }: MapViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DotaMapRenderer | null>(null);
@@ -119,6 +132,30 @@ export function MapViewer({
     };
   }, [width, height, mapImageUrl, useHeroIcons, heroIconSize, showCalibrationMarkers]);
 
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+
+    rendererRef.current.setWardSelectionHandler(onWardSelectionChange);
+  }, [isInitialized, onWardSelectionChange]);
+
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+
+    rendererRef.current.setWardHoverHandler(onWardHoverChange);
+  }, [isInitialized, onWardHoverChange]);
+
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+
+    rendererRef.current.setWardClickHandler(onWardClick);
+  }, [isInitialized, onWardClick]);
+
   // Update hero positions
   useEffect(() => {
     if (!isInitialized || !rendererRef.current) {
@@ -159,6 +196,14 @@ export function MapViewer({
     console.log('[MapViewer] Updating wards:', wards.length);
     rendererRef.current.renderWards(wards);
   }, [isInitialized, wards]);
+
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+
+    rendererRef.current.setSelectedWardKeys(selectedWardKeys);
+  }, [isInitialized, selectedWardKeys]);
 
   // Update kill markers
   useEffect(() => {
