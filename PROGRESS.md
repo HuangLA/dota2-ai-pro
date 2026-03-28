@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4/4.5 已完成 ✅ + 文档对齐更新，准备进入 Phase 5 🚀 |
-| 最后更新 | 2026-03-20 |
+| 最后更新 | 2026-03-26 |
 | 更新者 | Codex |
 
 ---
@@ -31,6 +31,120 @@
 ---
 
 ## 当前进展摘要（2026-03-20）
+
+### 最新完成任务（2026-03-28）
+**✅ minimap 建筑图标已切到“外塔跟随对应高地塔样式”，并加上阵营着色**
+- `frontend/src/renderer/components/map/objectiveIconCatalog.ts` 已调整 minimap 建筑图标选择规则：双方 6 个外塔不再使用单独的 `tower_outer` 环形图标，而是直接复用对应分路高地塔的官方样式。当前规则是中路 `T1/T2` 统一走 `tower_90`，上下两路 `T1/T2` 统一走 `tower`，从而和各自对应的 `T3` 保持同款视觉语言。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 已把 objective sprite 的默认 tint 从纯白改成阵营色：天辉建筑统一使用绿色 `#22c55e`，夜魇建筑统一使用红色 `#ef4444`；被摧毁后的建筑则继续保留同阵营但更暗、更透明的状态，既能看出归属，也能继续区分“已摧毁”。
+- `frontend/src/renderer/components/map/objectiveIconCatalog.test.ts` 已补回归，确保外塔不会再退回旧的 ring 样式，并且中路外塔与边路外塔会分别继承中路 / 边路高地塔的 icon 方向。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/components/map/objectiveIconCatalog.test.ts --reporter=verbose`、`cd frontend && npm run build`。
+
+### 最新完成任务（2026-03-28）
+**✅ 重新校准 minimap 世界坐标映射，并用 parser 实测坐标替换基地建筑近似锚点**
+- 已确认“基地建筑位置不对”的根因不只是 `mapElements.ts` 里的局部近似值，`frontend/src/renderer/components/map/mapCoordinateMapper.ts` 里的 `DOTA_MAP_BOUNDS` 也沿用了旧版映射范围，导致 parser 输出的真实世界坐标投到当前官方 minimap / `dotamap_*_buildings.png` 上时会整体偏移。为此我直接拿官方建筑覆盖图里可明确识别的外塔位置，加上 replay 里实测到的 objective 世界坐标，重新拟合了一套线性世界边界。
+- `frontend/src/renderer/components/map/mapCoordinateMapper.ts` 现已把世界边界更新为 `minX=6698 / maxX=25843 / minY=6774 / maxY=25881`，注释里也标明这是按官方 `dotamap_radiant_buildings.png / dotamap_dire_buildings.png` 与 parser objective 坐标联合校准出来的版本。这样英雄、眼位、建筑、objective 事件坐标都会共用同一套更贴近当前 minimap 的映射。
+- `frontend/src/renderer/data/mapElements.ts` 里的建筑锚点也同步收口到“实测优先”。当前已经把 replay 中能验证到的结构物全部替换成 parser 实测坐标，例如：`radiant_ancient -> (10464, 11032)`、`radiant_mid_t3 -> (11744, 12240)`、`radiant_mid_rax_melee -> (11712, 11832)`、`radiant_mid_rax_ranged -> (11324, 12185)`、`dire_top_rax_melee -> (20282.031, 21880)`、`dire_bot_rax_ranged -> (22448, 19760)`；少数当前样本里还没摧毁过的建筑，则先用新边界下的对称推导值兜底。
+- 随后又按用户反馈对“天辉上路高地三件套 + 天辉遗迹前两座塔”做了第二轮细调：`radiant_top_rax_ranged` 不再使用对称推导，改成从存活 barracks 实体位置读取到的 `9540 / 12625`；双方 T4 和夜魇遗迹也同步切到 live objective entity 实测坐标，分别收口为 `radiant_t4_top -> (10672, 11520)`、`radiant_t4_bot -> (10992, 11192)`、`dire_t4_top -> (21328, 21160)`、`dire_t4_bot -> (21664, 20816)`、`dire_ancient -> (21912, 21384)`。
+- 我用新的世界边界重新把 parser 坐标投回官方建筑图做了叠图核对，`t1/t2` 外塔、`t3`、中路双兵营、天辉遗迹和夜魇高地建筑现在都已经明显回到对应白色 minimap 图标附近，不再像之前那样整体偏一截。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/components/map/mapCoordinateMapper.test.ts src/renderer/data/mapElements.test.ts src/renderer/data/mapObjectives.test.ts src/renderer/components/map/objectiveIconCatalog.test.ts --reporter=verbose` → `17 passed`；`cd frontend && npm run build` → 通过。并额外补了一个 mapper 校准回归测试，确保已知 objective 世界坐标会落到官方建筑覆盖图的预期像素附近。
+
+### 最新完成任务（2026-03-27）
+**✅ Parser 已补上 objective 坐标回填，现有 replay 的建筑事件都能输出真实坐标**
+- 已改造 `parsers/src/main/java/SimpleDemoParser.java` 的 objective 坐标回填逻辑。结论是：当前 Clarity 在这批 replay 里能稳定暴露塔 / 兵营 / 遗迹实体的 `m_iHealth` 与世界坐标，但并没有暴露可直接拿来对齐 combat log 的建筑名字字段；因此旧方案才会出现“objective 有事件、但 `x/y` 为空”的情况。
+- 新方案改为维护 objective 实体的匿名状态快照：parser 会持续跟踪 `CDOTA_BaseNPC_Tower / Barracks / Fort` 等实体的 `type / team / health / x / y`，当实体从存活变成 `health <= 0` 或被删除时，先记录“最近死亡建筑快照”；随后在 combat log 收到 `npc_dota_*tower* / *rax* / *fort` 的 objective 事件、但原始日志没有 `locationX / locationY` 时，再按 `type + team + tick` 反向匹配这份死亡快照，把正确的 `x / y` 回填到 objective event。
+- 已使用新的 parser 重新解析本地现有 5 场 replay：`8729115809 / 8731134498 / 8732912726 / 8736891827 / 8739045863`。重解析后，这 5 场 `backend/data/matches/{match_id}/objectives.parquet` 里的结构物事件（`tower / barracks / ancient`）`x / y` 缺失数已经全部降为 `0`。
+- 针对前面暴露最明显的 `8736891827`，已确认天辉中路高地三件套现在会分别输出不同坐标：`tower3_mid -> (11744.0, 12240.0)`、`range_rax_mid -> (11324.0, 12185.0)`、`melee_rax_mid -> (11712.0, 11832.0)`，后续前端就可以直接优先使用这些真实事件坐标继续校正 minimap 锚点。
+- 本次验证：`gradle -p parsers shadowJar` → 通过；`java -jar parsers/build/libs/clarity-parser-1.0.0-uber.jar backend/data/replays/8736891827.dem` → 生成的 objective JSON 中结构物 `x/y` 缺失数为 `0`；`cd backend && ./.venv/bin/python -c "... ParseService(...).parse_replay(...)"` → 5 场 replay 全部重解析成功；`cd backend && ./.venv/bin/python -c "... pandas.read_parquet(...)"` → 5 场 `objectives.parquet` 结构物 `x/y` 缺失数均为 `0`。
+
+### 最新完成任务（2026-03-27）
+**✅ 重新核对本地 Dota minimap 资源，并切换到官方独立建筑图标渲染**
+- 已重新扫描本机 Dota 2 `pak01_dir.vpk` 的 minimap 相关资源，确认此前被拿来硬拆的 `panorama/images/minimap/dotamap_radiant_buildings_psd.vtex_c / dotamap_dire_buildings_psd.vtex_c` 并不是适合逐建筑拆分的稳定素材；同时确认本地还存在两套更合适的官方资源：一套是 `panorama/images/minimap/*tier1/*tier2/*base*` 这类“整路 / 整高地示意块”，另一套是 `materials/vgui/hud/minimap_tower* / minimap_racks* / minimap_ancient` 这类独立 minimap 建筑图标。
+- `frontend/scripts/sync-dota-game-assets.js` 现已扩展为同步 `materials/overviews/dota_minimal*`、`materials/vgui/hud/minimap_*`，并把提取结果落到仓库内新的 `frontend/public/assets/dota/minimap/icons/` 与 `frontend/public/assets/dota/minimap/reference/`。本次同步新增了 `tower_outer.png / tower.png / tower_90.png / racks_45.png / racks_90.png / ancient.png / minimap_minimal.png / reference/base_group.png`。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 已从“拆 `dotamap_*_buildings.png` 的像素块”改为直接使用官方独立 minimap 图标；T1/T2 走官方外塔环形图标，T3/T4 与兵营、遗迹走 HUD 中的独立建筑图标，不再依赖那张会把高地三件套和基地其他建筑粘成一大片的合成图。新的图标选择规则收口在 `frontend/src/renderer/components/map/objectiveIconCatalog.ts`，并补了 `objectiveIconCatalog.test.ts`。
+- 本次验证：`node frontend/scripts/sync-dota-game-assets.js --patch 7.41 --vrf-cli /tmp/source2viewer-cli/Source2Viewer-CLI` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/components/map/objectiveIconCatalog.test.ts src/renderer/data/mapElements.test.ts src/renderer/data/mapObjectives.test.ts --reporter=verbose` → `9 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-27）
+**✅ 排查高地兵营 / 遗迹偏移原因，并补上“事件坐标优先”回退链路**
+- 已对当前 minimap 渲染问题做定位：`frontend/src/renderer/data/mapElements.ts` 里的兵营与遗迹坐标本来就是手工近似锚点，夜魇兵营甚至直接写明是“按天辉镜像得到的近似坐标”；在切换到更清晰的官方独立 minimap 图标后，这批旧锚点的误差被明显放大，所以用户会感知到“高地兵营和基地位置不对”。
+- 进一步核实了 replay 数据来源：当前本地样本 `backend/data/matches/8736891827/objectives.parquet` 中，塔 / 兵营事件的 `x / y` 仍然为空，因此前端现在拿不到这类建筑的真实事件坐标，暂时只能依赖 `mapElements.ts` 里的固定锚点。也就是说，当前问题的主因不是新图标锚点，而是底层建筑锚点数据质量；图标中心锚点只会带来很小的附加偏移。
+- 为了避免后续 replay 或 parser 一旦提供了 objective `x / y` 还继续被死坐标限制，`frontend/src/renderer/data/mapObjectives.ts` 现在已经改为“事件坐标优先”：当 objective payload 自带 `x / y` 时，marker 会直接使用真实坐标覆盖手工锚点。并补了回归测试 `prefers event coordinates when the objective payload includes x/y`。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/data/mapObjectives.test.ts src/renderer/components/map/objectiveIconCatalog.test.ts src/renderer/data/mapElements.test.ts --reporter=verbose` → `10 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-26）
+**✅ 修正高地三件套渲染，避免 T3 / 近战兵营 / 远程兵营被看成同一块**
+- 在回放验证 `8736891827` 时，已确认 objective 事件本身是分开的：天辉中路高地的 `T3 / 远程兵营 / 近战兵营` 分别在 `game_time=1454.5665 / 1527.9 / 1539.4332` 被摧毁，因此“24:15 三个一起变灰”不是解析器问题，而是前端高地建筑贴图拆分与锚点的问题。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 现在对高地三件套改为优先使用稳定的高地模板纹理，而不再直接信任那些已经和基地其他建筑连成大连通块的局部拆片结果。这样 T3、近战兵营、远程兵营会按各自状态分别显示，不会再因为共用一大块 minimap 素材而一起变灰。
+- 同时修正了 `frontend/src/renderer/data/mapElements.ts` 中天辉中路高地两个兵营的锚点，把原本几乎重合的 `radiant_mid_rax_melee / radiant_mid_rax_ranged` 拉开为更接近游戏 minimap 品字形的位置，避免两个兵营继续压在同一个像素附近。
+- 本次验证：`CI=1 ./node_modules/.bin/vitest run src/renderer/data/mapObjectives.test.ts src/renderer/data/mapElements.test.ts --reporter=verbose` → `5 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-26）
+**✅ 本地已有 replay 已全部重解析，并确认建筑 objective 链路可用**
+- 已使用当前仓库里的解析器构建产物 `parsers/build/libs/clarity-parser-1.0.0-uber.jar` 重新解析 `backend/data/replays/` 下现有 5 场 replay：`8729115809 / 8731134498 / 8732912726 / 8736891827 / 8739045863`。重解析后，这 5 场对应的 `backend/data/matches/{match_id}/objectives.parquet` 都已生成。
+- 当前解析器对这些本地 replay 的 objective 提取是有效的，不需要额外补“建筑事件提取”功能：五场的 objective 行数分别为 `19 / 16 / 14 / 11 / 10`，字段统一包含 `type / objective_type / objective_name / tick / x / y / team / game_time / attacker_name`。
+- 已用 FastAPI `TestClient` 直接验证 `/api/v1/playback/8729115809/objectives` 路由可读到新数据，返回 `200`，`summary.total=19`，按类型统计为 `tower=10 / barracks=6 / roshan=2 / tormentor=1`。这说明“解析器 -> Parquet -> Playback objectives API -> 前端建筑状态层”这条链路在当前本地 replay 上已经打通；此前地图上建筑不消失，根因是旧解析产物里没有 `objectives.parquet`。
+
+### 最新完成任务（2026-03-26）
+**✅ 建筑层改为游戏内示意图风格，并临时移除 Roshan / Tormentor 显示**
+- 地图目标层已收口成纯建筑显示：`frontend/src/renderer/data/mapElements.ts` 的 `OBJECTIVE_MAP_ELEMENT_TYPES` 现在只保留 `tower / barracks / ancient`，因此前端回放地图不再显示 Roshan 与 Tormentor；`frontend/src/renderer/pages/RealMatchViewer.tsx` 的相关概览文案也同步改成“建筑概览 / 建筑”。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 的建筑渲染逻辑已进一步从“整张队伍建筑图层叠加”改成“基于 `dotamap_radiant_buildings.png / dotamap_dire_buildings.png` 的逐建筑拆片渲染”。现在每个塔、兵营、遗迹都会先在那两张游戏内 minimap 建筑素材图里按锚点切出自己的独立图标，然后在回放时按建筑状态单独显示；高地三件套会拆成“高地塔 / 近战兵营 / 远程兵营”三个元素，小型基地装饰建筑继续忽略。
+- 为了让这些独立图标落在正确位置，我用建筑图层做了一轮吸附校准，更新了 `frontend/src/renderer/data/mapElements.ts` 中塔、兵营、遗迹的坐标，尤其收紧了双方基地高地的建筑锚点。当前活着的建筑会显示对应 minimap 图标；摧毁后仅对应那一个建筑图标会单独变灰，不再影响同一路其他建筑。
+- 本次验证：`CI=1 ./node_modules/.bin/vitest run src/renderer/data/mapObjectives.test.ts --reporter=verbose` → `4 passed`；`cd frontend && npm run build` → 通过；本地 Vite 开发服务保持运行，可直接刷新查看效果。
+
+### 最新完成任务（2026-03-26）
+**✅ 切换到无透明边 minimap，并改用整图直接坐标映射**
+- 已按新的地图资产方向撤回“补透明边”方案：`frontend/public/assets/dota/minimap/minimap.png` 现在重新生成为无透明边的 `3072x3072` 高清图，alpha bbox 已恢复为整张图 `0..3071 / 3072`。
+- 前端坐标映射已切换到更直接的方案：`frontend/src/renderer/components/map/mapCoordinateMapper.ts` 里的默认 `MINIMAP_CONTENT_BOUNDS` 现在是整张图 `0..1`，并且默认关闭 `preserveAspectRatio`，也就是直接把世界坐标线性映射到整张 minimap。旧版有透明边的映射仍保留为 `LEGACY_MINIMAP_CONTENT_BOUNDS`，只在显式需要兼容老图时使用。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 的地图 fallback 顺序也已调整，优先回退到无透明边的 `minimap_source.png / minimap_game.png / minimap_simple.png`，把 `minimap_740.png` 与 `minimap.jpg` 继续放在最后兜底，避免默认链路误回到旧透明边资源。
+- 本次验证：`node frontend/scripts/sync-dota-game-assets.js --patch 7.41 --vrf-cli /tmp/source2viewer-cli/Source2Viewer-CLI` → 通过；`CI=1 ./node_modules/.bin/vitest run src/renderer/components/map/mapCoordinateMapper.test.ts --reporter=verbose` → `5 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-26）
+**✅ 修复 minimap 坐标偏移，高清默认图补回旧版透明边框**
+- 已核对当前前端坐标映射与旧地图资源的关系：`frontend/src/renderer/components/map/mapCoordinateMapper.ts` 中的 `MINIMAP_CONTENT_BOUNDS` 使用的是 `61 / 1024 ~ 962 / 1024` 这组历史边界，而旧版 `frontend/public/assets/dota/minimap/minimap_740.png` 的非透明内容框也正好落在 `61..962 / 1024`。此前新的高清 `minimap.png` 没有透明边框，所以坐标层会整体偏移。
+- `frontend/scripts/sync-dota-game-assets.js` 现在会在生成高清 `minimap.png` 时，自动补回与 `minimap_740.png` 相同的透明边框比例：默认 `3072x3072` 产物会保留 `183px` 的四周透明边，中间 `2706x2706` 区域放置高清 minimap 内容。这样前端现有的 `MINIMAP_CONTENT_BOUNDS` 和所有已有地图锚点、英雄、建筑、眼位坐标都可以继续复用，无需额外改前端映射公式。
+- 本次验证：旧图 `minimap_740.png` 的 alpha bbox 为 `61..962 / 1024`，新生成的 `minimap.png` alpha bbox 为 `183..2888 / 3072`，二者比例完全一致；`node frontend/scripts/sync-dota-game-assets.js --patch 7.41 --vrf-cli /tmp/source2viewer-cli/Source2Viewer-CLI` → 通过；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-26）
+**✅ 修正高清 minimap 方案，默认图切回官方同源 overview 链路**
+- 已重新确认当前项目真正需要的不是 `world.glb` 模型俯视渲染图，而是和现有 `minimap_source.png` 同源的官方 minimap 美术。进一步比对本地资源后，确认 `materials/overviews/dota.vmat_c` 导出的 `dota.png` 与当前写实小地图几乎同源，且原生尺寸为 `512x512`；它比 Panorama 内的 `minimap_game_png`（`400x400`）更适合用作默认高清链路的源头。
+- `frontend/scripts/sync-dota-game-assets.js` 已改为在基础提取阶段同时抽取 `materials/overviews/dota.vmat_c`，并自动生成默认的 `frontend/public/assets/dota/minimap/minimap.png`。现在 minimap 资产约定是：`minimap_source.png` 保留官方 overview 源图、`minimap_game.png` 保留游戏内 `400x400` 原图、`minimap.png` 则由脚本用 `sharp` 放大到 `3072x3072` 后供前端直接使用。
+- 文档也已同步修正：`docs/dota_asset_sync.md` 现在把 overview 放大链路设为默认流程；`frontend/scripts/render-dota-world-minimap.mjs` 仍保留在仓库里，但只作为实验性模型渲染脚本，不再作为默认地图更新方案。
+- 本次验证：`node frontend/scripts/sync-dota-game-assets.js --patch 7.41 --vrf-cli /tmp/source2viewer-cli/Source2Viewer-CLI` → 通过；`sips -g pixelWidth -g pixelHeight frontend/public/assets/dota/minimap/minimap_source.png frontend/public/assets/dota/minimap/minimap_game.png frontend/public/assets/dota/minimap/minimap.png frontend/public/assets/dota/minimap/minimap_simple.png` → 分别为 `512x512 / 400x400 / 3072x3072 / 1024x1024`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-26）
+**✅ 高清写实 minimap 已从 Dota world 模型离线渲染落地，并接入手动工作流**
+- 已新增 `frontend/scripts/render-dota-world-minimap.mjs`，这条脚本会读取 `Source2Viewer-CLI` 导出的 `/tmp/dota-world-glb/maps/dota/world.glb`，在本机启动临时静态服务，再通过 headless Chromium + Three.js 的正交俯视渲染生成高清 PNG。为了让输出更适合做地图底图，渲染时会把 world 网格材质压成以贴图为主的 `MeshBasicMaterial`，并在落盘前用 `sharp` 做无损压缩。
+- 当前默认写实地图已经不再是本地提取的 `400x400` 原图，而是新生成的 `frontend/public/assets/dota/minimap/minimap.png`，尺寸已提升到 `3072x3072`；原始写实提取图现在保留为 `frontend/public/assets/dota/minimap/minimap_source.png`（`400x400`），简易高分辨率图仍保留为 `minimap_simple.png`（`1024x1024`）。
+- 为了避免以后手动同步资源时又把高清默认图覆盖回低清版，`frontend/scripts/sync-dota-game-assets.js` 已调整 minimap 输出约定：基础提取只会写 `minimap_source.png`，而 `minimap.png` 明确保留给 world 离线渲染结果。`frontend/package.json` 新增了 `npm run assets:render:dota-minimap` 入口，`docs/dota_asset_sync.md` 也已同步补充高清写实地图的生成步骤。
+- 本次验证：`node frontend/scripts/render-dota-world-minimap.mjs --size 3072 --output frontend/public/assets/dota/minimap/minimap.png` → 通过；`node frontend/scripts/sync-dota-game-assets.js --patch 7.41 --vrf-cli /tmp/source2viewer-cli/Source2Viewer-CLI` → 通过，已生成 `minimap_source.png`；`sips -g pixelWidth -g pixelHeight frontend/public/assets/dota/minimap/minimap.png frontend/public/assets/dota/minimap/minimap_source.png frontend/public/assets/dota/minimap/minimap_simple.png` → 分别为 `3072x3072 / 400x400 / 1024x1024`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-26）
+**✅ 打通建筑 / Roshan / Tormentor 的实时地图目标层，并把状态接入回放主地图**
+- 解析链路已扩展到目标物事件：`parsers/src/main/java/SimpleDemoParser.java` 现在会从 combat log 提取建筑、兵营、遗迹、Roshan 与 Tormentor 的摧毁事件，并在解析 JSON 中输出 `objectives`；`backend/parsers/models.py`、`backend/parsers/clarity_parser.py`、`backend/storage/parquet_storage.py` 与 `backend/routers/playback.py` 也已同步接入，新增 `/api/v1/playback/{match_id}/objectives` 端点，前端可直接按比赛读取目标物时间线。
+- 前端主地图已接入动态目标层：`frontend/src/renderer/data/mapElements.ts` 补齐了建筑 / 兵营 / Roshan 双坑 / 双侧 Tormentor 的地图锚点，`frontend/src/renderer/data/mapObjectives.ts` 会根据当前比赛时间实时推导“在线 / 已摧毁 / 刷新中 / 未激活 / 不确定”状态，`frontend/src/renderer/components/map/DotaMapRenderer.ts` 与 `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将这些目标物叠加到主地图、状态条和图例中。
+- 为了适应 combat log 中部分目标缺少坐标的现实情况，前端推断层额外补了两条稳健规则：T4 在无坐标时会按未摧毁顺序依次分配；Tormentor 在无坐标时会优先按击杀方英雄阵营推断，仍无法确定时则以“双侧位置待定”的方式显示，而不是静默猜错。
+- 已完成验证：`gradle -p parsers shadowJar` → 通过；`./backend/.venv/bin/python -m pytest backend/tests/test_playback_objectives_contract.py -q` → `3 passed`；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/data/mapObjectives.test.ts src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx --reporter=verbose` → `20 passed`；`cd frontend && npm run build` → 通过。真实回放 `8729115809` 重新解析后，解析器已成功产出 `19` 条 objective events。
+
+### 最新完成任务（2026-03-26）
+**✅ 探明本地写实小地图的直接资源上限，并确认可走地图 world 自渲染路线**
+- 已继续重新扫描本机 Dota 2 安装目录、`pak01_dir.vpk` 和地图包 `maps/dota.vpk`。结论是：本地能直接稳定提取到的写实小地图仍然只有 `panorama/images/textures/minimap_game_png.vtex_c`，尺寸上限为 `400x400`；`materials/overviews/dotamap683.vmat_c` / `panorama/images/textures/dotamap683_psd.vtex_c` 能拿到的 `1024x1024` 仍然是简易风格，而不是写实风格。
+- 进一步确认 `maps/dota.vpk` 内含完整地图 world 资源链路，包括 `maps/dota.vmap_c`、`maps/dota/world.vwrld_c`、`maps/dota/worldnodes/*` 以及 `fog_flow_map.vtex_c / fog_opacity_map.vtex_c / water_flow_map.vtex_c`。这意味着虽然本地没有现成更大的写实 minimap 位图，但地图本体资源是齐的。
+- 已用 `Source2Viewer-CLI` 对 `maps/dota.vpk` 成功执行 `world.vwrld_c` 的 glTF 导出，得到 `/tmp/dota-world-glb/maps/dota/world.glb`（约 `155MB`）以及数百张地表/路径/悬崖/建筑相关纹理。说明“从地图 world 自己渲染一张更高分辨率写实俯视图”在技术上是可行的，只是这将不再是简单的位图提取，而是需要额外的正交相机渲染步骤。
+- 本次探索结论：短期内如果只想依赖现成本地贴图，写实风格上限就是 `400x400`；如果要真正提升默认写实地图清晰度，下一步应转向 `world.glb` / world 材质的离线渲染方案，而不是继续搜索 `minimap*.vtex_c`。
+
+### 最新完成任务（2026-03-26）
+**✅ 重新探索本地 Dota 小地图资源，默认图切换为本地写实版**
+- 已重新扫描本机 Dota 2 安装目录与 `pak01_dir.vpk` 中的 minimap / dotamap / overview 相关资源，并对多个候选贴图做了真实提取和尺寸核对。结论是：本地 `panorama/images/textures/minimap_game_png.vtex_c` 是写实风格，但分辨率只有 `400x400`；本地 `panorama/images/textures/dotamap683_psd.vtex_c` 则是简易风格，但分辨率可达 `1024x1024`。
+- `frontend/scripts/sync-dota-game-assets.js` 已更新 minimap 提取策略：`minimap.png` 现在优先由本地写实版 `minimap_game_png` 生成，`minimap_simple.png` 会单独保存本地高分辨率简易图；原有 `background.png` 与 `dotamap.png` 继续保留，方便后续对照或回退。
+- `frontend/src/renderer/components/map/DotaMapRenderer.ts` 已同步调整地图背景回退顺序：默认先尝试 `minimap.png`，若缺失则优先回退到新的 `minimap_simple.png`，再回退到历史 `minimap_740.png / minimap.jpg`。
+- 本机重新同步后已确认当前仓库内小地图资产尺寸为：`minimap.png = 400x400`（写实）、`minimap_simple.png = 1024x1024`（简易）、`background.png = 96x96`、`dotamap.png = 320x320`。也就是说，这次已经修掉了“默认图误用低清简易图”的问题。
+- 本次验证：`node frontend/scripts/sync-dota-game-assets.js --patch 7.41 --vrf-cli /tmp/source2viewer-cli/Source2Viewer-CLI` → 通过；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-03-25）
+**✅ 新增并验证本地 Dota 资源手动提取工作流，7.41 资源已完成一次真实落盘**
+- 已新增 `frontend/scripts/sync-dota-game-assets.js` 与 `frontend/scripts/lib/vpkDirectory.js`。新脚本支持直接读取本机 `pak01_dir.vpk` 目录树，在 `--inspect` 模式下验证目标资源是否存在；若本机已准备好 `Source2Viewer-CLI`，则可进一步把英雄头像、英雄小图、物品图标、小地图底图与 `dota_*.txt / abilities_*.txt / items_game.txt` 手动提取到项目目录。
+- 资源更新策略已从“优先 CDN 自动下载”收敛为“按 parser / patch 分支手动同步并提交到 git”。相关文档已写入 `docs/dota_asset_sync.md`，并在 `frontend/package.json` 新增了 `npm run assets:sync:dota` 入口；依赖说明也补充了官方 `ValveResourceFormat` release 的下载方式。
+- 前端资源消费已同步收口：`frontend/src/renderer/components/map/DotaMapRenderer.ts` 现在优先读取新的 `minimap.png`，若该文件尚未提取则会自动回退到当前仓库里的 `minimap_740.png / minimap.jpg`；`frontend/src/renderer/data/items.ts` 也已改为优先读取仓库内 `/assets/dota/items/*.png`，再回退到后端代理与 Steam CDN。
+- 本机验证：`node frontend/scripts/sync-dota-game-assets.js --inspect --patch 7.41` → 成功解析本地 `pak01_dir.vpk`，确认 `buildId=22492873` 且 `hero / item / minimap / localization / items_game` 目标资源均存在；使用官方 `Source2Viewer` macOS CLI release `18.0` 完成一次真实提取后，已落盘 `128` 张英雄头像、`127` 张英雄小图、`601` 张物品图标、`5` 张小地图相关文件与 `5` 份文本源文件；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/data/items.test.ts --reporter=verbose` → `4 passed`；`cd frontend && npm run build` → 通过。
 
 ### 最新完成任务（2026-03-23）
 **✅ 调整回放页头部辅助徽章位置，弱化标题区拥挤感**

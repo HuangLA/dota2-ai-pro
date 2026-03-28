@@ -32,6 +32,7 @@ import backendAPI, {
   MatchHeatmapResponse,
   MatchPlayer,
   MovementPathsResponse,
+  ObjectivesResponse,
   PlaybackTimeBasis,
   TickData,
   WardData,
@@ -55,6 +56,7 @@ import {
   formatGameClockTime,
   GameClockMapper,
 } from '../utils/gameClock';
+import { buildObjectiveMarkers, summarizeObjectiveMarkers } from '../data/mapObjectives';
 
 /** 时间范围常量（秒） */
 const PRE_GAME_FETCH_SECONDS = 180;
@@ -1605,6 +1607,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
   const [heroPositions, setHeroPositions] = useState<HeroPosition[]>([]);
   const [wardsResponse, setWardsResponse] = useState<WardsResponse | null>(null);
+  const [objectivesResponse, setObjectivesResponse] = useState<ObjectivesResponse | null>(null);
   const [activeKillMarkers, setActiveKillMarkers] = useState<KillMarkerData[]>([]);
   const [showPaths, setShowPaths] = useState(false);
 
@@ -1921,6 +1924,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     setHudMetricsWarnings([]);
     setHudMetricsLoading(false);
     setWardsResponse(null);
+    setObjectivesResponse(null);
     setHoveredWardPreview(null);
     setPinnedWardPreview(null);
     hasHudMetricsDataRef.current = false;
@@ -1961,13 +1965,18 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
         console.log(`[RealMatchViewer] 已加载 ${fullData.ticks.length} 个 tick`);
       }
 
-      const wardsData = await backendAPI.getWards(matchId);
+      const [wardsData, objectivesData] = await Promise.all([
+        backendAPI.getWards(matchId),
+        backendAPI.getObjectives(matchId),
+      ]);
       allWardsRef.current = wardsData;
       setWardsResponse(wardsData);
+      setObjectivesResponse(objectivesData);
 
       const resolveTimeBasis = (
         ticksBasis?: PlaybackTimeBasis,
-        wardsBasis?: PlaybackTimeBasis
+        wardsBasis?: PlaybackTimeBasis,
+        objectivesBasis?: PlaybackTimeBasis
       ): PlaybackTimeBasis | undefined => {
         if (ticksBasis) {
           return ticksBasis;
@@ -1975,14 +1984,22 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
         if (wardsBasis) {
           return wardsBasis;
         }
+        if (objectivesBasis) {
+          return objectivesBasis;
+        }
         return undefined;
       };
 
-      const timeBasis = resolveTimeBasis(fullData?.time_basis, wardsData?.time_basis);
+      const timeBasis = resolveTimeBasis(
+        fullData?.time_basis,
+        wardsData?.time_basis,
+        objectivesData?.time_basis,
+      );
 
       const mapperRecords = [
         ...allTicksRef.current,
         ...(wardsData?.wards ?? []),
+        ...(objectivesData?.objectives ?? []),
       ];
       const mapper = createGameClockMapper(mapperRecords, timeBasis);
       gameClockMapperRef.current = mapper;
@@ -3485,6 +3502,24 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const visibleWards = isOverlayDeclutterActive
     ? []
     : visionMapRecords.map((record) => toMapWard(record, currentTime));
+  const objectiveAttackerTeamByName = useMemo(() => {
+    const lookup: Record<string, number> = {};
+
+    for (const hero of [...teamLineups.radiant, ...teamLineups.dire]) {
+      const teamId = hero.team === 'radiant' ? 2 : 3;
+      lookup[hero.heroName.trim().toLowerCase()] = teamId;
+    }
+
+    return lookup;
+  }, [teamLineups]);
+  const liveObjectiveMarkers = useMemo(
+    () => buildObjectiveMarkers(currentDisplayGameTime, objectivesResponse, objectiveAttackerTeamByName),
+    [currentDisplayGameTime, objectiveAttackerTeamByName, objectivesResponse]
+  );
+  const objectiveSummary = useMemo(
+    () => summarizeObjectiveMarkers(liveObjectiveMarkers),
+    [liveObjectiveMarkers]
+  );
   const visibleKillMarkers = isMapDeclutterActive ? [] : activeKillMarkers;
   const visibleHeatmapGrid = isVisionAnalysisFocusMode ? null : heatmapGrid;
   const visibleHeatmapBounds = isVisionAnalysisFocusMode ? null : heatmapBounds;
@@ -3635,6 +3670,22 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               <span>英雄头像/圆点：当前仍存活的实时位置</span>
             </div>
             <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-sm border border-slate-100 bg-emerald-500" />
+              <span>方块 / 矩形 / 大圆：防御塔、兵营、遗迹等建筑目标</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative h-3.5 w-3.5 rounded-full border-2 border-amber-200 bg-amber-400/30">
+                <div className="absolute inset-[3px] rounded-full bg-amber-100/80" />
+              </div>
+              <span>金色外环：Roshan / Tormentor 正在刷新，或进入刷新窗口</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative h-3.5 w-3.5 rounded-sm border border-slate-400 bg-slate-500/50">
+                <div className="absolute left-0.5 top-1/2 h-px w-3 -translate-y-1/2 rotate-45 bg-slate-100" />
+              </div>
+              <span>灰色斜杠：建筑已被摧毁，或目标物当前未激活</span>
+            </div>
+            <div className="flex items-center gap-2">
               <div className="h-3.5 w-3.5 rounded-full border border-emerald-300 bg-yellow-300" />
               <span>假眼：当前仍存在的 Observer Ward</span>
             </div>
@@ -3645,6 +3696,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             <div className="flex items-center gap-2">
               <div className="h-3.5 w-3.5 rounded-full bg-rose-400 shadow-[0_0_14px_rgba(248,113,113,0.75)]" />
               <span>红色爆点：最近 5 秒的死亡位置</span>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2 text-slate-300">
+              建筑概览：存活 {objectiveSummary.alive} · 摧毁 {objectiveSummary.destroyed}
             </div>
             <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-2.5 py-2 text-slate-300">
               热力图颜色仍然遵循同一条密度带：蓝色稀疏，红色最密集。
@@ -4739,6 +4793,12 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                         <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">时长</span>
                         <span className="font-mono text-slate-100">{matchDurationClockLabel}</span>
                       </span>
+                      <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">建筑</span>
+                        <span className="font-mono text-slate-100">
+                          {objectiveSummary.alive}/{liveObjectiveMarkers.length}
+                        </span>
+                      </span>
                     </div>
 
                     <div
@@ -4757,6 +4817,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       </span>
                       <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
                         路径 {showPaths ? '开启' : '关闭'}
+                      </span>
+                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
+                        建筑 {objectiveSummary.alive}/{liveObjectiveMarkers.length}
                       </span>
                       <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
                         视野 {visionMapModeLabel}
@@ -4812,6 +4875,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                           height={mapViewportSize}
                           heroPositions={visibleHeroPositions}
                           wards={visibleWards}
+                          objectives={liveObjectiveMarkers}
                           killMarkers={visibleKillMarkers}
                           currentGameTime={currentDisplayGameTime}
                           showCalibrationMarkers={showCalibration}
@@ -4842,6 +4906,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                         </span>
                         <span className="text-slate-500">路径</span>
                         <span className="text-slate-300">{showPaths ? pathCompressionLabel : '关闭'}</span>
+                        <span className="text-slate-500">建筑</span>
+                        <span className="text-slate-300">
+                          存活 {objectiveSummary.alive} · 摧毁 {objectiveSummary.destroyed}
+                        </span>
                         <span className="text-slate-500">偏移</span>
                         <span className="font-mono text-slate-100">{timeBasisOffsetSeconds.toFixed(2)}s</span>
                       </div>

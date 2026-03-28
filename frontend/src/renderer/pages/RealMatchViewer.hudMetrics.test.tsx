@@ -244,6 +244,13 @@ describe('RealMatchViewer HUD metrics panel', () => {
         sentries_placed: 0,
       },
     });
+    vi.spyOn(backendAPI, 'getObjectives').mockResolvedValue({
+      match_id: 8674716612,
+      objectives: [],
+      summary: {
+        total: 0,
+      },
+    });
     vi.spyOn(backendAPI, 'getAdvantage').mockResolvedValue({
       match_id: 8674716612,
       data: [
@@ -366,8 +373,8 @@ describe('RealMatchViewer HUD metrics panel', () => {
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
     expect(await screen.findByTestId('replay-viewer-header')).toBeTruthy();
-    expect(screen.getByTestId('replay-viewer-header').className).toContain('2xl:grid-cols-[minmax(0,1fr)_320px]');
-    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:max-w-[320px]');
+    expect(screen.getByTestId('replay-viewer-header').className).toContain('2xl:grid-cols-[minmax(0,1fr)_360px]');
+    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:max-w-[360px]');
     expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:justify-self-end');
   });
 

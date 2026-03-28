@@ -31,8 +31,8 @@ describe('item helpers', () => {
 
   it('returns stable icon candidates with local-first fallback order', () => {
     expect(getItemIconCandidates('Aghanims_Scepter')).toEqual([
-      'http://127.0.0.1:8000/api/v1/assets/items/ultimate_scepter.png',
       '/assets/dota/items/ultimate_scepter.png',
+      'http://127.0.0.1:8000/api/v1/assets/items/ultimate_scepter.png',
       'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/ultimate_scepter.png',
       'https://cdn.akamai.steamstatic.com/apps/dota2/images/dota_react/items/ultimate_scepter.png',
       'https://steamcdn-a.akamaihd.net/apps/dota2/images/dota_react/items/ultimate_scepter.png',

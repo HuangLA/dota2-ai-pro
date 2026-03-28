@@ -8,6 +8,7 @@ import DotaMapRenderer, {
   HeatmapBounds,
   HeroPosition,
   KillMarkerData,
+  ObjectiveMarker,
   PathOverlay,
   Ward,
   WardInteractionPayload,
@@ -19,6 +20,7 @@ export interface MapViewerProps {
   mapImageUrl?: string;
   heroPositions?: HeroPosition[];
   wards?: Ward[];
+  objectives?: ObjectiveMarker[];
   /** Kill markers to display on the minimap */
   killMarkers?: KillMarkerData[];
   /** Current game time for kill marker fade calculation */
@@ -53,6 +55,7 @@ export function MapViewer({
   mapImageUrl,
   heroPositions = [],
   wards = [],
+  objectives = [],
   killMarkers = [],
   currentGameTime = 0,
   showPaths = false,
@@ -196,6 +199,14 @@ export function MapViewer({
     console.log('[MapViewer] Updating wards:', wards.length);
     rendererRef.current.renderWards(wards);
   }, [isInitialized, wards]);
+
+  useEffect(() => {
+    if (!isInitialized || !rendererRef.current) {
+      return;
+    }
+
+    rendererRef.current.renderObjectives(objectives);
+  }, [isInitialized, objectives]);
 
   useEffect(() => {
     if (!isInitialized || !rendererRef.current) {

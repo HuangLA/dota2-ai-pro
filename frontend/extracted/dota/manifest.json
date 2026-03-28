@@ -1,0 +1,41 @@
+{
+  "source": "local-dota-installation",
+  "patch": "7.41",
+  "language": "schinese",
+  "buildId": "22492873",
+  "installDir": "dota 2 beta",
+  "extractedAt": "2026-03-27T07:35:18.525Z",
+  "vpkVersion": 2,
+  "outputs": {
+    "heroPortraits": 128,
+    "heroIcons": 127,
+    "items": 601,
+    "minimapFiles": [
+      "minimap_source.png",
+      "minimap_game.png",
+      "background.png",
+      "minimap_simple.png",
+      "minimap_minimal.png",
+      "dotamap.png",
+      "dotamap_radiant_buildings.png",
+      "dotamap_dire_buildings.png",
+      "icons/tower.png",
+      "icons/tower_90.png",
+      "icons/racks_45.png",
+      "icons/racks_90.png",
+      "icons/ancient.png",
+      "icons/miscbuilding.png",
+      "icons/tower_outer.png",
+      "reference/base_group.png",
+      "minimap.png"
+    ],
+    "minimapDefaultSource": "minimap_source.png",
+    "sourceTexts": [
+      "source/resource/localization/dota_english.txt",
+      "source/resource/localization/dota_schinese.txt",
+      "source/resource/localization/abilities_english.txt",
+      "source/resource/localization/abilities_schinese.txt",
+      "source/scripts/items/items_game.txt"
+    ]
+  }
+}

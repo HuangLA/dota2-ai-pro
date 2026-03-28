@@ -22,6 +22,7 @@ from .models import (
     PositionSample,
     KillEvent,
     WardEvent,
+    ObjectiveEvent,
     EconomySample,
 )
 
@@ -95,6 +96,11 @@ def _trim_postgame_result(result: ParseResult) -> ParseResult:
     result.wards = [
         event
         for event in result.wards
+        if event.game_time is None or event.game_time <= cutoff_game_time + epsilon
+    ]
+    result.objectives = [
+        event
+        for event in result.objectives
         if event.game_time is None or event.game_time <= cutoff_game_time + epsilon
     ]
     result.economy = [
@@ -404,7 +410,20 @@ class ClarityParser:
                 placer_handle=w.get("placer_handle"),
                 placer_team=w.get("placer_team"),
             ))
-        
+
+        objectives = []
+        for objective in data.get("objectives", []):
+            objectives.append(ObjectiveEvent(
+                type=objective.get("type", ""),
+                objective_type=objective.get("objective_type", ""),
+                objective_name=objective.get("objective_name", ""),
+                tick=objective.get("tick", 0),
+                x=objective.get("x"),
+                y=objective.get("y"),
+                team=objective.get("team"),
+                game_time=objective.get("game_time"),
+                attacker_name=objective.get("attacker_name"),
+            ))
 
         # Parse economy samples
         economy = []
@@ -456,6 +475,7 @@ class ClarityParser:
             positions=positions,
             kills=kills,
             wards=wards,
+            objectives=objectives,
             heroes=heroes,
             economy=economy,
         ))

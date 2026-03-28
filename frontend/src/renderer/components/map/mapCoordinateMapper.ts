@@ -26,17 +26,27 @@ export interface CoordinatePoint {
 }
 
 export const DOTA_MAP_BOUNDS: DotaMapBounds = Object.freeze({
-  minX: 7558,
-  maxX: 25353,
-  minY: 7502,
-  maxY: 25269,
+  // Calibrated against official `dotamap_*_buildings.png` overlays plus
+  // parser-derived objective coordinates so static buildings and live replay
+  // world positions share the same linear mapping.
+  minX: 6698,
+  maxX: 25843,
+  minY: 6774,
+  maxY: 25881,
 });
 
-export const MINIMAP_CONTENT_BOUNDS: MinimapContentBounds = Object.freeze({
+export const LEGACY_MINIMAP_CONTENT_BOUNDS: MinimapContentBounds = Object.freeze({
   left: 61 / 1024,
   right: 962 / 1024,
   top: 61 / 1024,
   bottom: 962 / 1024,
+});
+
+export const MINIMAP_CONTENT_BOUNDS: MinimapContentBounds = Object.freeze({
+  left: 0,
+  right: 1,
+  top: 0,
+  bottom: 1,
 });
 
 function clamp01(value: number): number {
@@ -67,7 +77,7 @@ export interface MapCoordinateMapper {
 export function createMapCoordinateMapper(config: MapCoordinateMapperConfig): MapCoordinateMapper {
   const worldSize = getWorldSize(config.worldBounds);
   const contentSize = getContentSize(config.minimapContentBounds);
-  const preserveAspectRatio = config.preserveAspectRatio ?? true;
+  const preserveAspectRatio = config.preserveAspectRatio ?? false;
   const worldSpan = preserveAspectRatio ? Math.max(worldSize.width, worldSize.height) : 0;
   const worldPaddingX = preserveAspectRatio ? (worldSpan - worldSize.width) / 2 : 0;
   const worldPaddingY = preserveAspectRatio ? (worldSpan - worldSize.height) / 2 : 0;

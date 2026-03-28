@@ -140,6 +140,28 @@ class WardEvent:
 
 
 @dataclass
+class ObjectiveEvent:
+    """A structural objective event tracked from the combat log."""
+    type: str  # "destroyed"
+    objective_type: str  # "tower", "barracks", "ancient", "roshan", "tormentor"
+    objective_name: str  # raw combat log target name
+    tick: int
+    x: Optional[float] = None
+    y: Optional[float] = None
+    team: Optional[int] = None  # 2=Radiant, 3=Dire
+    game_time: Optional[float] = None  # In-game clock seconds (creep spawn is 0)
+    attacker_name: Optional[str] = None
+
+    @property
+    def team_name(self) -> Optional[str]:
+        if self.team == 2:
+            return "Radiant"
+        elif self.team == 3:
+            return "Dire"
+        return None
+
+
+@dataclass
 class MatchMetadata:
     """Metadata about the match."""
     match_id: Optional[int] = None
@@ -189,6 +211,7 @@ class ParseResult:
     positions: list[PositionSample] = field(default_factory=list)
     kills: list[KillEvent] = field(default_factory=list)
     wards: list[WardEvent] = field(default_factory=list)
+    objectives: list[ObjectiveEvent] = field(default_factory=list)
     heroes: dict[int, str] = field(default_factory=dict)  # handle -> hero_name
     economy: list[EconomySample] = field(default_factory=list)  # team-level gold/xp snapshots
     

@@ -10,13 +10,21 @@
 
 import * as PIXI from 'pixi.js';
 import { HEROES, getHeroById } from '@/data/heroes';
-import { MAP_ELEMENTS, MapElement } from '@/data/mapElements';
+import {
+  MAP_ELEMENTS,
+  MapElement,
+} from '@/data/mapElements';
 import {
   createMapCoordinateMapper,
   DOTA_MAP_BOUNDS,
   MINIMAP_CONTENT_BOUNDS,
   type MapCoordinateMapper,
 } from './mapCoordinateMapper';
+import {
+  OBJECTIVE_ICON_SPECS,
+  resolveObjectiveIconKey,
+  type ObjectiveIconKey,
+} from './objectiveIconCatalog';
 
 export { DOTA_MAP_BOUNDS } from './mapCoordinateMapper';
 
@@ -105,6 +113,18 @@ export interface PathOverlay {
   points: PathOverlayPoint[];
 }
 
+export interface ObjectiveMarker {
+  id: string;
+  type: MapElement['type'];
+  team: MapElement['team'];
+  x: number;
+  y: number;
+  name: string;
+  nameZh: string;
+  state: 'alive' | 'destroyed' | 'respawning' | 'inactive' | 'uncertain';
+  detailLabel?: string;
+}
+
 /**
  * Renderer configuration
  */
@@ -143,13 +163,32 @@ interface HeroState {
   usingIcon: boolean;
 }
 
+interface ObjectiveTextureAsset {
+  texture: PIXI.Texture;
+  anchorX: number;
+  anchorY: number;
+  sizeRatio: number;
+}
+
+const BUILDING_TEAM_TINT: Record<'radiant' | 'dire' | 'neutral', number> = {
+  radiant: 0x22c55e,
+  dire: 0xef4444,
+  neutral: 0xffd700,
+};
+
+const BUILDING_DESTROYED_TINT: Record<'radiant' | 'dire' | 'neutral', number> = {
+  radiant: 0x3f7f58,
+  dire: 0x9f3f49,
+  neutral: 0x78716c,
+};
+
 /**
  * Main Dota Map Renderer Class
  */
 export class DotaMapRenderer {
   private app!: PIXI.Application;
   private mapContainer!: PIXI.Container;
-  private buildingsContainer!: PIXI.Container;  // 建筑层
+  private buildingsContainer!: PIXI.Container;  // 目标物层
   private wardsContainer!: PIXI.Container;
   private killsContainer!: PIXI.Container;   // 击杀标记层
   private pathsContainer!: PIXI.Container;   // 英雄移动轨迹层
@@ -170,6 +209,7 @@ export class DotaMapRenderer {
     observer: { radiant: undefined, dire: undefined },
     sentry: { radiant: undefined, dire: undefined },
   };
+  private objectiveTextures: Map<ObjectiveIconKey, ObjectiveTextureAsset> = new Map();
   private coordinateMapper: MapCoordinateMapper;
   private currentWards: Ward[] = [];
   private selectedWardKeys: Set<string> = new Set();
@@ -220,7 +260,7 @@ export class DotaMapRenderer {
   constructor(config: RendererConfig) {
     this.config = {
       backgroundColor: 0x1a1a2e,
-      mapImageUrl: '/assets/dota/minimap/minimap_740.png',
+      mapImageUrl: '/assets/dota/minimap/minimap.png',
       mapDimOpacity: 0.32,
       useHeroIcons: true,
       heroIconSize: 32,
@@ -284,6 +324,8 @@ export class DotaMapRenderer {
     } else {
       this.drawGrid();
     }
+
+    await this.preloadObjectiveTextures();
 
     this.drawMapDimOverlay();
     
@@ -539,6 +581,24 @@ export class DotaMapRenderer {
     console.log(`[DotaMapRenderer] Drew ${MAP_ELEMENTS.length} map elements`);
   }
 
+  public renderObjectives(objectives: ObjectiveMarker[]): void {
+    const previousChildren = this.buildingsContainer.removeChildren();
+    for (const child of previousChildren) {
+      child.destroy({ children: true });
+    }
+
+    for (const objective of objectives) {
+      const screenPos = this.gameToScreen(objective.x, objective.y);
+      const container = this.createObjectiveSprite(objective) ?? this.createObjectiveGraphic(objective);
+      if (!container) {
+        continue;
+      }
+      container.x = screenPos.x;
+      container.y = screenPos.y;
+      this.buildingsContainer.addChild(container);
+    }
+  }
+
   /**
    * 创建地图元素的图形表示
    */
@@ -648,6 +708,148 @@ export class DotaMapRenderer {
     return graphic;
   }
 
+  private createObjectiveSprite(objective: ObjectiveMarker): PIXI.Container | null {
+    const asset = this.getObjectiveTextureAsset(objective);
+    if (!asset) {
+      return null;
+    }
+
+    const container = new PIXI.Container();
+    const sprite = new PIXI.Sprite(asset.texture);
+    const iconSize = Math.min(this.config.width, this.config.height) * asset.sizeRatio;
+    sprite.anchor.set(
+      asset.anchorX / asset.texture.width,
+      asset.anchorY / asset.texture.height,
+    );
+    sprite.scale.set(iconSize / Math.max(asset.texture.width, asset.texture.height));
+
+    if (objective.state === 'destroyed') {
+      sprite.tint = BUILDING_DESTROYED_TINT[objective.team];
+      sprite.alpha = 0.28;
+    } else if (objective.state === 'uncertain') {
+      sprite.tint = 0xfacc15;
+      sprite.alpha = 0.72;
+    } else {
+      sprite.tint = BUILDING_TEAM_TINT[objective.team];
+      sprite.alpha = 0.96;
+    }
+
+    container.addChild(sprite);
+    return container;
+  }
+
+  private getObjectiveTextureAsset(objective: ObjectiveMarker): ObjectiveTextureAsset | undefined {
+    const iconKey = resolveObjectiveIconKey(objective);
+    return iconKey ? this.objectiveTextures.get(iconKey) : undefined;
+  }
+
+  private createObjectiveGraphic(objective: ObjectiveMarker): PIXI.Container | null {
+    const container = new PIXI.Container();
+    const graphic = new PIXI.Graphics();
+
+    let fillColor =
+      objective.team === 'radiant'
+        ? 0x22c55e
+        : objective.team === 'dire'
+          ? 0xef4444
+          : 0xffd700;
+    let alpha = 0.82;
+    let strokeColor = 0xf8fafc;
+
+    if (objective.type === 'roshan') {
+      fillColor = 0xf97316;
+    } else if (objective.type === 'tormentor') {
+      fillColor = 0xe11d48;
+    } else if (objective.type === 'barracks') {
+      alpha = 0.7;
+    }
+
+    if (objective.state === 'destroyed') {
+      fillColor = 0x64748b;
+      alpha = 0.22;
+      strokeColor = 0x94a3b8;
+    } else if (objective.state === 'inactive') {
+      fillColor = 0x475569;
+      alpha = 0.18;
+      strokeColor = 0x64748b;
+    } else if (objective.state === 'respawning') {
+      fillColor = 0xf59e0b;
+      alpha = 0.6;
+      strokeColor = 0xfde68a;
+    } else if (objective.state === 'uncertain') {
+      fillColor = 0xfacc15;
+      alpha = 0.52;
+      strokeColor = 0xfef3c7;
+    }
+
+    switch (objective.type) {
+      case 'tower':
+        graphic.rect(-4, -4, 8, 8);
+        graphic.fill({ color: fillColor, alpha });
+        graphic.stroke({ width: 1.25, color: strokeColor, alpha: 0.8 });
+        break;
+      case 'barracks':
+        graphic.rect(-6, -4, 12, 8);
+        graphic.fill({ color: fillColor, alpha });
+        graphic.stroke({ width: 1.25, color: strokeColor, alpha: 0.8 });
+        break;
+      case 'ancient':
+        graphic.circle(0, 0, 9);
+        graphic.fill({ color: fillColor, alpha });
+        graphic.stroke({ width: 2, color: strokeColor, alpha: 0.85 });
+        break;
+      case 'roshan':
+        graphic.circle(0, 0, 8);
+        graphic.fill({ color: fillColor, alpha });
+        graphic.stroke({ width: 2, color: strokeColor, alpha: 0.9 });
+        graphic.circle(0, 0, 3);
+        graphic.fill({ color: 0x020617, alpha: 0.7 });
+        break;
+      case 'tormentor':
+        this.drawHexagon(graphic, 7, fillColor);
+        graphic.alpha = alpha;
+        break;
+      default:
+        return null;
+    }
+
+    container.addChild(graphic);
+
+    if (objective.state === 'destroyed' || objective.state === 'inactive') {
+      const slash = new PIXI.Graphics();
+      slash.moveTo(-6, -6);
+      slash.lineTo(6, 6);
+      slash.stroke({ width: 2, color: strokeColor, alpha: 0.8 });
+      container.addChild(slash);
+    } else if (objective.state === 'respawning' || objective.state === 'uncertain') {
+      const ring = new PIXI.Graphics();
+      ring.circle(0, 0, objective.type === 'roshan' ? 11 : 9);
+      ring.stroke({ width: 2, color: strokeColor, alpha: 0.9 });
+      container.addChild(ring);
+    }
+
+    if (
+      objective.detailLabel &&
+      (objective.type === 'roshan' || objective.type === 'tormentor')
+    ) {
+      const label = new PIXI.Text({
+        text: objective.detailLabel,
+        style: {
+          fontSize: 9,
+          fill: strokeColor,
+          fontWeight: '700',
+          stroke: { color: 0x020617, width: 3 },
+          align: 'center',
+        },
+      });
+      label.anchor.set(0.5, 0);
+      label.y = objective.type === 'roshan' ? 12 : 10;
+      container.addChild(label);
+    }
+
+    return container;
+  }
+
   /**
    * 绘制六边形
    */
@@ -709,6 +911,26 @@ export class DotaMapRenderer {
     await Promise.allSettled(loadPromises);
     this.texturesLoaded = true;
     console.log(`[DotaMapRenderer] Loaded ${this.heroTexturesById.size} hero textures`);
+  }
+
+  private async preloadObjectiveTextures(): Promise<void> {
+    const entries = Object.entries(OBJECTIVE_ICON_SPECS) as Array<[ObjectiveIconKey, (typeof OBJECTIVE_ICON_SPECS)[ObjectiveIconKey]]>;
+
+    await Promise.allSettled(
+      entries.map(async ([iconKey, spec]) => {
+        try {
+          const texture = await PIXI.Assets.load<PIXI.Texture>(spec.assetPath);
+          this.objectiveTextures.set(iconKey, {
+            texture,
+            anchorX: texture.width / 2,
+            anchorY: texture.height / 2,
+            sizeRatio: spec.sizeRatio,
+          });
+        } catch (error) {
+          console.warn(`[DotaMapRenderer] Failed to load objective icon ${iconKey}`, error);
+        }
+      }),
+    );
   }
 
   /**
@@ -1048,18 +1270,32 @@ export class DotaMapRenderer {
    * Load and display Dota 2 minimap background
    */
   private async loadMapBackground(url: string): Promise<void> {
-    console.log('[DotaMapRenderer] Loading map background from:', url);
-    try {
-      const texture = await PIXI.Assets.load(url);
-      this.mapSprite = new PIXI.Sprite(texture);
-      this.mapSprite.width = this.config.width;
-      this.mapSprite.height = this.config.height;
-      this.mapContainer.addChild(this.mapSprite);
-      console.log('[DotaMapRenderer] Map background loaded successfully');
-    } catch (error) {
-      console.error('[DotaMapRenderer] Failed to load map image:', error);
-      this.drawGrid();
+    const candidates = Array.from(new Set([
+      url,
+      '/assets/dota/minimap/minimap_source.png',
+      '/assets/dota/minimap/minimap_game.png',
+      '/assets/dota/minimap/minimap_simple.png',
+      '/assets/dota/minimap/minimap_740.png',
+      '/assets/dota/minimap/minimap.jpg',
+    ]));
+
+    for (const candidate of candidates) {
+      console.log('[DotaMapRenderer] Loading map background from:', candidate);
+      try {
+        const texture = await PIXI.Assets.load(candidate);
+        this.mapSprite = new PIXI.Sprite(texture);
+        this.mapSprite.width = this.config.width;
+        this.mapSprite.height = this.config.height;
+        this.mapContainer.addChild(this.mapSprite);
+        console.log('[DotaMapRenderer] Map background loaded successfully');
+        return;
+      } catch (error) {
+        console.warn('[DotaMapRenderer] Failed to load map image candidate:', candidate, error);
+      }
     }
+
+    console.error('[DotaMapRenderer] Failed to load all map image candidates');
+    this.drawGrid();
   }
 
   /**

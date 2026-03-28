@@ -120,6 +120,30 @@ export interface WardsResponse {
   };
 }
 
+export interface ObjectiveEventData {
+  type: 'destroyed';
+  objective_type: 'tower' | 'barracks' | 'ancient' | 'roshan' | 'tormentor' | string;
+  objective_name: string;
+  tick: number;
+  time: number;
+  game_time?: number;
+  x?: number;
+  y?: number;
+  team?: number;
+  team_name?: string;
+  attacker_name?: string;
+}
+
+export interface ObjectivesResponse {
+  match_id: number;
+  time_basis?: PlaybackTimeBasis;
+  objectives: ObjectiveEventData[];
+  summary: {
+    total: number;
+    by_type?: Record<string, number>;
+  };
+}
+
 export interface HudHeroMetric {
   hero: string;
   team: string;
@@ -465,6 +489,33 @@ class BackendAPI {
       return data;
     } catch (error) {
       console.error('Failed to fetch wards:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get structural objective events for a match
+   */
+  async getObjectives(matchId: number): Promise<ObjectivesResponse | null> {
+    try {
+      const response = await fetch(
+        buildApiUrl(`/api/v1/playback/${matchId}/objectives`),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: ObjectivesResponse = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch objective events:', error);
       return null;
     }
   }

@@ -850,8 +850,8 @@ export function getItemIconCandidates(itemName: string): string[] {
   }
 
   const basePaths = [
-    buildApiUrl(`/api/v1/assets/items/${normalized}.png`),
     `/assets/dota/items/${normalized}.png`,
+    buildApiUrl(`/api/v1/assets/items/${normalized}.png`),
     `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${normalized}.png`,
     `https://cdn.akamai.steamstatic.com/apps/dota2/images/dota_react/items/${normalized}.png`,
     `https://steamcdn-a.akamaihd.net/apps/dota2/images/dota_react/items/${normalized}.png`,

@@ -48,7 +48,20 @@ public class SimpleDemoParser {
     private static final float OBSERVER_WARD_LIFETIME_SECONDS = 360.0f;
     private static final float SENTRY_WARD_LIFETIME_SECONDS = 420.0f;
     private static final float WARD_NATURAL_EXPIRATION_TOLERANCE_SECONDS = 15.0f;
+    private static final int OBJECTIVE_DELETE_MATCH_TICK_WINDOW = 120;
+    private static final int MAX_RECENT_OBJECTIVE_SNAPSHOTS_PER_NAME = 4;
+    private static final int MAX_RECENT_OBJECTIVE_DEATH_SNAPSHOTS = 64;
+    private static final boolean OBJECTIVE_DEBUG = Boolean.parseBoolean(
+            System.getenv().getOrDefault("TRUE_SIGHT_OBJECTIVE_DEBUG", "false")
+    );
     private static final Map<String, String> SUMMON_OWNER_PATTERNS = createSummonOwnerPatterns();
+    private static final List<String> OBJECTIVE_ENTITY_NAME_PROPERTIES = Arrays.asList(
+            "m_iszUnitName",
+            "m_iName",
+            "m_szUnitName",
+            "m_pEntity.m_name",
+            "m_pEntity.m_iszEntityName"
+    );
 
     private static Map<String, String> createSummonOwnerPatterns() {
         Map<String, String> patterns = new LinkedHashMap<>();
@@ -117,6 +130,7 @@ public class SimpleDemoParser {
             System.err.println("Position samples: " + processor.getPositionSamples().size());
             System.err.println("Kill events: " + processor.getKillEvents().size());
             System.err.println("Ward events: " + processor.getWardEvents().size());
+            System.err.println("Objective events: " + processor.getObjectiveEvents().size());
             System.err.println("");
             
             // Build output JSON
@@ -249,6 +263,9 @@ public class SimpleDemoParser {
         // Add ward events
         result.put("wards", processor.getWardEvents());
 
+        // Add structural objective events
+        result.put("objectives", processor.getObjectiveEvents());
+
         // Add economy timeline samples
         result.put("economy", processor.getEconomySamples());
         
@@ -316,6 +333,7 @@ public class SimpleDemoParser {
         private List<Map<String, Object>> positionSamples = new ArrayList<>();
         private List<Map<String, Object>> killEvents = new ArrayList<>();
         private List<Map<String, Object>> wardEvents = new ArrayList<>();
+        private List<Map<String, Object>> objectiveEvents = new ArrayList<>();
         private List<Map<String, Object>> wardDestroySignals = new ArrayList<>();
         private List<Map<String, Object>> economySamples = new ArrayList<>();
         private Map<Integer, String> heroMapping = new HashMap<>();
@@ -329,6 +347,11 @@ public class SimpleDemoParser {
         private Map<Integer, HeroState> heroesByPlayerId = new HashMap<>();
         private Map<Integer, HeroState> heroesByPlayerOwnerId = new HashMap<>();
         private Map<Integer, HeroState> heroesByOwnerEntityRef = new HashMap<>();
+        private Map<Integer, ObjectiveEntityState> trackedObjectiveEntities = new HashMap<>();
+        private Deque<ObjectivePositionSnapshot> recentObjectiveDeathSnapshots = new ArrayDeque<>();
+        private Map<String, List<ObjectiveEntityState>> objectiveEntitiesByName = new HashMap<>();
+        private Map<String, Deque<ObjectivePositionSnapshot>> recentDeletedObjectiveEntities = new HashMap<>();
+        private Set<String> objectiveLookupDebuggedNames = new HashSet<>();
 
         // Cache item slot field names per hero DT class once discovered.
         private Map<String, List<String>> heroItemSlotProperties = new HashMap<>();
@@ -360,6 +383,10 @@ public class SimpleDemoParser {
         public void onTickStart(Context ctx, boolean synthetic) {
             totalTicks++;
             lastObservedReplayTime = getReplayTime(ctx.getTick(), currentGameRulesTime);
+
+            if (!minimalMode) {
+                sampleObjectiveEntityPositions();
+            }
             
             // Sample hero positions at regular intervals
             if (!minimalMode && (totalTicks - lastSampledTick) >= POSITION_SAMPLE_INTERVAL) {
@@ -400,6 +427,30 @@ public class SimpleDemoParser {
             if (dataDireEntity != null && e != null && dataDireEntity.getHandle() == e.getHandle()) {
                 dataDireEntity = null;
             }
+        }
+
+        @OnEntityCreated(classPattern = "CDOTA_.*")
+        public void onObjectiveCandidateCreated(Context ctx, Entity entity) {
+            if (entity == null || minimalMode) {
+                return;
+            }
+            registerObjectiveEntity(entity);
+        }
+
+        @OnEntityUpdated(classPattern = "CDOTA_.*(Tower|Barracks|Fort|Roshan|Miniboss|MiniBoss).*")
+        public void onObjectiveCandidateUpdated(Context ctx, Entity entity, FieldPath[] changedPaths, int numChanges) {
+            if (entity == null || minimalMode) {
+                return;
+            }
+            registerObjectiveEntity(entity);
+        }
+
+        @OnEntityDeleted(classPattern = "CDOTA_.*")
+        public void onObjectiveCandidateDeleted(Context ctx, Entity entity) {
+            if (entity == null || minimalMode) {
+                return;
+            }
+            unregisterObjectiveEntity(entity.getHandle());
         }
         
         private void updateGameRules(Context ctx, Entity e) {
@@ -482,6 +533,7 @@ public class SimpleDemoParser {
                     if (firstClockZeroTimeSeen || clockZeroTimeChanged) {
                         recalculateGameTimes(positionSamples);
                         recalculateGameTimes(wardEvents);
+                        recalculateGameTimes(objectiveEvents);
                         recalculateGameTimes(wardDestroySignals);
                         recalculateGameTimes(economySamples);
                     }
@@ -545,6 +597,592 @@ public class SimpleDemoParser {
 
             float pregameToZeroDelta = rawGameStartTime - preGameStartTime;
             return Math.abs(pregameToZeroDelta - 90.0f) <= PREGAME_ALIGNMENT_EPSILON_SECONDS;
+        }
+
+        private void registerObjectiveEntity(Entity entity) {
+            String objectiveName = extractObjectiveEntityName(entity);
+            ObjectiveDescriptor descriptor = objectiveName != null
+                    ? classifyObjectiveTarget(objectiveName)
+                    : classifyObjectiveEntity(entity);
+            if (descriptor == null) {
+                return;
+            }
+
+            int handle = entity.getHandle();
+            ObjectiveEntityState state = trackedObjectiveEntities.get(handle);
+            if (state == null) {
+                state = new ObjectiveEntityState();
+                state.handle = handle;
+                trackedObjectiveEntities.put(handle, state);
+            } else if (state.objectiveName != null && !state.objectiveName.equals(objectiveName)) {
+                removeTrackedObjectiveEntityReference(state);
+            }
+
+            state.objectiveName = objectiveName;
+            state.type = descriptor.type;
+            state.team = descriptor.team;
+            refreshObjectiveEntityState(state, entity);
+            if (state.objectiveName != null) {
+                addTrackedObjectiveEntityReference(state);
+            }
+        }
+
+        private void refreshObjectiveEntityState(ObjectiveEntityState state, Entity entity) {
+            if (state == null || entity == null) {
+                return;
+            }
+
+            Integer previousHealth = state.hasHealth ? state.lastHealth : null;
+            float[] pos = getEntityPosition(entity);
+            if (pos != null) {
+                state.lastX = pos[0];
+                state.lastY = pos[1];
+                state.hasPosition = true;
+            }
+
+            Integer health = toIntOrNull(getPropertySafe(entity, "m_iHealth"));
+            if (health != null) {
+                state.lastHealth = health;
+                state.hasHealth = true;
+                if (!state.destroyedRecorded
+                        && state.hasPosition
+                        && ((previousHealth != null && previousHealth > 0 && health <= 0)
+                        || (previousHealth == null && health <= 0))) {
+                    rememberObjectiveDeathSnapshot(state, totalTicks);
+                    state.destroyedRecorded = true;
+                }
+                if (health > 0) {
+                    state.destroyedRecorded = false;
+                }
+            }
+
+            state.lastSeenTick = totalTicks;
+        }
+
+        private void sampleObjectiveEntityPositions() {
+            for (ObjectiveEntityState state : trackedObjectiveEntities.values()) {
+                Entity entity = entities.getByHandle(state.handle);
+                if (entity == null) {
+                    continue;
+                }
+                refreshObjectiveEntityState(state, entity);
+            }
+        }
+
+        private void unregisterObjectiveEntity(int handle) {
+            ObjectiveEntityState state = trackedObjectiveEntities.remove(handle);
+            if (state == null) {
+                return;
+            }
+
+            if (state.hasPosition && !state.destroyedRecorded) {
+                rememberObjectiveDeathSnapshot(state, totalTicks);
+                state.destroyedRecorded = true;
+            }
+            removeTrackedObjectiveEntityReference(state);
+            rememberDeletedObjectiveEntity(state);
+        }
+
+        private void addTrackedObjectiveEntityReference(ObjectiveEntityState state) {
+            if (state == null || state.objectiveName == null) {
+                return;
+            }
+
+            List<ObjectiveEntityState> states = objectiveEntitiesByName.computeIfAbsent(
+                    state.objectiveName,
+                    key -> new ArrayList<>()
+            );
+            if (!states.contains(state)) {
+                states.add(state);
+            }
+        }
+
+        private void removeTrackedObjectiveEntityReference(ObjectiveEntityState state) {
+            if (state == null || state.objectiveName == null) {
+                return;
+            }
+
+            List<ObjectiveEntityState> states = objectiveEntitiesByName.get(state.objectiveName);
+            if (states == null) {
+                return;
+            }
+            states.remove(state);
+            if (states.isEmpty()) {
+                objectiveEntitiesByName.remove(state.objectiveName);
+            }
+        }
+
+        private void rememberDeletedObjectiveEntity(ObjectiveEntityState state) {
+            if (state == null || state.objectiveName == null || !state.hasPosition) {
+                return;
+            }
+
+            Deque<ObjectivePositionSnapshot> snapshots = recentDeletedObjectiveEntities.computeIfAbsent(
+                    state.objectiveName,
+                    key -> new ArrayDeque<>()
+            );
+            snapshots.addLast(new ObjectivePositionSnapshot(
+                    state.objectiveName,
+                    state.type,
+                    state.team,
+                    state.lastX,
+                    state.lastY,
+                    totalTicks,
+                    state.handle
+            ));
+            while (snapshots.size() > MAX_RECENT_OBJECTIVE_SNAPSHOTS_PER_NAME) {
+                snapshots.removeFirst();
+            }
+        }
+
+        private void rememberObjectiveDeathSnapshot(ObjectiveEntityState state, int tick) {
+            if (state == null || state.type == null || !state.hasPosition) {
+                return;
+            }
+
+            recentObjectiveDeathSnapshots.addLast(new ObjectivePositionSnapshot(
+                    state.objectiveName,
+                    state.type,
+                    state.team,
+                    state.lastX,
+                    state.lastY,
+                    tick,
+                    state.handle
+            ));
+
+            while (recentObjectiveDeathSnapshots.size() > MAX_RECENT_OBJECTIVE_DEATH_SNAPSHOTS) {
+                recentObjectiveDeathSnapshots.removeFirst();
+            }
+        }
+
+        private void attachObjectiveFallbackLocation(Map<String, Object> objectiveEvent, String objectiveName) {
+            ObjectivePositionSnapshot snapshot = resolveRecentObjectiveDeathSnapshot(objectiveName);
+            if (snapshot == null) {
+                snapshot = resolveObjectivePositionSnapshot(objectiveName);
+            }
+            if (snapshot == null) {
+                snapshot = scanObjectivePositionSnapshot(objectiveName);
+            }
+            if (snapshot == null) {
+                debugObjectiveLookup(objectiveName);
+                return;
+            }
+
+            objectiveEvent.put("x", snapshot.x);
+            objectiveEvent.put("y", snapshot.y);
+        }
+
+        private ObjectivePositionSnapshot resolveRecentObjectiveDeathSnapshot(String objectiveName) {
+            ObjectiveDescriptor descriptor = classifyObjectiveTarget(objectiveName);
+            if (descriptor == null) {
+                return null;
+            }
+
+            pruneExpiredRecentObjectiveDeathSnapshots();
+
+            ObjectivePositionSnapshot bestSnapshot = null;
+            int bestTickDistance = Integer.MAX_VALUE;
+
+            for (ObjectivePositionSnapshot snapshot : recentObjectiveDeathSnapshots) {
+                if (snapshot == null || snapshot.consumed) {
+                    continue;
+                }
+                if (!descriptor.type.equals(snapshot.type)) {
+                    continue;
+                }
+                if (descriptor.team != null && snapshot.team != null && !descriptor.team.equals(snapshot.team)) {
+                    continue;
+                }
+
+                int tickDistance = Math.abs(totalTicks - snapshot.tick);
+                if (tickDistance > OBJECTIVE_DELETE_MATCH_TICK_WINDOW) {
+                    continue;
+                }
+
+                if (objectiveName.equals(snapshot.objectiveName)) {
+                    snapshot.consumed = true;
+                    return snapshot;
+                }
+
+                if (bestSnapshot == null
+                        || tickDistance < bestTickDistance
+                        || (tickDistance == bestTickDistance && snapshot.tick > bestSnapshot.tick)) {
+                    bestSnapshot = snapshot;
+                    bestTickDistance = tickDistance;
+                }
+            }
+
+            if (bestSnapshot != null) {
+                bestSnapshot.consumed = true;
+            }
+            return bestSnapshot;
+        }
+
+        private ObjectivePositionSnapshot resolveObjectivePositionSnapshot(String objectiveName) {
+            if (objectiveName == null || objectiveName.isEmpty()) {
+                return null;
+            }
+
+            pruneExpiredObjectiveSnapshots(objectiveName);
+
+            Deque<ObjectivePositionSnapshot> deletedSnapshots = recentDeletedObjectiveEntities.get(objectiveName);
+            if (deletedSnapshots != null && !deletedSnapshots.isEmpty()) {
+                return deletedSnapshots.peekLast();
+            }
+
+            List<ObjectiveEntityState> liveStates = objectiveEntitiesByName.get(objectiveName);
+            if (liveStates == null || liveStates.isEmpty()) {
+                return null;
+            }
+
+            ObjectiveEntityState bestState = null;
+            for (ObjectiveEntityState candidate : liveStates) {
+                if (!candidate.hasPosition) {
+                    continue;
+                }
+                if (bestState == null || candidate.lastSeenTick > bestState.lastSeenTick) {
+                    bestState = candidate;
+                }
+            }
+
+            if (bestState == null) {
+                return null;
+            }
+
+            if (liveStates.size() > 1 && objectiveName.contains("tower4")) {
+                return null;
+            }
+
+            return new ObjectivePositionSnapshot(
+                    objectiveName,
+                    bestState.type,
+                    bestState.team,
+                    bestState.lastX,
+                    bestState.lastY,
+                    bestState.lastSeenTick,
+                    bestState.handle
+            );
+        }
+
+        private ObjectivePositionSnapshot scanObjectivePositionSnapshot(String objectiveName) {
+            if (objectiveName == null || objectiveName.isEmpty()) {
+                return null;
+            }
+            ObjectiveDescriptor descriptor = classifyObjectiveTarget(objectiveName);
+            if (descriptor == null) {
+                return null;
+            }
+
+            Iterator<Entity> iterator = entities.getAllByPredicate(entity -> entity != null);
+            ObjectivePositionSnapshot bestSnapshot = null;
+            Integer bestHealth = null;
+            int matchCount = 0;
+
+            while (iterator.hasNext()) {
+                Entity entity = iterator.next();
+                if (entity == null || !entity.isActive() || entity.getDtClass() == null) {
+                    continue;
+                }
+
+                String dtName = entity.getDtClass().getDtName();
+                if (!isLikelyObjectiveEntityClass(dtName, objectiveName)) {
+                    continue;
+                }
+
+                String entityObjectiveName = extractObjectiveEntityName(entity);
+                if (!objectiveName.equals(entityObjectiveName)) {
+                    continue;
+                }
+
+                float[] pos = getEntityPosition(entity);
+                if (pos == null) {
+                    continue;
+                }
+
+                matchCount += 1;
+                Integer health = toIntOrNull(getPropertySafe(entity, "m_iHealth"));
+                if (bestSnapshot == null) {
+                    bestSnapshot = new ObjectivePositionSnapshot(
+                            objectiveName,
+                            descriptor.type,
+                            descriptor.team,
+                            pos[0],
+                            pos[1],
+                            totalTicks,
+                            entity.getHandle()
+                    );
+                    bestHealth = health;
+                    continue;
+                }
+
+                if (health != null && (bestHealth == null || health < bestHealth)) {
+                    bestSnapshot = new ObjectivePositionSnapshot(
+                            objectiveName,
+                            descriptor.type,
+                            descriptor.team,
+                            pos[0],
+                            pos[1],
+                            totalTicks,
+                            entity.getHandle()
+                    );
+                    bestHealth = health;
+                }
+            }
+
+            if (matchCount == 0) {
+                return null;
+            }
+
+            if (matchCount > 1 && objectiveName.contains("tower4") && bestHealth == null) {
+                return null;
+            }
+
+            return bestSnapshot;
+        }
+
+        private boolean isLikelyObjectiveEntityClass(String dtName, String objectiveName) {
+            if (dtName == null || objectiveName == null) {
+                return false;
+            }
+
+            String normalizedDtName = dtName.toLowerCase(Locale.ROOT);
+            if (objectiveName.contains("_tower")) {
+                return normalizedDtName.contains("tower");
+            }
+            if (objectiveName.contains("_rax")) {
+                return normalizedDtName.contains("barracks");
+            }
+            if (objectiveName.contains("_fort")) {
+                return normalizedDtName.contains("fort");
+            }
+            if ("npc_dota_roshan".equals(objectiveName)) {
+                return normalizedDtName.contains("roshan");
+            }
+            if ("npc_dota_miniboss".equals(objectiveName)) {
+                return normalizedDtName.contains("miniboss");
+            }
+
+            return normalizedDtName.contains("tower")
+                    || normalizedDtName.contains("barracks")
+                    || normalizedDtName.contains("fort")
+                    || normalizedDtName.contains("roshan")
+                    || normalizedDtName.contains("miniboss");
+        }
+
+        private ObjectiveDescriptor classifyObjectiveEntity(Entity entity) {
+            if (entity == null || entity.getDtClass() == null) {
+                return null;
+            }
+
+            String dtName = entity.getDtClass().getDtName();
+            if (dtName == null || dtName.isEmpty()) {
+                return null;
+            }
+
+            String normalizedDtName = dtName.toLowerCase(Locale.ROOT);
+            Integer team = resolveObjectiveEntityTeam(entity);
+            if (normalizedDtName.contains("tower")) {
+                return new ObjectiveDescriptor("tower", team);
+            }
+            if (normalizedDtName.contains("barracks")) {
+                return new ObjectiveDescriptor("barracks", team);
+            }
+            if (normalizedDtName.contains("fort")) {
+                return new ObjectiveDescriptor("ancient", team);
+            }
+            if (normalizedDtName.contains("roshan")) {
+                return new ObjectiveDescriptor("roshan", null);
+            }
+            if (normalizedDtName.contains("miniboss")) {
+                return new ObjectiveDescriptor("tormentor", null);
+            }
+            return null;
+        }
+
+        private Integer resolveObjectiveEntityTeam(Entity entity) {
+            if (entity == null) {
+                return null;
+            }
+            return toIntOrNull(getPropertySafe(entity, "m_iTeamNum"));
+        }
+
+        private void debugObjectiveLookup(String objectiveName) {
+            if (!OBJECTIVE_DEBUG || objectiveName == null || !objectiveLookupDebuggedNames.add(objectiveName)) {
+                return;
+            }
+
+            System.err.println("[objective-debug] lookup miss for " + objectiveName + " at tick " + totalTicks);
+            Iterator<Entity> iterator = entities.getAllByPredicate(entity -> entity != null);
+            int inspected = 0;
+            while (iterator.hasNext() && inspected < 40) {
+                Entity entity = iterator.next();
+                if (entity == null || entity.getDtClass() == null || !entity.isActive()) {
+                    continue;
+                }
+
+                String dtName = entity.getDtClass().getDtName();
+                if (!isLikelyObjectiveEntityClass(dtName, objectiveName)) {
+                    continue;
+                }
+
+                inspected += 1;
+                String extractedName = extractObjectiveEntityName(entity);
+                float[] pos = getEntityPosition(entity);
+                Integer health = toIntOrNull(getPropertySafe(entity, "m_iHealth"));
+                System.err.println(String.format(
+                        Locale.ROOT,
+                        "[objective-debug] candidate dt=%s handle=%d extracted=%s health=%s pos=%s",
+                        dtName,
+                        entity.getHandle(),
+                        extractedName,
+                        health,
+                        pos == null ? "null" : Arrays.toString(pos)
+                ));
+
+                List<String> interestingFields = collectInterestingStringFields(entity);
+                for (String field : interestingFields) {
+                    System.err.println("[objective-debug]   field " + field);
+                }
+            }
+
+            if (inspected == 0) {
+                System.err.println("[objective-debug] no active candidate entities matched class filters");
+            }
+        }
+
+        private List<String> collectInterestingStringFields(Entity entity) {
+            List<String> fields = new ArrayList<>();
+            if (entity == null || entity.getDtClass() == null || entity.getState() == null) {
+                return fields;
+            }
+
+            try {
+                for (FieldPath fieldPath : entity.getDtClass().collectFieldPaths(entity.getState())) {
+                    String fieldName = entity.getDtClass().getNameForFieldPath(fieldPath);
+                    Object value = entity.getPropertyForFieldPath(fieldPath);
+                    if (!(value instanceof String)) {
+                        continue;
+                    }
+                    String text = ((String) value).trim();
+                    String normalized = normalizeCombatLogEntityName(text);
+                    if (normalized == null) {
+                        continue;
+                    }
+                    if (!normalized.contains("tower")
+                            && !normalized.contains("rax")
+                            && !normalized.contains("fort")
+                            && !normalized.contains("goodguys")
+                            && !normalized.contains("badguys")) {
+                        continue;
+                    }
+                    fields.add((fieldName != null ? fieldName : "<unknown>") + "=" + text);
+                    if (fields.size() >= 6) {
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Best-effort debug only.
+            }
+
+            return fields;
+        }
+
+        private void pruneExpiredObjectiveSnapshots(String objectiveName) {
+            Deque<ObjectivePositionSnapshot> snapshots = recentDeletedObjectiveEntities.get(objectiveName);
+            if (snapshots == null) {
+                return;
+            }
+
+            while (!snapshots.isEmpty()) {
+                ObjectivePositionSnapshot snapshot = snapshots.peekFirst();
+                if (snapshot == null || (totalTicks - snapshot.tick) <= OBJECTIVE_DELETE_MATCH_TICK_WINDOW) {
+                    break;
+                }
+                snapshots.removeFirst();
+            }
+
+            if (snapshots.isEmpty()) {
+                recentDeletedObjectiveEntities.remove(objectiveName);
+            }
+        }
+
+        private void pruneExpiredRecentObjectiveDeathSnapshots() {
+            while (!recentObjectiveDeathSnapshots.isEmpty()) {
+                ObjectivePositionSnapshot snapshot = recentObjectiveDeathSnapshots.peekFirst();
+                if (snapshot == null || (totalTicks - snapshot.tick) <= OBJECTIVE_DELETE_MATCH_TICK_WINDOW) {
+                    break;
+                }
+                recentObjectiveDeathSnapshots.removeFirst();
+            }
+        }
+
+        private String extractObjectiveEntityName(Entity entity) {
+            if (entity == null) {
+                return null;
+            }
+
+            for (String property : OBJECTIVE_ENTITY_NAME_PROPERTIES) {
+                String normalizedName = normalizeEntityPropertyName(getPropertySafe(entity, property));
+                if (normalizedName != null && classifyObjectiveTarget(normalizedName) != null) {
+                    return normalizedName;
+                }
+            }
+
+            String scannedStateName = scanObjectiveEntityNameFromState(entity);
+            if (scannedStateName != null) {
+                return scannedStateName;
+            }
+
+            String dtName = entity.getDtClass() != null ? entity.getDtClass().getDtName() : null;
+            if (dtName == null) {
+                return null;
+            }
+
+            String normalizedDtName = dtName.toLowerCase(Locale.ROOT);
+            if (normalizedDtName.contains("roshan")) {
+                return "npc_dota_roshan";
+            }
+            if (normalizedDtName.contains("miniboss")) {
+                return "npc_dota_miniboss";
+            }
+
+            return null;
+        }
+
+        private String scanObjectiveEntityNameFromState(Entity entity) {
+            if (entity == null || entity.getDtClass() == null || entity.getState() == null) {
+                return null;
+            }
+
+            try {
+                for (FieldPath fieldPath : entity.getDtClass().collectFieldPaths(entity.getState())) {
+                    Object value = entity.getPropertyForFieldPath(fieldPath);
+                    String normalizedName = normalizeEntityPropertyName(value);
+                    if (normalizedName != null && classifyObjectiveTarget(normalizedName) != null) {
+                        return normalizedName;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Some fields can fail to materialize, keep scanning best-effort only.
+            }
+
+            return null;
+        }
+
+        private String normalizeEntityPropertyName(Object value) {
+            if (value == null) {
+                return null;
+            }
+
+            if (value instanceof String) {
+                return normalizeCombatLogEntityName((String) value);
+            }
+
+            if (value instanceof byte[]) {
+                return normalizeCombatLogEntityName(new String((byte[]) value));
+            }
+
+            return null;
         }
         
         @OnEntityCreated(classPattern = "CDOTA_Unit_Hero_.*")
@@ -722,8 +1360,50 @@ public class SimpleDemoParser {
                         }
                         
                         killEvents.add(killEvent);
-                    } else if (isWardCombatLogTarget(cle)) {
-                        recordWardDestroySignal(cle);
+                    } else if (cle.hasTargetName()) {
+                        ObjectiveDescriptor objective = classifyObjectiveTarget(cle.getTargetName());
+                        if (objective != null) {
+                            Map<String, Object> objectiveEvent = new HashMap<>();
+                            objectiveEvent.put("type", "destroyed");
+                            objectiveEvent.put("objective_type", objective.type);
+                            objectiveEvent.put("objective_name", normalizeCombatLogEntityName(cle.getTargetName()));
+                            objectiveEvent.put("tick", totalTicks);
+                            objectiveEvent.put("game_time", getCurrentGameClock(
+                                    totalTicks,
+                                    currentGameRulesTime,
+                                    currentTotalPausedSeconds,
+                                    currentGamePaused
+                            ));
+                            snapshotTimingState(
+                                    objectiveEvent,
+                                    currentGameRulesTime,
+                                    currentTotalPausedSeconds,
+                                    currentGamePaused
+                            );
+
+                            if (objective.team != null) {
+                                objectiveEvent.put("team", objective.team);
+                            }
+
+                            if (cle.hasLocationX() && cle.hasLocationY()) {
+                                objectiveEvent.put("x", cle.getLocationX());
+                                objectiveEvent.put("y", cle.getLocationY());
+                            } else {
+                                attachObjectiveFallbackLocation(
+                                        objectiveEvent,
+                                        normalizeCombatLogEntityName(cle.getTargetName())
+                                );
+                            }
+
+                            String attackerName = cle.getAttackerName();
+                            if (attackerName != null && !attackerName.isEmpty()) {
+                                objectiveEvent.put("attacker_name", attackerName);
+                            }
+
+                            objectiveEvents.add(objectiveEvent);
+                        } else if (isWardCombatLogTarget(cle)) {
+                            recordWardDestroySignal(cle);
+                        }
                     }
                 }
 
@@ -747,6 +1427,7 @@ public class SimpleDemoParser {
                             || Float.compare(previousClockZeroTime, clockZeroTime) != 0) {
                         recalculateGameTimes(positionSamples);
                         recalculateGameTimes(wardEvents);
+                        recalculateGameTimes(objectiveEvents);
                         recalculateGameTimes(wardDestroySignals);
                         recalculateGameTimes(economySamples);
                     }
@@ -1123,6 +1804,35 @@ public class SimpleDemoParser {
                 normalized = "npc_dota_" + normalized;
             }
             return normalized;
+        }
+
+        private ObjectiveDescriptor classifyObjectiveTarget(String targetName) {
+            String normalized = normalizeCombatLogEntityName(targetName);
+            if (normalized == null || normalized.isEmpty()) {
+                return null;
+            }
+
+            Integer targetTeam = resolveCombatLogEntityTeam(normalized);
+            if (normalized.startsWith("npc_dota_goodguys_tower")
+                    || normalized.startsWith("npc_dota_badguys_tower")) {
+                return new ObjectiveDescriptor("tower", targetTeam);
+            }
+            if (normalized.startsWith("npc_dota_goodguys_melee_rax")
+                    || normalized.startsWith("npc_dota_badguys_melee_rax")
+                    || normalized.startsWith("npc_dota_goodguys_range_rax")
+                    || normalized.startsWith("npc_dota_badguys_range_rax")) {
+                return new ObjectiveDescriptor("barracks", targetTeam);
+            }
+            if ("npc_dota_goodguys_fort".equals(normalized) || "npc_dota_badguys_fort".equals(normalized)) {
+                return new ObjectiveDescriptor("ancient", targetTeam);
+            }
+            if ("npc_dota_roshan".equals(normalized)) {
+                return new ObjectiveDescriptor("roshan", null);
+            }
+            if ("npc_dota_miniboss".equals(normalized)) {
+                return new ObjectiveDescriptor("tormentor", null);
+            }
+            return null;
         }
 
         private String normalizeHeroDestroyerName(String attackerName) {
@@ -2062,6 +2772,7 @@ public class SimpleDemoParser {
 
             trimTimedSamples(positionSamples);
             trimTimedSamples(wardEvents);
+            trimTimedSamples(objectiveEvents);
             trimTimedSamples(economySamples);
             trimKillEvents();
             trimPauseIntervals();
@@ -2107,6 +2818,10 @@ public class SimpleDemoParser {
             enrichWardDestroyEvents();
             return wardEvents;
         }
+        public List<Map<String, Object>> getObjectiveEvents() {
+            trimPostGameSamples();
+            return objectiveEvents;
+        }
         public List<Map<String, Object>> getEconomySamples() {
             trimPostGameSamples();
             return economySamples;
@@ -2125,5 +2840,58 @@ public class SimpleDemoParser {
         Integer playerId;
         Integer playerOwnerId;
         Integer ownerEntityRef;
+    }
+
+    private static class ObjectiveEntityState {
+        int handle;
+        String objectiveName;
+        String type;
+        Integer team;
+        float lastX;
+        float lastY;
+        int lastHealth;
+        int lastSeenTick;
+        boolean hasPosition;
+        boolean hasHealth;
+        boolean destroyedRecorded;
+    }
+
+    private static class ObjectivePositionSnapshot {
+        String objectiveName;
+        String type;
+        Integer team;
+        float x;
+        float y;
+        int tick;
+        int handle;
+        boolean consumed;
+
+        ObjectivePositionSnapshot(
+                String objectiveName,
+                String type,
+                Integer team,
+                float x,
+                float y,
+                int tick,
+                int handle
+        ) {
+            this.objectiveName = objectiveName;
+            this.type = type;
+            this.team = team;
+            this.x = x;
+            this.y = y;
+            this.tick = tick;
+            this.handle = handle;
+        }
+    }
+
+    private static class ObjectiveDescriptor {
+        String type;
+        Integer team;
+
+        ObjectiveDescriptor(String type, Integer team) {
+            this.type = type;
+            this.team = team;
+        }
     }
 }

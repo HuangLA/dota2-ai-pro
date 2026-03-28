@@ -9,6 +9,7 @@ Storage structure:
         ├── positions.parquet     # Hero position samples + optional HUD items
         ├── kills.parquet         # Kill events
         ├── wards.parquet         # Ward placement/destruction
+        ├── objectives.parquet    # Structural objective events (tower/Roshan/etc.)
         ├── economy.parquet       # Team/per-player gold/xp/net worth snapshots
         └── meta.json             # Match metadata
 """
@@ -21,7 +22,14 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from parsers.models import ParseResult, PositionSample, KillEvent, WardEvent, EconomySample
+from parsers.models import (
+    ParseResult,
+    PositionSample,
+    KillEvent,
+    WardEvent,
+    ObjectiveEvent,
+    EconomySample,
+)
 
 
 def _coerce_float(value: object) -> Optional[float]:
@@ -99,7 +107,10 @@ class ParquetStorage:
         
         # Save wards
         self._save_wards(match_dir, result.wards)
-        
+
+        # Save objective events
+        self._save_objectives(match_dir, result.objectives)
+
         # Save economy snapshots
         self._save_economy(match_dir, result.economy)
         
@@ -205,6 +216,36 @@ class ParquetStorage:
         pq.write_table(
             table,
             match_dir / "wards.parquet",
+            compression="snappy"
+        )
+
+    def _save_objectives(self, match_dir: Path, objectives: list[ObjectiveEvent]) -> None:
+        """Save structural objective events to Parquet."""
+        if not objectives:
+            df = pd.DataFrame(columns=[
+                "type", "objective_type", "objective_name", "tick", "x", "y", "team",
+                "game_time", "attacker_name",
+            ])
+        else:
+            data = []
+            for objective in objectives:
+                data.append({
+                    "type": objective.type,
+                    "objective_type": objective.objective_type,
+                    "objective_name": objective.objective_name,
+                    "tick": objective.tick,
+                    "x": objective.x,
+                    "y": objective.y,
+                    "team": objective.team,
+                    "game_time": getattr(objective, "game_time", None),
+                    "attacker_name": getattr(objective, "attacker_name", None),
+                })
+            df = pd.DataFrame(data)
+
+        table = pa.Table.from_pandas(df)
+        pq.write_table(
+            table,
+            match_dir / "objectives.parquet",
             compression="snappy"
         )
     
@@ -495,6 +536,37 @@ class ParquetStorage:
         if "destroyer_team" not in df.columns:
             df["destroyer_team"] = pd.NA
         
+        return df
+
+    def get_objectives(
+        self,
+        match_id: int,
+        objective_type: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """
+        Get structural objective events for a match.
+
+        Args:
+            match_id: Match ID
+            objective_type: Filter by objective type
+        """
+        parquet_path = self.get_match_dir(match_id) / "objectives.parquet"
+
+        if not parquet_path.exists():
+            return pd.DataFrame()
+
+        df = pq.read_table(parquet_path).to_pandas()
+
+        if objective_type and not df.empty:
+            df = df[df["objective_type"] == objective_type]
+
+        if "game_time" not in df.columns:
+            df["game_time"] = pd.NA
+        if "team" not in df.columns:
+            df["team"] = pd.NA
+        if "attacker_name" not in df.columns:
+            df["attacker_name"] = pd.NA
+
         return df
     
     def get_economy(self, match_id: int) -> pd.DataFrame:

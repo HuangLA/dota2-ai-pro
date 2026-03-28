@@ -1056,6 +1056,81 @@ async def get_wards(
     }
 
 
+@router.get("/{match_id}/objectives")
+async def get_objectives(
+    match_id: int,
+    objective_type: Optional[str] = Query(
+        None,
+        description="Filter by objective type: tower, barracks, ancient, roshan, tormentor",
+    ),
+) -> dict:
+    """Get structural objective events for live minimap rendering."""
+    if not parquet_storage.match_exists(match_id):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Match {match_id} not found or not parsed"
+        )
+
+    meta = parquet_storage.get_metadata(match_id)
+    objectives_df = parquet_storage.get_objectives(match_id, objective_type=objective_type)
+    fallback_positions_df = parquet_storage.get_positions(match_id)
+    has_game_time = has_non_null_game_time(objectives_df) or has_non_null_game_time(fallback_positions_df)
+
+    offset_seconds, clock_zero_source = resolve_offset_seconds(meta, objectives_df, fallback_positions_df)
+    pause_intervals = resolve_pause_intervals(meta, objectives_df, fallback_positions_df)
+    time_basis = build_time_basis(
+        meta,
+        has_game_time,
+        offset_seconds,
+        clock_zero_source,
+        pause_intervals,
+    )
+
+    events = []
+    type_counts: dict[str, int] = {}
+
+    if not objectives_df.empty:
+        for _, row in objectives_df.iterrows():
+            objective_tick = row["tick"]
+            objective_tick_int = int(cast(int, objective_tick))
+            objective_type_value = str(row["objective_type"])
+
+            event = {
+                "type": str(row["type"]),
+                "objective_type": objective_type_value,
+                "objective_name": str(row["objective_name"]),
+                "tick": objective_tick_int,
+                "time": tick_to_seconds(objective_tick_int),
+                "game_time": resolve_game_time(row, objective_tick_int),
+            }
+
+            if "x" in row.index and pd.notna(row["x"]):
+                event["x"] = float(row["x"])
+            if "y" in row.index and pd.notna(row["y"]):
+                event["y"] = float(row["y"])
+            if "team" in row.index and pd.notna(row["team"]):
+                event["team"] = int(cast(int, row["team"]))
+                event["team_name"] = "Radiant" if row["team"] == 2 else "Dire"
+            if "attacker_name" in row.index and pd.notna(row["attacker_name"]):
+                event["attacker_name"] = str(row["attacker_name"])
+
+            events.append(event)
+            type_counts[objective_type_value] = type_counts.get(objective_type_value, 0) + 1
+
+    events.sort(key=lambda item: item["tick"])
+
+    return {
+        "match_id": match_id,
+        "objectives": events,
+        "time_basis": time_basis,
+        "pause_intervals": pause_intervals,
+        "summary": {
+            "total": len(events),
+            "by_type": type_counts,
+        },
+    }
+
+
 @router.get("/{match_id}/heroes")
 async def get_heroes(match_id: int) -> dict:
     """

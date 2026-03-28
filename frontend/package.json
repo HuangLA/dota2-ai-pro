@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "assets:sync:dota": "node scripts/sync-dota-game-assets.js",
+    "assets:render:dota-minimap": "node scripts/render-dota-world-minimap.mjs",
     "build": "tsc --noEmit && vite build",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
@@ -30,6 +32,7 @@
     "recharts": "^2.12.0",
     "sharp": "^0.34.5",
     "tailwind-merge": "^2.2.0",
+    "three": "^0.183.2",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
@@ -70,12 +73,19 @@
       {
         "from": "../backend/dist/truesight-backend",
         "to": "backend",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../parsers/jdk17/jdk-17.0.18+8",
         "to": "jdk",
-        "filter": ["bin/**/*", "lib/**/*", "conf/**/*", "release"]
+        "filter": [
+          "bin/**/*",
+          "lib/**/*",
+          "conf/**/*",
+          "release"
+        ]
       },
       {
         "from": "../parsers/build/libs/clarity-parser-1.0.0-uber.jar",
