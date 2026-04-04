@@ -1,0 +1,7405 @@
+{
+  "blink": {
+    "english_name": "Blink Dagger",
+    "localized_name": "闪烁匕首",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "闪烁",
+        "description": "传送到最远1200距离的位置。 受到来自敌方英雄或肉山的攻击时，闪烁匕首将在3.0秒内无法使用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "快速点击两次会将自己往己方泉水方向传送。"
+    ],
+    "localized_lore": "传说中这片大陆上来去如风的刺客使用的匕首。"
+  },
+  "overwhelming_blink": {
+    "english_name": "Overwhelming Blink",
+    "localized_name": "盛势闪光",
+    "localized_attributes": [
+      "力量 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "盛势闪光",
+        "description": "传送到最远1200距离的位置。 传送后，800范围内所有敌人受到100 + 50%力量值的瞬时伤害，并且额外持续受到总计为100%力量值的伤害，被减缓50%移动速度，降低50攻击速度，持续6秒。 受到来自敌方英雄或肉山的攻击时，盛势闪光将在3.0秒内无法使用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "快速点击两次会将自己往己方泉水方向传送。"
+    ],
+    "localized_lore": "令人生畏的匕首，在混沌之喉中打造，凡人之手几乎无法企及。"
+  },
+  "swift_blink": {
+    "english_name": "Swift Blink",
+    "localized_name": "迅疾闪光",
+    "localized_attributes": [
+      "敏捷 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "迅疾闪光",
+        "description": "传送到最远1200距离的位置。 传送后获得40%移动速度加成和相位移动状态，+35点敏捷，持续6秒。 受到来自敌方英雄或肉山的攻击时，迅疾闪光将在3.0秒内无法使用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "快速点击两次会将自己往己方泉水方向传送。"
+    ],
+    "localized_lore": "一把聪颖的战刃，可以预见佩戴者的动向并加以实现。"
+  },
+  "arcane_blink": {
+    "english_name": "Arcane Blink",
+    "localized_name": "秘奥闪光",
+    "localized_attributes": [
+      "智力 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "秘奥闪光",
+        "description": "传送到最远1400距离的位置。 传送后回复250点生命和100点魔法。 受到来自敌方英雄或肉山的攻击时，秘奥闪光将在3.0秒内无法使用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "快速点击两次会将自己往己方泉水方向传送。"
+    ],
+    "localized_lore": "让人精神焕发的工具，可以帮忙分担施展奥术耗费的精力。"
+  },
+  "recipe_arcane_blink": {
+    "english_name": "Arcane Blink Recipe",
+    "localized_name": "图纸（秘奥闪光）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_swift_blink": {
+    "english_name": "Swift Blink Recipe",
+    "localized_name": "图纸（迅疾闪光）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_overwhelming_blink": {
+    "english_name": "Overwhelming Blink Recipe",
+    "localized_name": "图纸（盛势闪光）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "blades_of_attack": {
+    "english_name": "Blades of Attack",
+    "localized_name": "攻击之爪",
+    "localized_attributes": [
+      "攻击力 +9"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "里面藏着的小尖刃不容小觑。"
+  },
+  "broadsword": {
+    "english_name": "Broadsword",
+    "localized_name": "阔剑",
+    "localized_attributes": [
+      "攻击力 +15"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "骑士经典的武器选择，这把坚固的利刃用于杀敌相当可靠。"
+  },
+  "chainmail": {
+    "english_name": "Chainmail",
+    "localized_name": "锁子甲",
+    "localized_attributes": [
+      "护甲 +4"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "金属锁链制成的编织甲。"
+  },
+  "claymore": {
+    "english_name": "Claymore",
+    "localized_name": "大剑",
+    "localized_attributes": [
+      "攻击力 +20"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把能劈透铠甲的剑，通常是新晋剑士的首选武器。"
+  },
+  "helm_of_iron_will": {
+    "english_name": "Helm of Iron Will",
+    "localized_name": "铁意头盔",
+    "localized_attributes": [
+      "护甲 +4",
+      "生命恢复 +4"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一位战死沙场的传奇战士身故时戴着的头盔。"
+  },
+  "javelin": {
+    "english_name": "Javelin",
+    "localized_name": "标枪",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "穿刺",
+        "description": "每次攻击有25%几率无视闪避并造成额外60点魔法伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把相当有特色的长矛，攻击时偶尔会刺穿敌人的盔甲。"
+  },
+  "mithril_hammer": {
+    "english_name": "Mithril Hammer",
+    "localized_name": "秘银锤",
+    "localized_attributes": [
+      "攻击力 +24"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "由纯粹的秘银打造而成的锤子。"
+  },
+  "platemail": {
+    "english_name": "Platemail",
+    "localized_name": "板甲",
+    "localized_attributes": [
+      "护甲 +10"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "保护整个上身的厚重金属板。注意别砸到脚。"
+  },
+  "quarterstaff": {
+    "english_name": "Quarterstaff",
+    "localized_name": "短棍",
+    "localized_attributes": [
+      "攻击速度 +10",
+      "攻击力 +10"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "能让你攻击变快的普通棍子。"
+  },
+  "quelling_blade": {
+    "english_name": "Quelling Blade",
+    "localized_name": "压制之刃",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "砍伐",
+        "description": "砍伐一根指定树木。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "压制",
+        "description": "对非英雄单位进行物理攻击会造成额外伤害，近战英雄为8点，远程英雄为4点。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多个压制之刃效果不会叠加。"
+    ],
+    "localized_lore": "堕落地精的斧头，能让你更快的在森林中穿行。"
+  },
+  "faerie_fire": {
+    "english_name": "Faerie Fire",
+    "localized_name": "仙灵之火",
+    "localized_attributes": [
+      "攻击力 +2"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞服",
+        "description": "立刻回复85点生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "虚无的火焰，来自天木熊熊燃烧的遗迹，可以跨越现实燃烧。"
+  },
+  "infused_raindrop": {
+    "english_name": "Infused Raindrops",
+    "localized_name": "凝魂之露",
+    "localized_attributes": [
+      "魔法恢复 +0.8"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "魔法伤害抵挡",
+        "description": "受到超过75点伤害时自动触发，消耗一点能量并抵挡120点魔法伤害。 自带6点能量。能量耗尽后消失。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "每次受到伤害时最多使用一点能量。"
+    ],
+    "localized_lore": "为魔法突袭提供质朴的防护。"
+  },
+  "wind_lace": {
+    "english_name": "Wind Lace",
+    "localized_name": "风灵之纹",
+    "localized_attributes": [
+      "移动速度 +15"
+    ],
+    "localized_abilities": [],
+    "localized_desc": "多个风灵之纹的加成效果不会叠加。",
+    "localized_notes": [],
+    "localized_lore": "脚跟经过轻风的吹拂，在战斗中更加轻盈。"
+  },
+  "ring_of_protection": {
+    "english_name": "Ring of Protection",
+    "localized_name": "守护指环",
+    "localized_attributes": [
+      "护甲 +2"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "能保护佩戴者的闪光戒指。"
+  },
+  "stout_shield": {
+    "english_name": "Stout Shield",
+    "localized_name": "圆盾",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "伤害格挡",
+        "description": "拥有50%几率格挡伤害，近战英雄可格挡20点伤害，远程英雄可格挡8点。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多种伤害格挡物品的效果互不叠加。"
+    ],
+    "localized_lore": "一个人的酒桶底盖，在另一个人手里就成了圆盾。"
+  },
+  "moon_shard": {
+    "english_name": "Moon Shard",
+    "localized_name": "银月之晶",
+    "localized_attributes": [
+      "攻击速度 +140",
+      "额外夜间视野 +400"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞噬",
+        "description": "吞噬银月之晶，永久获得60攻击速度和200夜间视野加成。最多使用1次。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "月夜之视",
+        "description": "提供额外夜间视野。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "相传这是月之女神赛莉蒙妮流下的一滴眼泪。"
+  },
+  "gauntlets": {
+    "english_name": "Gauntlets of Strength",
+    "localized_name": "力量手套",
+    "localized_attributes": [
+      "力量 +3"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "带来野兽般力量的钉饰皮革手套。"
+  },
+  "slippers": {
+    "english_name": "Slippers of Agility",
+    "localized_name": "敏捷便鞋",
+    "localized_attributes": [
+      "敏捷 +3"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "蜘蛛皮做成的轻便靴子，能让你感觉到刺痛。"
+  },
+  "mantle": {
+    "english_name": "Mantle of Intelligence",
+    "localized_name": "智力斗篷",
+    "localized_attributes": [
+      "智力 +3"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "历代女王都穿过的美丽斗篷，上面镶有蓝宝石。"
+  },
+  "branches": {
+    "english_name": "Iron Branch",
+    "localized_name": "铁树枝干",
+    "localized_attributes": [
+      "全属性 +1"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "种树",
+        "description": "对地面施放，种下一棵快乐的小树，持续20秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一根看起来很普通的树枝，它如铁般坚硬的品质赋予持有者好运。"
+  },
+  "belt_of_strength": {
+    "english_name": "Belt of Strength",
+    "localized_name": "力量腰带",
+    "localized_attributes": [
+      "力量 +6"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "提高活力的重要配件。"
+  },
+  "boots_of_elves": {
+    "english_name": "Band of Elvenskin",
+    "localized_name": "精灵布带",
+    "localized_attributes": [
+      "敏捷 +6"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "轻巧且便于行动的柔韧纺织物。"
+  },
+  "robe": {
+    "english_name": "Robe of the Magi",
+    "localized_name": "法师长袍",
+    "localized_attributes": [
+      "智力 +6"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这个长袍将腐化使用者的灵魂，并以给予智慧作为交换。"
+  },
+  "circlet": {
+    "english_name": "Circlet",
+    "localized_name": "圆环",
+    "localized_attributes": [
+      "全属性 +2"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "为人类公主们设计的雅致头环。"
+  },
+  "crown": {
+    "english_name": "Crown",
+    "localized_name": "王冠",
+    "localized_attributes": [
+      "全属性 +4"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一顶庄严的王冠，打造的目的是保证善良而无能的继承人可以抵御篡夺者，并以铁腕手段治理国事。"
+  },
+  "diadem": {
+    "english_name": "Diadem",
+    "localized_name": "宝冕",
+    "localized_attributes": [
+      "全属性 +6"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一顶永远无法摘下的冠冕。"
+  },
+  "ogre_axe": {
+    "english_name": "Ogre Axe",
+    "localized_name": "食人魔之斧",
+    "localized_attributes": [
+      "力量 +10"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "只要双手握着就会变得强壮。"
+  },
+  "blade_of_alacrity": {
+    "english_name": "Blade of Alacrity",
+    "localized_name": "欢欣之刃",
+    "localized_attributes": [
+      "敏捷 +10"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把充满时间魔法的长刃。"
+  },
+  "staff_of_wizardry": {
+    "english_name": "Staff of Wizardry",
+    "localized_name": "魔力法杖",
+    "localized_attributes": [
+      "智力 +10"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一个由法师长老代代相传的魔法之杖。"
+  },
+  "ultimate_orb": {
+    "english_name": "Ultimate Orb",
+    "localized_name": "极限法球",
+    "localized_attributes": [
+      "全属性 +15"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "蕴含生命本质的神秘法球。"
+  },
+  "gloves": {
+    "english_name": "Gloves of Haste",
+    "localized_name": "加速手套",
+    "localized_attributes": [
+      "攻击速度 +20"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一双似乎能化手中武器为无物的魔法手套。"
+  },
+  "blitz_knuckles": {
+    "english_name": "Blitz Knuckles",
+    "localized_name": "闪电指套",
+    "localized_attributes": [
+      "攻击速度 +35"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "在地下活动的秘术师对经典非法勾当的再度演绎。"
+  },
+  "lifesteal": {
+    "english_name": "Morbid Mask",
+    "localized_name": "吸血面具",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "吸血",
+        "description": "攻击者每次攻击都将根据造成伤害的一定百分比回复生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这个面具会吸取被它凝视之人的生命力。"
+  },
+  "voodoo_mask": {
+    "english_name": "Voodoo Mask",
+    "localized_name": "巫毒面具",
+    "localized_attributes": [
+      "技能吸血 +15%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "技能吸血",
+        "description": "佩戴者每次对敌人造成技能攻击都将根据造成伤害的一定百分比回复生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "纯粹伤害或反弹伤害不会进行治疗。"
+    ],
+    "localized_lore": "一副面具，适合从施法者和敌人之间的奥术维系里吸收少许。"
+  },
+  "ring_of_regen": {
+    "english_name": "Ring of Regen",
+    "localized_name": "回复戒指",
+    "localized_attributes": [
+      "生命恢复 +1.25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一些侏儒迷信这个戒指能带来好运气。"
+  },
+  "sobi_mask": {
+    "english_name": "Sage's Mask",
+    "localized_name": "贤者面罩",
+    "localized_attributes": [
+      "魔法恢复 +0.7"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "法师和术士在各类祭祀中常用的面罩。"
+  },
+  "boots": {
+    "english_name": "Boots of Speed",
+    "localized_name": "速度之靴",
+    "localized_attributes": [
+      "移动速度 +45"
+    ],
+    "localized_abilities": [],
+    "localized_desc": "多个鞋类物品提供的移动速度加成不叠加。",
+    "localized_notes": [],
+    "localized_lore": "穿双鞋子，跑的更快。"
+  },
+  "gem": {
+    "english_name": "Gem of True Sight",
+    "localized_name": "真视宝石",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "现形",
+        "description": "显示300范围内的守卫和单位，即使在战争迷雾中也会现形。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "真实视域",
+        "description": "携带者自身和周围友方单位可以看见900范围内的隐形单位和守卫。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "永恒",
+        "description": "死亡后掉落，而且不能被摧毁。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "在信使身上时没有实际效果。"
+    ],
+    "localized_lore": "只为苍生不受深海的奴役 只为生魂免去溺灵要塞的灾戾 只为让麦尔朗恩长眠于海底 璀璨的宝石终归于沉寂"
+  },
+  "cloak": {
+    "english_name": "Cloak",
+    "localized_name": "抗魔斗篷",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "能与其他提高魔法抗性的技能叠加。"
+    ],
+    "localized_lore": "一顶用魔法材料制成的斗篷，可以驱散一切施加于其上的魔法。"
+  },
+  "talisman_of_evasion": {
+    "english_name": "Talisman of Evasion",
+    "localized_name": "闪避护符",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "与其他闪避效果为非线性叠加。"
+    ],
+    "localized_lore": "能让你预知到敌人攻击的项链。"
+  },
+  "cheese": {
+    "english_name": "Cheese",
+    "localized_name": "奶酪",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "干酪",
+        "description": "立刻回复2500点生命与1500点魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "奶酪可以共享。"
+    ],
+    "localized_lore": "一个久未谋面的熊怪供应商用奶做的奶酪，能瞬间回复品尝者的活力。"
+  },
+  "magic_stick": {
+    "english_name": "Magic Stick",
+    "localized_name": "魔棒",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "充能",
+        "description": "立刻根据能量点数回复相应的生命和魔法，每点能量恢复15点生命和魔法。 每当附近1200范围内有可见敌人施放技能都会自动充能（最多10点能量）。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "1200范围内的可见敌人使用技能后就会获得点数。",
+      "部分英雄技能和物品技能的施放将不会增加点数。"
+    ],
+    "localized_lore": "一根朴实的魔杖，能够引导魔法能量——巫师学徒和高级术士都对其青睐有加。"
+  },
+  "recipe_magic_wand": {
+    "english_name": "Magic Wand Recipe",
+    "localized_name": "图纸（魔杖）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "magic_wand": {
+    "english_name": "Magic Wand",
+    "localized_name": "魔杖",
+    "localized_attributes": [
+      "全属性 +3"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "充能",
+        "description": "立刻根据能量点数回复相应的生命和魔法，每点能量恢复15点生命和魔法。 每当附近1200范围内有可见敌人施放技能都会自动充能（最多20点能量）。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "1200范围内的可见敌人使用技能后就会获得点数。",
+      "部分英雄技能和物品技能的施放将不会增加点数。"
+    ],
+    "localized_lore": "一根朴实的魔杖，能够引导魔法能量——巫师学徒和高级术士都对其青睐有加。"
+  },
+  "ghost": {
+    "english_name": "Ghost Scepter",
+    "localized_name": "幽魂权杖",
+    "localized_attributes": [
+      "全属性 +5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "幽灵形态",
+        "description": "进入虚无状态，持续4.0秒，期间对物理伤害免疫，但是无法发动攻击，而且受到的魔法伤害额外增加-30%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "如果在开启期间进入减益免疫状态，幽魂效果将会中止。如果在减益免疫状态下开启权杖将不会拥有幽魂效果。",
+      "和所有幽魂权杖升级物品共享冷却时间。"
+    ],
+    "localized_lore": "赐予使用者幽灵般的姿态，让他们避开物理性的伤害。"
+  },
+  "clarity": {
+    "english_name": "Clarity",
+    "localized_name": "净化药水",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "回魔",
+        "description": "向目标提供6点/秒魔法恢复，持续25秒。 受到敌方英雄或肉山攻击时效果会被驱散。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "能增强冥想能力的清水。"
+  },
+  "enchanted_mango": {
+    "english_name": "Enchanted Mango",
+    "localized_name": "魔法芒果",
+    "localized_attributes": [
+      "生命恢复 +0.4"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞食芒果",
+        "description": "立刻回复100点魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键点击附近友方英雄可以对其使用。"
+    ],
+    "localized_lore": "基迪岛上特有的苦甜参半风味让两栖动物无法抗拒。"
+  },
+  "famango": {
+    "english_name": "Healing Lotus",
+    "localized_name": "疗伤莲花",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞食莲花",
+        "description": "立刻回复125点生命和魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键点击附近友方英雄可以对其使用。"
+    ],
+    "localized_lore": null
+  },
+  "great_famango": {
+    "english_name": "Great Healing Lotus",
+    "localized_name": "大疗伤莲花",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞食莲花",
+        "description": "立刻回复400点生命和魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键点击附近友方英雄可以对其使用。"
+    ],
+    "localized_lore": null
+  },
+  "greater_famango": {
+    "english_name": "Greater Healing Lotus",
+    "localized_name": "巨大疗伤莲花",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞食莲花",
+        "description": "立刻回复900点生命和魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键点击附近友方英雄可以对其使用。"
+    ],
+    "localized_lore": null
+  },
+  "blood_grenade": {
+    "english_name": "Blood Grenade",
+    "localized_name": "血腥榴弹",
+    "localized_attributes": [
+      "生命值 +50"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "投掷榴弹",
+        "description": "向目标区域投掷一枚榴弹。区域内敌人被击中时受到50点伤害，减速-15%并且每1秒受到15点伤害，持续5秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "猎人和猎物都必须付出血的代价。"
+  },
+  "royale_with_cheese": {
+    "english_name": "Block of Cheese",
+    "localized_name": "奶酪块",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "可口",
+        "description": "倒是吃啊！"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一开始有力量腰带。然后有远行鞋。现在，终于有了，奶酪块。"
+  },
+  "flask": {
+    "english_name": "Healing Salve",
+    "localized_name": "治疗药膏",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "药膏",
+        "description": "向目标提供30点/秒生命恢复，持续13秒。 受到敌方英雄或肉山攻击时效果会被驱散。 对友军施放时每秒治疗量减半。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "即使最严重的伤口也能快速治愈的魔法药膏。"
+  },
+  "dust": {
+    "english_name": "Dust of Appearance",
+    "localized_name": "显影之尘",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "现形",
+        "description": "在施法者站立位置的1050范围内创造一片区域，使其中的隐身单位现形，并减速-20%，区域持续12秒。现形的单位受到25点伤害。 负面状态会在敌方英雄离开该范围后额外粘滞8秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "对范围内的敌方单位施加负面状态，他们在隐身状态下依然会显形。"
+    ],
+    "localized_lore": "容颜易藏，音声难隐。"
+  },
+  "bottle": {
+    "english_name": "Bottle",
+    "localized_name": "魔瓶",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "恢复",
+        "description": "每次使用都能在2.7秒内恢复110点生命与60点魔法。受到来自敌方英雄或肉山的攻击会失去恢复效果。 魔瓶在靠近友方泉水时会被灌满。 按住Ctrl键可以对友军施放。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "储存神符",
+        "description": "右键点击神符可以将其存入魔瓶内留作备用，90秒后神符未被使用将会自动激活。 使用储存的神符后魔瓶将会被灌满。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "魔瓶可以共享。储存的神符无法共享。",
+      "使用储存的赏金或圣水神符后，若储存时魔瓶被灌满时，那么魔瓶还会被灌满；否则将灌至两口。"
+    ],
+    "localized_lore": "一个流传至今的古老瓶子，内部空间随着时间的流逝逐渐拥有魔力。"
+  },
+  "ward_observer": {
+    "english_name": "Observer Ward",
+    "localized_name": "侦察守卫",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "放置",
+        "description": "放置隐形的侦察守卫来获得附近区域1600范围内的视野。持续6分钟。 按住Ctrl键可以对友方英雄使用，将1个守卫转移到他的物品栏中。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一种植物形态，只有一半的感知力，一般由巫师学徒培养。"
+  },
+  "ward_sentry": {
+    "english_name": "Sentry Ward",
+    "localized_name": "岗哨守卫",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "放置",
+        "description": "放置隐形的岗哨守卫来为附近1050范围的区域提供真实视域。可以看到隐形的敌方单位和守卫。 持续7分钟。 本身不提供视野。 按住Ctrl键可以对友方英雄使用，将1个守卫转移到他的物品栏中。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一种植物形态，原种于一位害世国王的花园中。"
+  },
+  "ward_dispenser": {
+    "english_name": "Observer and Sentry Wards",
+    "localized_name": "侦察·岗哨守卫",
+    "localized_attributes": [
+      "侦察视野范围：1600",
+      "侦察持续时间（分钟）：6",
+      "岗哨守卫持续时间（分钟）：8",
+      "岗哨守卫真实视域范围：1050"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "放置",
+        "description": "放置当前可用的守卫。双击守卫切换当前可用的守卫。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键可以将一个守卫分给友方英雄。"
+    ],
+    "localized_lore": "层叠效率的提升让守卫比以往更便于携带。"
+  },
+  "tango": {
+    "english_name": "Tango",
+    "localized_name": "树之祭祀",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞食",
+        "description": "吃掉一棵树，获得7.0点/秒生命恢复，持续16.0秒。食用铁树枝干种下的小树后恢复时间加倍。 可以使用3次。对友方英雄使用可以分给他一次使用机会。 吞食树木施法距离：165"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "战场上的救命稻草。"
+  },
+  "tango_single": {
+    "english_name": "Tango (Shared)",
+    "localized_name": "树之祭祀（共享）",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞食",
+        "description": "吃掉一棵树，获得3.5点/秒生命恢复，持续16.0秒。食用铁树枝干种下的小树后恢复时间加倍。 距离：165"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "吧唧吧唧。"
+  },
+  "courier": {
+    "english_name": "Animal Courier",
+    "localized_name": "动物信使",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "flying_courier": {
+    "english_name": "Flying Courier",
+    "localized_name": "飞行信使",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "tpscroll": {
+    "english_name": "Town Portal Scroll",
+    "localized_name": "回城卷轴",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "传送",
+        "description": "经过3.0秒持续施法后传送到指定的友方建筑。 双击将直接传送至己方泉水。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "如果多名英雄在短时间内接连传送至相同地点，那么后续英雄的传送时间都会相应地有所延长。",
+      "传送可以被缠绕类技能阻止或取消。"
+    ],
+    "localized_lore": "英雄真正需要的东西。"
+  },
+  "recipe_travel_boots": {
+    "english_name": "Boots of Travel Recipe",
+    "localized_name": "图纸（远行鞋）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "travel_boots": {
+    "english_name": "Boots of Travel",
+    "localized_name": "远行鞋",
+    "localized_attributes": [
+      "移动速度 +90",
+      "回城卷轴冷却时间：40"
+    ],
+    "localized_abilities": [
+      {
+        "type": "upgrade",
+        "type_label": "升级",
+        "title": "回城卷轴",
+        "description": "使回城卷轴升级。可以对单位使用，降低冷却时间，并且使用时不会消耗次数。 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "足生双翼，上天入地。"
+  },
+  "travel_boots_2": {
+    "english_name": "Boots of Travel 2",
+    "localized_name": "远行鞋",
+    "localized_attributes": [
+      "移动速度 +110",
+      "回城卷轴冷却时间：40",
+      "回城卷轴持续施法时间：2"
+    ],
+    "localized_abilities": [
+      {
+        "type": "upgrade",
+        "type_label": "升级",
+        "title": "回城卷轴",
+        "description": "使回城卷轴升级。可以对单位和英雄使用，降低冷却时间，持续施法时间，并且使用时不会消耗次数。 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "足生双翼，上天入地。"
+  },
+  "phase_boots": {
+    "english_name": "Phase Boots",
+    "localized_name": "相位鞋",
+    "localized_attributes": [
+      "移动速度 +50",
+      "攻击力（近战） +18",
+      "攻击力（远程） +12",
+      "护甲 +4"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "相位移动",
+        "description": "提升移动速度并使你可以穿越单位，转身也更快，持续3.0秒。近战英雄提升20%移动速度，远程英雄提升10%移动速度。 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "穿着它的人可以穿越虚空。"
+  },
+  "demon_edge": {
+    "english_name": "Demon Edge",
+    "localized_name": "恶魔刀锋",
+    "localized_attributes": [
+      "攻击力 +40"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "由恶魔铁匠阿布兹迪安锻造的古老武器之一，一出炉就在试刃时杀死了它的锻造者。"
+  },
+  "eagle": {
+    "english_name": "Eaglesong",
+    "localized_name": "鹰歌弓",
+    "localized_attributes": [
+      "敏捷 +25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这只神秘的号角捕获了雄鹰嘹亮的呼啸，能给予听见这声音的英雄几近无限的敏捷度。"
+  },
+  "reaver": {
+    "english_name": "Reaver",
+    "localized_name": "掠夺者之斧",
+    "localized_attributes": [
+      "力量 +25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把开山断岳的强力巨斧。"
+  },
+  "relic": {
+    "english_name": "Sacred Relic",
+    "localized_name": "圣者遗物",
+    "localized_attributes": [
+      "攻击力 +55"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件足以改变战争形势的强力武器。"
+  },
+  "hyperstone": {
+    "english_name": "Hyperstone",
+    "localized_name": "振奋宝石",
+    "localized_attributes": [
+      "攻击速度 +60"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一块刻有神秘纹路的石头，能够提升携带者的激情。"
+  },
+  "ring_of_health": {
+    "english_name": "Ring of Health",
+    "localized_name": "治疗指环",
+    "localized_attributes": [
+      "生命恢复 +4.5"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一枚闪闪发光的指环，在一个胖乎乎的半身人尸体下被人所发现。"
+  },
+  "ring_of_tarrasque": {
+    "english_name": "Ring of Tarrasque",
+    "localized_name": "恐鳌之戒",
+    "localized_attributes": [
+      "生命恢复 +12"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一枚永恒的戒指，铸造时使用了一种原本非常简单的血魔法，据推断是主要成分的来源加强了功效。"
+  },
+  "void_stone": {
+    "english_name": "Void Stone",
+    "localized_name": "虚无宝石",
+    "localized_attributes": [
+      "魔法恢复 +1.75"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件曾被用来引导冥界魔法的珠宝，这个戒指中跃动着魔力。"
+  },
+  "tiara_of_selemene": {
+    "english_name": "Tiara of Selemene",
+    "localized_name": "赛莉蒙妮之冠",
+    "localized_attributes": [
+      "魔法恢复 +6"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "恩泽的象征，授予了赛莉蒙妮的女祭司。"
+  },
+  "mystic_staff": {
+    "english_name": "Mystic Staff",
+    "localized_name": "神秘法杖",
+    "localized_attributes": [
+      "智力 +25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这根谜一般的法杖是由最贵重的水晶做成的。"
+  },
+  "energy_booster": {
+    "english_name": "Energy Booster",
+    "localized_name": "能量之球",
+    "localized_attributes": [
+      "魔法值 +250"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "巫师们若想提升战场上的存在感，通常会把这块天青石加入自己的收藏。"
+  },
+  "point_booster": {
+    "english_name": "Point Booster",
+    "localized_name": "精气之球",
+    "localized_attributes": [
+      "魔法值 +175",
+      "生命值 +175"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一块完美成型的紫水晶，持有时可以滋养身体和心灵。"
+  },
+  "vitality_booster": {
+    "english_name": "Vitality Booster",
+    "localized_name": "活力之球",
+    "localized_attributes": [
+      "生命值 +250"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一块在战士家族中世代相传的红宝石。"
+  },
+  "fluffy_hat": {
+    "english_name": "Fluffy Hat",
+    "localized_name": "毛毛帽",
+    "localized_attributes": [
+      "生命值 +125"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "缤纷纨绔绒，纯绚绵绝缎。"
+  },
+  "power_treads": {
+    "english_name": "Power Treads",
+    "localized_name": "动力鞋",
+    "localized_attributes": [
+      "移动速度（远程英雄） +45",
+      "移动速度（近战英雄） +55",
+      "攻击速度 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "属性切换",
+        "description": "将附加属性在力量，敏捷以及智力三者间切换，选择+10点力量，+10点敏捷或+10点智力。 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "动力鞋可以使用力量腰带、精灵布带或法师长袍合成。"
+    ],
+    "localized_lore": "一双厚实的皮靴，能根据穿着者的需求切换属性。"
+  },
+  "lunar_crest": {
+    "english_name": "Lunar Crest",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_phylactery": {
+    "english_name": "Phylactery Recipe",
+    "localized_name": "图纸（灵匣）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "phylactery": {
+    "english_name": "Phylactery",
+    "localized_name": "灵匣",
+    "localized_attributes": [
+      "全属性 +6",
+      "生命恢复 +6.5",
+      "魔法恢复 +2.25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法术强化",
+        "description": "下个对敌人施放的单体技能会单独对目标造成150点额外伤害，并且减缓30%移动速度，持续3秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "洋溢着强大魔力的护身符。"
+  },
+  "angels_demise": {
+    "english_name": "Khanda",
+    "localized_name": "绝刃",
+    "localized_attributes": [
+      "生命值 +450",
+      "魔法值 +450",
+      "全属性 +8",
+      "生命恢复 +7",
+      "魔法恢复 +3"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法术强化",
+        "description": "下个对敌人施放的单体技能会单独对目标造成250点额外伤害，禁用其被动技能，并且减缓30%移动速度，持续4秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "减速的负面效果可以被驱散。",
+      "破坏的负面效果不能被驱散。"
+    ],
+    "localized_lore": "锋利至极的刀刃，足以斩开魔法本身。"
+  },
+  "recipe_hand_of_midas": {
+    "english_name": "Hand of Midas Recipe",
+    "localized_name": "图纸（迈达斯之手）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "hand_of_midas": {
+    "english_name": "Hand of Midas",
+    "localized_name": "迈达斯之手",
+    "localized_attributes": [
+      "攻击速度 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "炼金",
+        "description": "立刻炼化一个普通单位，获得160金钱。对中立生物使用时，在允许的情况下会掉落一包狂石。 无法用于远古单位。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "获得的金钱属于不可靠金钱（不会得到击杀该单位的正常金钱）。",
+      "使用炼金获得的经验不会与他人共享。"
+    ],
+    "localized_lore": "以未知的魔法手段维持着的迈达斯之手，是件贪婪的武器，通过炼化生灵来装满持有者的腰包。"
+  },
+  "oblivion_staff": {
+    "english_name": "Oblivion Staff",
+    "localized_name": "空明杖",
+    "localized_attributes": [
+      "智力 +10",
+      "攻击速度 +35",
+      "魔法恢复 +1.25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "让人误以为只是根普通战棍的外表下，其实威力不凡，就像原来拥有它的邪王。"
+  },
+  "recipe_witch_blade": {
+    "english_name": "Witch Blade Recipe",
+    "localized_name": "图纸（巫师之刃）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "witch_blade": {
+    "english_name": "Witch Blade",
+    "localized_name": "巫师之刃",
+    "localized_attributes": [
+      "攻击速度 +40",
+      "智力 +12",
+      "魔法恢复 +1.5",
+      "护甲 +5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "巫师之刃",
+        "description": "使下次攻击施加毒素，持续4秒，减缓25%移动速度，并且每秒造成0.75倍智力值的伤害。本次攻击具有克敌机先效果。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把怨毒的战刃，它鲁莽的创造者不慎将自己的灵魂依附在上面。"
+  },
+  "pers": {
+    "english_name": "Perseverance",
+    "localized_name": "坚韧球",
+    "localized_attributes": [
+      "生命恢复 +6.5",
+      "魔法恢复 +2.25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "给持有者带来勇气的宝石。"
+  },
+  "cornucopia": {
+    "english_name": "Cornucopia",
+    "localized_name": "丰饶之环",
+    "localized_attributes": [
+      "生命恢复 +5",
+      "魔法恢复 +2",
+      "攻击力 +7"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "滋养精神和身体的源泉。"
+  },
+  "poor_mans_shield": {
+    "english_name": "Poor Man's Shield",
+    "localized_name": "穷鬼盾",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "伤害格挡",
+        "description": "近战英雄有100%几率格挡30点伤害，远程英雄为20点伤害。 有50%几率格挡来自非英雄单位的伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多种伤害格挡物品的效果互不叠加。"
+    ],
+    "localized_lore": "一块破旧的老式盾牌，格挡效果却比想象中要好。"
+  },
+  "recipe_bracer": {
+    "english_name": "Bracer Recipe",
+    "localized_name": "图纸（护腕）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "bracer": {
+    "english_name": "Bracer",
+    "localized_name": "护腕",
+    "localized_attributes": [
+      "力量 +5",
+      "敏捷 +2",
+      "智力 +2",
+      "生命恢复 +0.75",
+      "生命值 +50"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "护腕是增强防御、延长寿命的常见选择。"
+  },
+  "recipe_wraith_band": {
+    "english_name": "Wraith Band Recipe",
+    "localized_name": "图纸（怨灵系带）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "wraith_band": {
+    "english_name": "Wraith Band",
+    "localized_name": "怨灵系带",
+    "localized_attributes": [
+      "敏捷 +5",
+      "力量 +2",
+      "智力 +2",
+      "攻击速度 +6",
+      "护甲 +1.75"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "总是回响着微弱耳语的圆环。"
+  },
+  "recipe_null_talisman": {
+    "english_name": "Null Talisman Recipe",
+    "localized_name": "图纸（空灵挂件）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "null_talisman": {
+    "english_name": "Null Talisman",
+    "localized_name": "空灵挂件",
+    "localized_attributes": [
+      "智力 +5",
+      "力量 +2",
+      "敏捷 +2",
+      "魔法恢复 +1.0"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "由锁链装饰起来的小巧的宝石。"
+  },
+  "recipe_mekansm": {
+    "english_name": "Mekansm Recipe",
+    "localized_name": "图纸（梅肯斯姆）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "mekansm": {
+    "english_name": "Mekansm",
+    "localized_name": "梅肯斯姆",
+    "localized_attributes": [
+      "护甲 +5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "回复",
+        "description": "为1200范围内友方单位回复250点生命值。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "梅肯斯姆光环",
+        "description": "提升1200范围内友方单位2.5点/秒生命恢复。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "梅肯斯姆的冷却时间内回复不能作用于已经被回复或卫士胫甲的修复作用过的单位。",
+      "多个梅肯斯姆光环效果不会叠加。"
+    ],
+    "localized_lore": "各种散件不知是怎样完美地组合起来，形成了散发着光芒的珠宝。"
+  },
+  "vladmir": {
+    "english_name": "Vladmir's Offering",
+    "localized_name": "弗拉迪米尔的祭品",
+    "localized_attributes": [
+      "护甲 +1",
+      "魔法恢复 +0.75"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "弗拉迪米尔光环",
+        "description": "向周围队友提供20%吸血，18%攻击力加成，1点/秒魔法恢复和2.0点护甲。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "攻击非英雄单位的吸血效果减少至12%。"
+    ],
+    "localized_lore": "一副怪异的面具，纠缠着死去吸血鬼的怨念。"
+  },
+  "wraith_pact": {
+    "english_name": "Wraith Pact",
+    "localized_name": "怨灵之契",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_buckler": {
+    "english_name": "Buckler Recipe",
+    "localized_name": "图纸（玄冥盾牌）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "buckler": {
+    "english_name": "Buckler",
+    "localized_name": "玄冥盾牌",
+    "localized_attributes": [
+      "护甲 +1"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "玄冥光环",
+        "description": "向友方玩家单位提供2点护甲。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一面强大的盾牌赐予携带者过往英雄们的力量，它能在战斗中为整支军队提供保护。"
+  },
+  "recipe_ring_of_basilius": {
+    "english_name": "Ring of Basilius Recipe",
+    "localized_name": "图纸（王者之戒）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ring_of_basilius": {
+    "english_name": "Ring of Basilius",
+    "localized_name": "王者之戒",
+    "localized_attributes": [
+      "魔法恢复 +0.25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "王者光环",
+        "description": "提升友方单位1.0点/秒魔法恢复。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这枚戒指是最伟大的法师才能获得的嘉奖。"
+  },
+  "recipe_holy_locket": {
+    "english_name": "Holy Locket Recipe",
+    "localized_name": "图纸（圣洁吊坠）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "holy_locket": {
+    "english_name": "Holy Locket",
+    "localized_name": "圣洁吊坠",
+    "localized_attributes": [
+      "全属性 +7",
+      "冷却时间：13"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "充能",
+        "description": "使友方单位目标受到的治疗增强提升10%，持续4.0秒，并且立刻根据能量点数回复相应的生命和魔法，每点能量恢复17点生命和15点魔法。 每10秒自动获得一点能量，每当附近1200范围内有可见敌人施放技能也会获得一点。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "神圣福佑",
+        "description": "自身提供的治疗效果提升15%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件珍贵的圣物，多年以来人们认为在远征失败后已经永远地遗失了。"
+  },
+  "recipe_pipe": {
+    "english_name": "Pipe of Insight Recipe",
+    "localized_name": "图纸（洞察烟斗）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "pipe": {
+    "english_name": "Pipe of Insight",
+    "localized_name": "洞察烟斗",
+    "localized_attributes": [
+      "生命恢复 +14.0"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "魔法护盾",
+        "description": "为周围友方单位套上能抵挡425点魔法伤害的护盾。持续8.0秒。 作用范围：1200"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "洞察光环",
+        "description": "提升友方单位8%魔法抗性。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "护盾不会作用于洞察烟斗的冷却时间内已受过护盾作用的单位。",
+      "能与其他提高魔法抗性的技能叠加。"
+    ],
+    "localized_lore": "一件来源神秘的强大古物，能制造出抵挡法术攻击的护盾。"
+  },
+  "recipe_urn_of_shadows": {
+    "english_name": "Urn of Shadows Recipe",
+    "localized_name": "图纸（影之灵龛）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "urn_of_shadows": {
+    "english_name": "Urn of Shadows",
+    "localized_name": "影之灵龛",
+    "localized_attributes": [
+      "魔法恢复 +1.25",
+      "护甲 +2",
+      "全属性 +2"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "灵魂释放",
+        "description": "对友方单位施放时提供30点/秒生命恢复，对敌方单位则造成25点每秒伤害。持续8.0秒。 每当敌方英雄在1500范围内死亡时获得充能。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "点数为0的灵龛将获得2点能量。",
+      "如果友方单位被敌方英雄或肉山攻击，效果将会消失。",
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "内含强大恶魔的骨灰。"
+  },
+  "recipe_headdress": {
+    "english_name": "Headdress Recipe",
+    "localized_name": "图纸（恢复头巾）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "headdress": {
+    "english_name": "Headdress",
+    "localized_name": "恢复头巾",
+    "localized_attributes": [
+      "生命恢复 +0.5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "恢复光环",
+        "description": "提升友方单位2.0点/秒生命恢复。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "创造一个镇痛的光环在战斗中为友军恢复生命。"
+  },
+  "recipe_sheepstick": {
+    "english_name": "Scythe of Vyse Recipe",
+    "localized_name": "图纸（邪恶镰刀）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "sheepstick": {
+    "english_name": "Scythe of Vyse",
+    "localized_name": "邪恶镰刀",
+    "localized_attributes": [
+      "智力 +30",
+      "魔法恢复 +8.5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "妖术",
+        "description": "将一个单位变成无害的小动物，持续2.8秒。目标的基础移速变为140，并且被沉默、锁闭和缴械。 幻象会被立刻消灭。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "目标的基础移速将降至140，但是若拥有极限移动速度的状态就不会受影响。"
+    ],
+    "localized_lore": "维斯教会中守卫最为森严的圣物，也是法师们最为垂涎的武器。"
+  },
+  "recipe_orchid": {
+    "english_name": "Orchid Malevolence Recipe",
+    "localized_name": "图纸（紫怨）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "orchid": {
+    "english_name": "Orchid Malevolence",
+    "localized_name": "紫怨",
+    "localized_attributes": [
+      "攻击速度 +35",
+      "攻击力 +20",
+      "魔法恢复 +2.5",
+      "生命恢复 +6.0",
+      "智力 +12"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "灵魂燃烧",
+        "description": "沉默目标单位5秒，沉默结束后所受伤害的30%将以额外魔法伤害的形式结算。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一颗诞自火焰恶魔精华的榴石。"
+  },
+  "recipe_bloodthorn": {
+    "english_name": "Bloodthorn Recipe",
+    "localized_name": "图纸（血棘）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "bloodthorn": {
+    "english_name": "Bloodthorn",
+    "localized_name": "血棘",
+    "localized_attributes": [
+      "智力 +25",
+      "攻击速度 +70",
+      "魔法恢复 +4",
+      "生命恢复 +6.5",
+      "攻击力 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "灵魂撕裂",
+        "description": "使目标沉默5秒，沉默结束后其间所受伤害的60%将以额外魔法伤害的形式结算。 英雄/非英雄对目标发动攻击会分别额外造成50 / 25点伤害。另外，自身和控制单位对目标发动的所有攻击都拥有克敌机先效果。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "穿刺",
+        "description": "每次攻击有40%几率无视闪避并造成额外60点魔法伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把亵渎之刃，受害者临死前的每次挣扎都会使其砍得更深。"
+  },
+  "echo_sabre": {
+    "english_name": "Echo Sabre",
+    "localized_name": "回音战刃",
+    "localized_attributes": [
+      "攻击力 +20",
+      "力量 +15",
+      "魔法恢复 +1.75"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "回音一击",
+        "description": "近战攻击可以快速攻击两次。两次攻击都将减缓100%移动速度，第一次持续0.8秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把看似迅捷异常的战刃，其中注入了共鸣魔力。"
+  },
+  "recipe_cyclone": {
+    "english_name": "Eul's Scepter Recipe",
+    "localized_name": "图纸（Eul的神圣法杖）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "cyclone": {
+    "english_name": "Eul's Scepter of Divinity",
+    "localized_name": "Eul的神圣法杖",
+    "localized_attributes": [
+      "智力 +10",
+      "魔法恢复 +2.5",
+      "移动速度 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "龙卷风",
+        "description": "使目标单位被卷入龙卷风中，持续2.5秒，并处于无敌状态。只能对敌方单位或自身使用龙卷风。 敌方单位落地后将受到50点魔法伤害。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不能对队友使用龙卷风。",
+      "对自己施放龙卷风时无视减益免疫。",
+      "龙卷风可以驱散部分正面和负面状态。",
+      "龙卷风持续时间不受状态抗性影响。"
+    ],
+    "localized_lore": "一支从久远年代流传下来的神秘权杖，能招来破坏性的龙卷风行善或作恶。"
+  },
+  "recipe_wind_waker": {
+    "english_name": "Wind Waker Recipe",
+    "localized_name": "图纸（风之杖）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "wind_waker": {
+    "english_name": "Wind Waker",
+    "localized_name": "风之杖",
+    "localized_attributes": [
+      "移动速度 +30",
+      "魔法恢复 +3.0",
+      "智力 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "龙卷风",
+        "description": "使目标单位被卷入龙卷风中，持续2.5秒，并处于无敌状态。可以对自身、敌方单位或友方单位使用龙卷风。对自身使用后，自身能使龙卷风以300的移速进行移动。 敌方单位落地后将受到50点魔法伤害。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "龙卷风可以驱散部分正面和负面状态。",
+      "对自身施放时，龙卷风可以任意移动，移动速度为360。",
+      "龙卷风持续时间不受状态抗性影响。"
+    ],
+    "localized_lore": "对于部分人来说，足以证明看不见的势力操控着现实位面发生的事件。"
+  },
+  "recipe_aether_lens": {
+    "english_name": "Aether Lens Recipe",
+    "localized_name": "图纸（以太透镜）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "aether_lens": {
+    "english_name": "Aether Lens",
+    "localized_name": "以太透镜",
+    "localized_attributes": [
+      "魔法值 +300",
+      "魔法恢复 +2.5"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "以太透镜和达贡之神力提供的施法距离加成不会叠加。"
+    ],
+    "localized_lore": "这件礼物上点缀着行将就木的法师拼着最后一口气说出的咒语，被赠予他体弱多病的儿子。"
+  },
+  "recipe_force_staff": {
+    "english_name": "Force Staff Recipe",
+    "localized_name": "图纸（原力法杖）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "force_staff": {
+    "english_name": "Force Staff",
+    "localized_name": "原力法杖",
+    "localized_attributes": [
+      "智力 +10",
+      "生命值 +175"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "原力",
+        "description": "将任何目标单位向其面对方向推进600距离。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "快速点击两次可以对自身施放原力。",
+      "原力法杖不会打断目标的动作。",
+      "对时间结界，决斗或黑洞内的单位无效。",
+      "原力法杖对敌人施放时施法距离为850。"
+    ],
+    "localized_lore": "让你可以操纵他人，不论出于善或恶。"
+  },
+  "recipe_hurricane_pike": {
+    "english_name": "Hurricane Pike Recipe",
+    "localized_name": "图纸（飓风长戟）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "hurricane_pike": {
+    "english_name": "Hurricane Pike",
+    "localized_name": "飓风长戟",
+    "localized_attributes": [
+      "智力 +15",
+      "生命值 +200",
+      "敏捷 +20",
+      "力量 +15"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "飓风之力",
+        "description": "将自己和敌方目标朝相反方向各推开425距离，并且接下来对目标的5次攻击将不受英雄攻击距离的限制，同时获得+100攻击速度，持续6秒。 对自身或友军使用，向面对方向推进600距离。 对敌军施法距离：425"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "对自身施法会对自己使用飓风长戟。",
+      "飓风长戟不会打断目标的动作。",
+      "对时间结界，决斗或黑洞内的单位无效。",
+      "来自魔龙枪和升级物品的攻击距离加成不会叠加。"
+    ],
+    "localized_lore": "一柄传奇战戟，曾是远古飞龙骑士的皇家印记。"
+  },
+  "recipe_dagon": {
+    "english_name": "Dagon Recipe",
+    "localized_name": "图纸（达贡之神力）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "dagon": {
+    "english_name": "Dagon",
+    "localized_name": "达贡之神力",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "能量冲击",
+        "description": "释放高伤害的魔法爆发冲击敌方目标单位。可以升级。 伤害：400 / 500 / 600 / 700 / 800 魔法消耗：120 / 140 / 160 / 180 / 200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "立刻消灭幻象。",
+      "以太透镜和达贡之神力提供的施法距离加成不会叠加。"
+    ],
+    "localized_lore": "越用威力就越大的次级法杖，让持有者的魔法从指尖喷涌而出。"
+  },
+  "dagon_2": {
+    "english_name": "Dagon",
+    "localized_name": "达贡之神力",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "能量冲击",
+        "description": "释放高伤害的魔法爆发冲击敌方目标单位。可以升级。 伤害：400 / 500 / 600 / 700 / 800 魔法消耗：120 / 140 / 160 / 180 / 200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "立刻消灭幻象。",
+      "以太透镜和达贡之神力提供的施法距离加成不会叠加。"
+    ],
+    "localized_lore": "越用威力就越大的次级法杖，让持有者的魔法从指尖喷涌而出。"
+  },
+  "dagon_3": {
+    "english_name": "Dagon",
+    "localized_name": "达贡之神力",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "能量冲击",
+        "description": "释放高伤害的魔法爆发冲击敌方目标单位。可以升级。 伤害：400 / 500 / 600 / 700 / 800 魔法消耗：120 / 140 / 160 / 180 / 200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "立刻消灭幻象。",
+      "以太透镜和达贡之神力提供的施法距离加成不会叠加。"
+    ],
+    "localized_lore": "越用威力就越大的次级法杖，让持有者的魔法从指尖喷涌而出。"
+  },
+  "dagon_4": {
+    "english_name": "Dagon",
+    "localized_name": "达贡之神力",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "能量冲击",
+        "description": "释放高伤害的魔法爆发冲击敌方目标单位。可以升级。 伤害：400 / 500 / 600 / 700 / 800 魔法消耗：120 / 140 / 160 / 180 / 200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "立刻消灭幻象。",
+      "以太透镜和达贡之神力提供的施法距离加成不会叠加。"
+    ],
+    "localized_lore": "越用威力就越大的次级法杖，让持有者的魔法从指尖喷涌而出。"
+  },
+  "dagon_5": {
+    "english_name": "Dagon",
+    "localized_name": "达贡之神力",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "能量冲击",
+        "description": "释放高伤害的魔法爆发冲击敌方目标单位。 伤害：400 / 500 / 600 / 700 / 800 魔法消耗：120 / 140 / 160 / 180 / 200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "立刻消灭幻象。",
+      "以太透镜和达贡之神力提供的施法距离加成不会叠加。"
+    ],
+    "localized_lore": "越用威力就越大的次级法杖，让持有者的魔法从指尖喷涌而出。"
+  },
+  "recipe_necronomicon": {
+    "english_name": "Necronomicon Recipe",
+    "localized_name": "图纸（死灵书）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "necronomicon": {
+    "english_name": "Necronomicon",
+    "localized_name": "死灵书",
+    "localized_attributes": [
+      "力量 +6 / 12 / 18",
+      "魔法恢复 +2 / 3 / 4"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "召唤死灵",
+        "description": "召唤一个死灵战士和死灵射手为你作战，持续60秒。"
+      },
+      {
+        "type": "text",
+        "type_label": "效果",
+        "title": "战士：",
+        "description": "每次攻击燃烧魔法，并且对将其击杀的单位造成魔法伤害。3级时获得真实视域。 生命值：800 / 1200 / 1600 攻击力：25 / 45 / 65 法力损毁伤害：30 / 40 / 50 遗愿伤害：600 / 700 / 800"
+      },
+      {
+        "type": "text",
+        "type_label": "效果",
+        "title": "射手：",
+        "description": "拥有提升移动速度与攻击速度的被动光环。3级时拥有主动施放的净化技能。 生命值：800 / 1200 / 1600 攻击力：37 / 57 / 75 光环移动速度：5 / 7 / 9 光环作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "借助亡灵术和恶魔学的终极奥义，强大的邪恶力量被封印在书页之内。"
+  },
+  "necronomicon_2": {
+    "english_name": "Necronomicon",
+    "localized_name": "死灵书",
+    "localized_attributes": [
+      "力量 +6 / 12 / 18",
+      "魔法恢复 +2 / 3 / 4"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "召唤死灵",
+        "description": "召唤一个死灵战士和死灵射手为你作战，持续60秒。"
+      },
+      {
+        "type": "text",
+        "type_label": "效果",
+        "title": "战士：",
+        "description": "每次攻击燃烧魔法，并且对将其击杀的单位造成魔法伤害。3级时获得真实视域。 生命值：800 / 1200 / 1600 攻击力：25 / 45 / 65 法力损毁伤害：30 / 40 / 50 遗愿伤害：600 / 700 / 800"
+      },
+      {
+        "type": "text",
+        "type_label": "效果",
+        "title": "射手：",
+        "description": "拥有提升移动速度与攻击速度的被动光环。3级时拥有主动施放的净化技能。 生命值：800 / 1200 / 1600 攻击力：37 / 57 / 75 光环移动速度：5 / 7 / 9 光环作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "被视为亡灵术和恶魔学的终极造诣，书页之内封印的是强大的邪恶力量。"
+  },
+  "necronomicon_3": {
+    "english_name": "Necronomicon",
+    "localized_name": "死灵书",
+    "localized_attributes": [
+      "力量 +6 / 12 / 18",
+      "魔法恢复 +2 / 3 / 4"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "召唤死灵",
+        "description": "召唤一个死灵战士和死灵射手为你作战，持续60秒。"
+      },
+      {
+        "type": "text",
+        "type_label": "效果",
+        "title": "战士：",
+        "description": "每次攻击燃烧魔法，并且对将其击杀的单位造成魔法伤害。3级时获得真实视域。 生命值：800 / 1200 / 1600 攻击力：25 / 45 / 65 法力损毁伤害：30 / 40 / 50 遗愿伤害：600 / 700 / 800"
+      },
+      {
+        "type": "text",
+        "type_label": "效果",
+        "title": "射手：",
+        "description": "拥有提升移动速度与攻击速度的被动光环。3级时拥有主动施放的净化技能。 生命值：800 / 1200 / 1600 攻击力：37 / 57 / 75 光环移动速度：5 / 7 / 9 光环作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "被视为亡灵术和恶魔学的终极造诣，书页之内封印的是强大的邪恶力量。"
+  },
+  "ultimate_scepter": {
+    "english_name": "Aghanim's Scepter",
+    "localized_name": "阿哈利姆神杖",
+    "localized_attributes": [
+      "全属性 +10",
+      "生命值 +175",
+      "魔法值 +175"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "技能升级",
+        "description": "提升所有英雄的终极技能或基础技能效果。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把权杖属于拥有半神之力的法师。"
+  },
+  "recipe_ultimate_scepter_2": {
+    "english_name": "Aghanim's Blessing Recipe",
+    "localized_name": "阿哈利姆福佑",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ultimate_scepter_2": {
+    "english_name": "Aghanim's Blessing",
+    "localized_name": "阿哈利姆福佑",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "技能升级",
+        "description": "提升所有英雄的终极技能或基础技能效果。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把权杖属于拥有半神之力的法师。"
+  },
+  "ultimate_scepter_roshan": {
+    "english_name": "Aghanim's Blessing - Roshan",
+    "localized_name": "阿哈利姆福佑 - 肉山",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "技能升级",
+        "description": "提升所有英雄的终极技能或基础技能效果。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把权杖属于拥有半神之力的法师。"
+  },
+  "aghanims_shard": {
+    "english_name": "Aghanim's Shard",
+    "localized_name": "阿哈利姆魔晶",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "技能升级",
+        "description": "使英雄升级一个已有技能，或新增一个技能。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这块不可思议的水晶只有一名巫师知晓它的起源，而水晶的碎片几乎与赫赫有名的神杖一样让人梦寐以求。"
+  },
+  "aghanims_shard_roshan": {
+    "english_name": "Aghanim's Shard - Consumable",
+    "localized_name": "阿哈利姆魔晶 - 消耗品",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "技能升级",
+        "description": "使英雄升级一个已有技能，或新增一个技能。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这块不可思议的水晶只有一名巫师知晓它的起源，而水晶的碎片几乎与赫赫有名的神杖一样让人梦寐以求。"
+  },
+  "recipe_refresher": {
+    "english_name": "Refresher Orb Recipe",
+    "localized_name": "图纸（刷新球）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "refresher": {
+    "english_name": "Refresher Orb",
+    "localized_name": "刷新球",
+    "localized_attributes": [
+      "生命恢复 +12",
+      "魔法恢复 +7.0"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "完全重置",
+        "description": "重置所有技能的冷却时间。与刷新球碎片共享冷却时间。这件物品只会在英雄的主物品栏中进行冷却。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件为巫师量身定做的强力物品。"
+  },
+  "recipe_assault": {
+    "english_name": "Assault Cuirass Recipe",
+    "localized_name": "图纸（强袭胸甲）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "assault": {
+    "english_name": "Assault Cuirass",
+    "localized_name": "强袭胸甲",
+    "localized_attributes": [
+      "攻击速度 +30",
+      "护甲 +10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "强袭光环",
+        "description": "附近友军单位和建筑提升30攻击速度和5点护甲，削弱附近敌军-5点护甲。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "在三途川的深处锻造而成，这件地狱盔甲能提高整支军队的护甲和攻击速度。"
+  },
+  "recipe_heart": {
+    "english_name": "Heart of Tarrasque Recipe",
+    "localized_name": "图纸（恐鳌之心）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "heart": {
+    "english_name": "Heart of Tarrasque",
+    "localized_name": "恐鳌之心",
+    "localized_attributes": [
+      "力量 +40",
+      "最大生命值恢复 +1%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "巨兽之血",
+        "description": "生命恢复提升缺失生命值的1.5%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多个巨兽之血的效果不会叠加。"
+    ],
+    "localized_lore": "保存完好的心脏，来自早已绝种的怪兽，能提升携带者的耐久力。"
+  },
+  "recipe_black_king_bar": {
+    "english_name": "Black King Bar Recipe",
+    "localized_name": "图纸（黑皇杖）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "black_king_bar": {
+    "english_name": "Black King Bar",
+    "localized_name": "黑皇杖",
+    "localized_attributes": [
+      "力量 +10",
+      "攻击力 +24"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "天神下凡",
+        "description": "施加弱驱散。获得减益免疫状态。提供60%魔法抗性加成，并且免疫反弹和纯粹伤害。持续时间内敌方技能的负面效果不会生效。 持续时间：9 / 8 / 7秒 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "再次购买黑皇杖也不会重置天神下凡的持续时间。"
+    ],
+    "localized_lore": "渗透了巨人之力的强大法杖。"
+  },
+  "aegis": {
+    "english_name": "Aegis of the Immortal",
+    "localized_name": "不朽之守护",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "重生",
+        "description": "死亡5.0秒后在原地满血满魔复活。 重生必须在5分钟内使用，否则不朽之守护将消失。消失时将在5秒内回复英雄的生命值。（受到攻击将会停止回复）"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "（英文）读作ayy jis。"
+    ],
+    "localized_lore": "据说不朽者拥有一面能帮他躲过死亡的盾牌。"
+  },
+  "recipe_shivas_guard": {
+    "english_name": "Shiva's Guard Recipe",
+    "localized_name": "图纸（希瓦的守护）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "shivas_guard": {
+    "english_name": "Shiva's Guard",
+    "localized_name": "希瓦的守护",
+    "localized_attributes": [
+      "护甲 +17"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "极寒冲击",
+        "description": "发出一道寒冷的波动，对敌人造成260点魔法伤害并减速-40%，持续4.0秒。 作用范围：825"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "霜冷光环",
+        "description": "降低所有敌人-45攻击速度。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "极寒冲击的扩张速度为400，最大半径为825。",
+      "极寒冲击将以施放者为中心。",
+      "多个霜冷光环效果不会叠加。",
+      "多个裂隙之石或升级物品的作用范围加成不会叠加。"
+    ],
+    "localized_lore": "据说曾经属于某位女神，至今仍保持大部分神力。"
+  },
+  "bloodstone": {
+    "english_name": "Bloodstone",
+    "localized_name": "血精石",
+    "localized_attributes": [
+      "生命值 +650",
+      "魔法值 +450",
+      "技能吸血 +20%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "血之契约",
+        "description": "血精石的技能吸血效果提升至60%。持续5秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法术虚弱光环",
+        "description": "敌方单位承受的技能伤害增加12%。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "法术虚弱光环不与纷争面纱的法术虚弱叠加。"
+    ],
+    "localized_lore": "血精石鲜红的色彩在战场上绝对不会被看错，拥有者似乎有无限的生命力和精力。"
+  },
+  "recipe_sphere": {
+    "english_name": "Linken's Sphere Recipe",
+    "localized_name": "图纸（林肯法球）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "sphere": {
+    "english_name": "Linken's Sphere",
+    "localized_name": "林肯法球",
+    "localized_attributes": [
+      "全属性 +16",
+      "生命恢复 +6.5",
+      "魔法恢复 +4.25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法术抵抗",
+        "description": "每14.0秒被动抵挡一次大部分指向性技能。"
+      },
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "抵抗转移",
+        "description": "将抵挡状态暂时转移给一个友方单位，持续14.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "中立物品的指向性技能不会触发法术抵抗。"
+    ],
+    "localized_lore": "这个有魔力的球体曾经保护了一位历史上最有名的英雄。"
+  },
+  "recipe_lotus_orb": {
+    "english_name": "Lotus Orb Recipe",
+    "localized_name": "图纸（清莲宝珠）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "lotus_orb": {
+    "english_name": "Lotus Orb",
+    "localized_name": "清莲宝珠",
+    "localized_attributes": [
+      "护甲 +10",
+      "生命恢复 +6.5",
+      "魔法恢复 +4.0",
+      "魔法值 +250"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "回音之壳",
+        "description": "对目标单位施加一个外壳，持续5秒，可以将大部分指向性技能反馈给施法者。 拥有外壳的单位依然会受到技能的伤害。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "中立物品的指向性技能不会触发回音之壳。"
+    ],
+    "localized_lore": "位居中央的宝石依然能反射出其制造者苍白的景象。"
+  },
+  "recipe_meteor_hammer": {
+    "english_name": "Meteor Hammer Recipe",
+    "localized_name": "图纸（陨星锤）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "meteor_hammer": {
+    "english_name": "Meteor Hammer",
+    "localized_name": "陨星锤",
+    "localized_attributes": [
+      "力量 +6",
+      "敏捷 +6",
+      "智力 +24",
+      "技能增强 +10%",
+      "魔法恢复增强 +40%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "陨星锤",
+        "description": "持续施法 - 成功施法后召唤一颗陨石，打击400范围内敌人，造成0.75秒眩晕和冲击伤害。对敌方单位和建筑造成持续伤害，持续6秒。非建筑单位在烧灼期间还会被减速20%。 对建筑冲击伤害：90 对建筑持续伤害：50 对非建筑冲击伤害：130 对非建筑持续伤害：50 持续施法时间：2秒 落地时间：0.5秒"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一柄带有魔力的战锤，铸造所用的金属发掘自被流星雨摧毁的村庄废墟之内。"
+  },
+  "nullifier": {
+    "english_name": "Nullifier",
+    "localized_name": "否决坠饰",
+    "localized_attributes": [
+      "攻击力 +75",
+      "护甲 +10",
+      "生命恢复 +6",
+      "移动速度减缓：10%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "否决",
+        "description": "驱散目标身上的效果，并且施加负面效果，持续4.0秒。期间持续驱散和减速目标。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "可以对无敌单位施放。"
+    ],
+    "localized_lore": "危险的武器，盗自一个反维度。"
+  },
+  "recipe_aeon_disk": {
+    "english_name": "Aeon Disk Recipe",
+    "localized_name": "图纸（永恒之盘）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "aeon_disk": {
+    "english_name": "Aeon Disk",
+    "localized_name": "永恒之盘",
+    "localized_attributes": [
+      "生命值 +250",
+      "魔法值 +300",
+      "冷却时间：105.0 / 125.0 / 145.0 / 165.0"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "强断连招",
+        "description": "当受到伤害并且生命值低于70%时，会对英雄施加强驱散效果，并且获得2.5秒的加成状态，提供+75%状态抗性，并且所有受到和造成的伤害全部归零。只有来自玩家的伤害才会触发。每次触发后冷却时间都会增加。 驱散类型：强驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件多年以前被偷偷运出象牙孵巢的强力宝物。很多人都相信了这个说法。"
+  },
+  "recipe_kaya": {
+    "english_name": "Kaya Recipe",
+    "localized_name": "图纸（慧光）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "kaya": {
+    "english_name": "Kaya",
+    "localized_name": "慧光",
+    "localized_attributes": [
+      "智力 +16",
+      "技能增强 +10%",
+      "魔法恢复增强 +40%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一位闻名遐迩的女巫师手上的法杖，已经失落了上万年。"
+  },
+  "trident": {
+    "english_name": "Trident",
+    "localized_name": "三元重戟",
+    "localized_attributes": [
+      "力量 +30",
+      "敏捷 +30",
+      "智力 +30",
+      "状态抗性 +30%",
+      "攻击速度 +30",
+      "移动速度 +10%",
+      "生命恢复和吸血增强 +30%",
+      "魔法恢复增强 +30%",
+      "技能增强 +30%",
+      "魔法伤害攻击 +30"
+    ],
+    "localized_abilities": [],
+    "localized_desc": "由散华，夜叉和慧光一起合成。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "refresher_shard": {
+    "english_name": "Refresher Shard",
+    "localized_name": "刷新球碎片",
+    "localized_attributes": [
+      "生命恢复 +12",
+      "魔法恢复 +6.0",
+      "攻击力 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "完全重置",
+        "description": "重置所有技能的冷却时间。与刷新球共享冷却时间。这件物品只会在英雄的主物品栏中进行冷却。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "刷新球碎片可以共享。"
+    ],
+    "localized_lore": "无尽之战时代的前前后后，不朽者的求胜之志始终从未动摇。"
+  },
+  "recipe_spirit_vessel": {
+    "english_name": "Spirit Vessel Recipe",
+    "localized_name": "图纸（魂之灵瓮）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "spirit_vessel": {
+    "english_name": "Spirit Vessel",
+    "localized_name": "魂之灵瓮",
+    "localized_attributes": [
+      "魔法恢复 +1.75",
+      "全属性 +10",
+      "护甲 +2"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "灵魂释放",
+        "description": "对敌人使用时，每秒减少4%当前生命值，并且生命回复降低70%。每秒造成25点伤害。 对友军使用时，提供40点/秒生命恢复。 持续8.0秒。 每当敌方英雄在1500范围内死亡时获得充能。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "点数为0的灵瓮将获得2点能量。",
+      "只有距离阵亡英雄最近的魂之灵瓮才会获得一点能量。",
+      "如果友方单位被敌方英雄或肉山攻击，效果将会消失。",
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "由一位神铸造，用来俘获同类的灵魂。"
+  },
+  "vanguard": {
+    "english_name": "Vanguard",
+    "localized_name": "先锋盾",
+    "localized_attributes": [
+      "生命值 +250",
+      "生命恢复 +4.5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "伤害格挡",
+        "description": "拥有60%几率格挡伤害，近战英雄可格挡50点伤害，远程英雄可格挡25点。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多种伤害格挡物品的效果互不叠加。"
+    ],
+    "localized_lore": "能够让持有者躲过最致命攻击的强力盾牌。"
+  },
+  "recipe_crimson_guard": {
+    "english_name": "Crimson Guard Recipe",
+    "localized_name": "图纸（赤红甲）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "crimson_guard": {
+    "english_name": "Crimson Guard",
+    "localized_name": "赤红甲",
+    "localized_attributes": [
+      "生命值 +250",
+      "生命恢复 +12",
+      "护甲 +6"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "坚盾",
+        "description": "使周围所有友方英雄和建筑每次受到物理攻击都有100%几率格挡伤害，数值为70 + 2.0%施法者最大生命值。持续7秒。 作用范围：1200"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "伤害格挡",
+        "description": "近战英雄每次受到攻击都有60%几率格挡75点伤害，远程英雄则是格挡50点。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多种伤害格挡效果不会叠加。",
+      "坚盾的加成效果施加给远程英雄时，格挡的伤害减少25点。",
+      "坚盾不会作用于赤红甲的冷却时间内已受过坚盾作用的单位。"
+    ],
+    "localized_lore": "原为抵御可怕的年兽所打造的铠甲。"
+  },
+  "recipe_blade_mail": {
+    "english_name": "Blade Mail Recipe",
+    "localized_name": "图纸（刃甲）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "blade_mail": {
+    "english_name": "Blade Mail",
+    "localized_name": "刃甲",
+    "localized_attributes": [
+      "攻击力 +15",
+      "护甲 +7"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "伤害反弹",
+        "description": "5.5秒内会反弹所有来源的伤害，百分比提升85%。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "伤害反弹",
+        "description": "每次受到攻击时，反弹10 + 所受攻击伤害的15%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "反弹的均为减免前的伤害。",
+      "反弹伤害的类型与受到时相同。",
+      "这个技能造成的伤害被视为反弹伤害。反弹伤害不提供任何吸血，而且无法反弹。"
+    ],
+    "localized_lore": "覆盖着尖锐剃刀的盔甲，战斗中可以用来做出不顾自身安危的烈士行为。"
+  },
+  "soul_booster": {
+    "english_name": "Soul Booster",
+    "localized_name": "振魂石",
+    "localized_attributes": [
+      "生命值 +425",
+      "魔法值 +425"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "再次鼓起丧失的勇气。"
+  },
+  "hood_of_defiance": {
+    "english_name": "Hood of Defiance",
+    "localized_name": "挑战头巾",
+    "localized_attributes": [
+      "生命恢复 +8.5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "绝缘",
+        "description": "创造一个技能护盾，可以吸收350点魔法伤害。持续12.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "能与其他提高魔法抗性的技能叠加。"
+    ],
+    "localized_lore": "一件具有魔法抵抗力的皮质头巾，受到巫师们的畏惧。"
+  },
+  "recipe_eternal_shroud": {
+    "english_name": "Eternal Shroud Recipe",
+    "localized_name": "图纸（永世法衣）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "eternal_shroud": {
+    "english_name": "Eternal Shroud",
+    "localized_name": "永世法衣",
+    "localized_attributes": [
+      "力量 +10",
+      "生命值 +250"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法衣",
+        "description": "受到敌人的技能伤害在减免前的25%会转化为自身的魔法。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "永世耐力",
+        "description": "装备的英雄每受到300点技能伤害，就会获得一层持续5秒的叠加效果，最多为6层。每层效果会使永世法衣的魔法抗性提升3.5%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "崭新的兜帽，以斗争为能量加强它的主人。"
+  },
+  "rapier": {
+    "english_name": "Divine Rapier",
+    "localized_name": "圣剑",
+    "localized_attributes": [
+      "攻击力 +250"
+    ],
+    "localized_abilities": [
+      {
+        "type": "toggle",
+        "type_label": "切换",
+        "title": "转变",
+        "description": "在25%技能增强加成和250攻击力加成之间切换。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "永恒",
+        "description": "死亡后掉落，而且无法被摧毁。 当拥有者的队友拾取后，仅在返还给拥有者后才会有效。一旦被敌人拾取，圣剑将不再受此限制，信使无法拾取掉落的圣剑。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "如果圣剑掉落后被拥有者的敌人拾取，那么只有在敌人死亡后才会再次掉落。"
+    ],
+    "localized_lore": "它强横无匹，并不满足于侍奉唯一的主人。"
+  },
+  "recipe_monkey_king_bar": {
+    "english_name": "Monkey King Bar Recipe",
+    "localized_name": "图纸（金箍棒）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "monkey_king_bar": {
+    "english_name": "Monkey King Bar",
+    "localized_name": "金箍棒",
+    "localized_attributes": [
+      "攻击力 +50",
+      "攻击速度 +50"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "穿刺",
+        "description": "每次攻击均有80%几率无视闪避，并造成额外70点魔法伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一位大师级战士使用的强力棍棒。"
+  },
+  "radiance": {
+    "english_name": "Radiance",
+    "localized_name": "辉耀",
+    "localized_attributes": [
+      "攻击力 +55"
+    ],
+    "localized_abilities": [
+      {
+        "type": "toggle",
+        "type_label": "开关",
+        "title": "辉耀灼烧",
+        "description": "开启后，辉耀灼烧每秒对敌军造成60点魔法伤害。幻象每秒造成35点魔法伤害。 作用范围：650"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把神圣的武器，剑身的耀眼光芒能将敌人化为灰烬。"
+  },
+  "butterfly": {
+    "english_name": "Butterfly",
+    "localized_name": "蝴蝶",
+    "localized_attributes": [
+      "敏捷 +35",
+      "攻击力 +25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "与其他闪避效果为非线性叠加。"
+    ],
+    "localized_lore": "只有最强大最老练的战士才能携带蝴蝶，但它也提供无可比拟的战斗灵活力作为回报。"
+  },
+  "recipe_greater_crit": {
+    "english_name": "Daedalus Recipe",
+    "localized_name": "图纸（代达罗斯之殇）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "greater_crit": {
+    "english_name": "Daedalus",
+    "localized_name": "代达罗斯之殇",
+    "localized_attributes": [
+      "攻击力 +88"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "致命一击",
+        "description": "普通攻击有30%几率造成225%伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "致命一击对建筑无效。"
+    ],
+    "localized_lore": "这件武器有着惊人的力量，即使是最强的战士也难以掌控它。"
+  },
+  "recipe_basher": {
+    "english_name": "Skull Basher Recipe",
+    "localized_name": "图纸（碎颅锤）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "basher": {
+    "english_name": "Skull Basher",
+    "localized_name": "碎颅锤",
+    "localized_attributes": [
+      "攻击力 +30",
+      "力量 +10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "重击",
+        "description": "近战英雄的攻击有25%的概率击晕目标1.2秒并额外造成100点物理伤害。远程英雄的击晕概率为10%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不与其他击晕类技能叠加。",
+      "以下英雄无法触发该物品的重击效果：裂魂人，虚空假面，斯拉达和双钗模式下的凯。",
+      "米波的克隆体和天穹守望者的风暴双雄不继承重击效果。"
+    ],
+    "localized_lore": "用对了地方会让人闻风丧胆的武器，千万不要低估这把大槌粉碎对手防御的能力。"
+  },
+  "recipe_bfury": {
+    "english_name": "Battle Fury Recipe",
+    "localized_name": "图纸（狂战斧）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "bfury": {
+    "english_name": "Battle Fury",
+    "localized_name": "狂战斧",
+    "localized_attributes": [
+      "攻击力 +50",
+      "生命恢复 +7.5",
+      "魔法恢复 +2.75"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "砍伐",
+        "description": "砍伐一根指定树木。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "压制",
+        "description": "对非英雄单位进行物理攻击会造成额外伤害，近战英雄为10点，远程英雄为5点。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "分裂",
+        "description": "普通攻击时对目标周围最远650距离的锥形区域内敌人造成60%物理伤害。对非英雄单位造成40%物理伤害。（仅近战有效）"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "分裂伤害无视减益免疫。",
+      "如果存在多个分裂效果，每个分裂的伤害都会单独计算。"
+    ],
+    "localized_lore": "握着这把强大的斧头可以一次砍倒一片敌人。"
+  },
+  "recipe_manta": {
+    "english_name": "Manta Style Recipe",
+    "localized_name": "图纸（幻影斧）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "manta": {
+    "english_name": "Manta Style",
+    "localized_name": "幻影斧",
+    "localized_attributes": [
+      "力量 +10",
+      "敏捷 +26",
+      "智力 +10",
+      "攻击速度 +15",
+      "移动速度 +10%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "镜像",
+        "description": "制造2个你的幻象，持续18秒。 近战英雄的幻象继承33%的攻击力，远程英雄的幻象继承28%的攻击力。幻象承受300%的伤害。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "有0.1秒的施法时间，其间处于无敌状态。",
+      "可以使用幻影斧移除多种负面效果。",
+      "不会与其他夜叉、散夜对剑以及幻影斧提供的移动速度加成叠加。"
+    ],
+    "localized_lore": "用反光材料制成的斧头，能够混淆敌军。"
+  },
+  "recipe_lesser_crit": {
+    "english_name": "Crystalys Recipe",
+    "localized_name": "图纸（水晶剑）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "lesser_crit": {
+    "english_name": "Crystalys",
+    "localized_name": "水晶剑",
+    "localized_attributes": [
+      "攻击力 +32"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "致命一击",
+        "description": "每次攻击时有30%概率造成160%伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "在攻击建筑物时不会触发致命一击。"
+    ],
+    "localized_lore": "用稀有水晶锻造的剑刃，会寻找敌人护甲的脆弱处。"
+  },
+  "recipe_dragon_lance": {
+    "english_name": "Dragon Lance Recipe",
+    "localized_name": "图纸（魔龙枪）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "dragon_lance": {
+    "english_name": "Dragon Lance",
+    "localized_name": "魔龙枪",
+    "localized_attributes": [
+      "敏捷 +15",
+      "力量 +10"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "来自魔龙枪和升级物品的攻击距离加成不会叠加。"
+    ],
+    "localized_lore": "向前冲锋的飞龙群毫不留情。"
+  },
+  "recipe_armlet": {
+    "english_name": "Armlet of Mordiggian Recipe",
+    "localized_name": "图纸（莫尔迪基安的臂章）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "armlet": {
+    "english_name": "Armlet of Mordiggian",
+    "localized_name": "莫尔迪基安的臂章",
+    "localized_attributes": [
+      "攻击力 +15",
+      "攻击速度 +25",
+      "护甲 +6",
+      "生命恢复 +5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "toggle",
+        "type_label": "开关",
+        "title": "邪恶之力",
+        "description": "开启后邪恶之力将提供+35点攻击力、+25点力量和+4点护甲，但每秒失去45点生命值。 开启邪恶之力后生命流失并不会导致死亡，关闭邪恶之力后力量降低也不会导致死亡。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "力量值的变化会影响血量上限和当前生命值，但是不会致死。",
+      "力量的增加将在0.6秒内完成。",
+      "开启或关闭邪恶之力并不会打断持续施法。"
+    ],
+    "localized_lore": "暴徒们首选的武器，持有者牺牲自己的生命能量来获得巨大力量。"
+  },
+  "invis_sword": {
+    "english_name": "Shadow Blade",
+    "localized_name": "影刃",
+    "localized_attributes": [
+      "攻击力 +25",
+      "攻击速度 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "疾影步",
+        "description": "进入隐身状态，持续17.0秒。直到持续时间结束、攻击或施法。当激活疾影步时，移动速度提升20%并能穿越单位。 破隐一击造成175点额外物理伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "拥有0.3秒的进入隐身时间。",
+      "如果隐身结束时没有攻击，额外伤害效果将会消失。"
+    ],
+    "localized_lore": "一位国王死后留下的宝剑，拿着它你可以隐身移动并从阴影中发动突袭。"
+  },
+  "recipe_silver_edge": {
+    "english_name": "Silver Edge Recipe",
+    "localized_name": "图纸（白银之锋）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "silver_edge": {
+    "english_name": "Silver Edge",
+    "localized_name": "白银之锋",
+    "localized_attributes": [
+      "攻击力 +70",
+      "攻击速度 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "疾影步",
+        "description": "进入隐身直到17.0秒持续时间结束、或者在此之前攻击或施法。隐身时，移动速度将提升25%，而且可以穿越单位。 破隐一击将额外造成300点物理伤害，同时5秒内目标的被动技能无效，移动速度不会超过200。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "曾经是手刃不义之君的利器，但是后来王国也因此陷入了内乱。"
+  },
+  "sange_and_yasha": {
+    "english_name": "Sange and Yasha",
+    "localized_name": "散夜对剑",
+    "localized_attributes": [
+      "力量 +16",
+      "敏捷 +16",
+      "状态抗性 +15%",
+      "攻击速度 +20",
+      "移动速度 +12%",
+      "生命恢复和吸血增强 +20%",
+      "减速抗性 +25%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会与其他夜叉、散夜对剑以及幻影斧提供的移动速度加成叠加。"
+    ],
+    "localized_lore": "散华和夜叉经过月光的照耀而产生共鸣，双剑合璧发挥出更大的威力。"
+  },
+  "kaya_and_sange": {
+    "english_name": "Kaya and Sange",
+    "localized_name": "散慧对剑",
+    "localized_attributes": [
+      "力量 +16",
+      "智力 +16",
+      "减速抗性 +25%",
+      "魔法恢复增强 +50%",
+      "技能增强 +12%",
+      "生命恢复和吸血增强 +20%",
+      "魔法消耗/魔法损失降低 +25%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这是三大利器的其中两件，因为他们都蕴含着不可思议的力量，很多人相信他们全是在同一个附魔师的熔炉中打造的。"
+  },
+  "yasha_and_kaya": {
+    "english_name": "Yasha and Kaya",
+    "localized_name": "慧夜对剑",
+    "localized_attributes": [
+      "敏捷 +16",
+      "智力 +16",
+      "攻击速度 +20",
+      "魔法恢复增强 +50%",
+      "移动速度 +12%",
+      "技能增强 +12%",
+      "施法速度加成 +25%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "夜叉和慧光配成一对时会产生共鸣。"
+  },
+  "satanic": {
+    "english_name": "Satanic",
+    "localized_name": "撒旦之邪力",
+    "localized_attributes": [
+      "力量 +25",
+      "攻击力 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "不洁狂热",
+        "description": "吸血效果提升至175%，持续6.0秒。 驱散类型：弱驱散"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "吸血",
+        "description": "攻击者每次攻击都将根据造成伤害的一定百分比回复生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "无穷的力量，需要你付出灵魂作为代价。"
+  },
+  "recipe_mjollnir": {
+    "english_name": "Mjollnir Recipe",
+    "localized_name": "图纸（雷神之锤）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "mjollnir": {
+    "english_name": "Mjollnir",
+    "localized_name": "雷神之锤",
+    "localized_attributes": [
+      "攻击力 +25",
+      "攻击速度 +90"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "静电冲击",
+        "description": "对目标单位施加一个静电护盾，持续15.0秒。护盾有20%几率对附近攻击护盾的目标及其周围4个敌方单位释放闪电冲击，造成225点魔法伤害。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "连环闪电",
+        "description": "攻击有25%几率释放一道连环闪电，在650范围内12个目标之间跳跃，每次造成180点魔法伤害。触发闪电时无视闪避。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "静电冲击的触发间隔大于1秒。",
+      "静电冲击的闪电伤害范围以拥有甲盾的英雄为圆心。静电冲击只会对900范围以内的目标发出闪电冲击。",
+      "静电冲击不会弹跳至处于隐身状态下或战争迷雾内的英雄。"
+    ],
+    "localized_lore": "索尔的魔法之锤，由矮人名匠布鲁克和艾崔打造。"
+  },
+  "skadi": {
+    "english_name": "Eye of Skadi",
+    "localized_name": "斯嘉蒂之眼",
+    "localized_attributes": [
+      "全属性 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "霜冻攻击",
+        "description": "攻击对敌方远程目标会减缓-50%移动速度，对敌方近战目标会减缓-25%移动速度。攻击还会降低敌人-20%攻击速度和50%生命回复。持续3.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "极度罕见的古物，由苍空之龙看管。"
+  },
+  "recipe_sange": {
+    "english_name": "Sange Recipe",
+    "localized_name": "图纸（散华）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "sange": {
+    "english_name": "Sange",
+    "localized_name": "散华",
+    "localized_attributes": [
+      "力量 +16",
+      "减速抗性 +20%",
+      "生命恢复和吸血增强 +16%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "散华是一把异常精准的武器，会自动寻找对方的弱点所在。"
+  },
+  "recipe_helm_of_the_dominator": {
+    "english_name": "Helm of the Dominator Recipe",
+    "localized_name": "图纸（支配头盔）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "helm_of_the_dominator": {
+    "english_name": "Helm of the Dominator",
+    "localized_name": "支配头盔",
+    "localized_attributes": [
+      "全属性 +6",
+      "护甲 +6",
+      "生命恢复 +6"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "支配",
+        "description": "控制一个普通、非远古单位，其移动速度变为370。被支配单位的最大生命值将不会少于1000点。另外还将使该单位+25点基础攻击力，+12点/秒生命恢复，+4点/秒魔法恢复和+4点护甲。 被支配单位的最大生命值大于1000点时将保留原来的最大生命值。施法者会获得被支配单位50%的原击杀金钱和经验。被支配单位的击杀奖励为固定100金，并且不会被秒杀非英雄单位的技能直接击杀。 被支配单位受到来自敌方英雄或肉山的伤害后3秒内无法使用支配技能。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "只能存在一个被支配的单位。如果支配了新的单位，原来的单位将会死亡。",
+      "出售支配头盔会导致支配的单位死亡。",
+      "出售支配头盔会导致被支配单位死亡。"
+    ],
+    "localized_lore": "死去的死灵法师留下的可怕头盔。"
+  },
+  "recipe_helm_of_the_overlord": {
+    "english_name": "Helm of the Overlord Recipe",
+    "localized_name": "图纸（统御头盔）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "helm_of_the_overlord": {
+    "english_name": "Helm of the Overlord",
+    "localized_name": "统御头盔",
+    "localized_attributes": [
+      "全属性 +21",
+      "护甲 +7",
+      "生命恢复 +7"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "支配",
+        "description": "控制一个中立单位，其移动速度变为380。被支配单位的最大生命值将不会少于1800点。另外还将使该单位+70点基础攻击力，+12点/秒生命恢复，+4点/秒魔法恢复，+7点护甲并且目标的部分技能等级提升1级。 被支配单位的最大生命值大于1800点时将保留原来的最大生命值。施法者会获得被支配单位的原击杀金钱和经验。被支配单位的击杀奖励为固定250金，并且不会被秒杀非英雄单位的技能直接击杀。 被支配单位受到来自敌方英雄或肉山的伤害后3秒内无法使用支配技能。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "也可以支配敌方线上小兵和召唤单位。",
+      "出售会导致支配的单位死亡。"
+    ],
+    "localized_lore": "不死的死灵法师留下的可怕头盔。"
+  },
+  "maelstrom": {
+    "english_name": "Maelstrom",
+    "localized_name": "漩涡",
+    "localized_attributes": [
+      "攻击力 +25",
+      "攻击速度 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "连环闪电",
+        "description": "攻击有25%几率释放一道连环闪电，在650范围内4个目标之间跳跃，闪电将造成110点魔法伤害。触发闪电时无视闪避。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "神亲自打造的战锤，漩涡可以在攻击中发动闪电的力量。"
+  },
+  "recipe_gungir": {
+    "english_name": "Gleipnir Recipe",
+    "localized_name": "图纸（缚灵索）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "gungir": {
+    "english_name": "Gleipnir",
+    "localized_name": "缚灵索",
+    "localized_attributes": [
+      "作用范围 +75",
+      "生命值 +450",
+      "智力 +12",
+      "魔法值 +200"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "永恒锁链",
+        "description": "缠绕目标350范围内所有敌人，持续2.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多个裂隙之石或升级物品的作用范围加成不会叠加。"
+    ],
+    "localized_lore": "以不可能的手段铸就的束缚之物，为了限制一个上古魔物。"
+  },
+  "desolator": {
+    "english_name": "Desolator",
+    "localized_name": "黯灭",
+    "localized_attributes": [
+      "攻击力 +55"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "毁蚀",
+        "description": "物理攻击将降低目标-6点护甲，持续7.0秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "灵魂窃取",
+        "description": "黯灭在装备后每次有英雄死于毁蚀效果下就会+2点攻击力，最高为30点。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "护甲降低效果对建筑有效。"
+    ],
+    "localized_lore": "这把邪恶并且嗜血的武器，通常用于拷打政治犯。"
+  },
+  "recipe_yasha": {
+    "english_name": "Yasha Recipe",
+    "localized_name": "图纸（夜叉）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "yasha": {
+    "english_name": "Yasha",
+    "localized_name": "夜叉",
+    "localized_attributes": [
+      "敏捷 +16",
+      "攻击速度 +15",
+      "移动速度 +10%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会与其他夜叉、散夜对剑以及幻影斧提供的移动速度加成叠加。"
+    ],
+    "localized_lore": "夜叉可以称得上有史以来最轻巧的武器。"
+  },
+  "mask_of_madness": {
+    "english_name": "Mask of Madness",
+    "localized_name": "疯狂面具",
+    "localized_attributes": [
+      "攻击力 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "狂热",
+        "description": "攻击速度提升100，移动速度提升8，但是护甲降低7点，并且被沉默。持续6.0秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "吸血",
+        "description": "攻击者每次攻击都将根据造成伤害的一定百分比回复生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一旦戴上这个面具就会变成无法控制的好战分子。"
+  },
+  "recipe_diffusal_blade": {
+    "english_name": "Diffusal Blade Recipe",
+    "localized_name": "图纸（净魂之刃）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "diffusal_blade": {
+    "english_name": "Diffusal Blade",
+    "localized_name": "净魂之刃",
+    "localized_attributes": [
+      "敏捷 +15",
+      "智力 +10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "阻止",
+        "description": "以敌方单位为目标，减缓其移动速度，持续4.0秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "破法",
+        "description": "每次攻击将燃烧目标40点魔法，而且每燃烧一点魔法都会造成1点物理伤害。 幻象不会燃烧魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会与其他净魂之刃叠加。"
+    ],
+    "localized_lore": "一把直接切入敌人灵魂的魔力之刃。"
+  },
+  "recipe_disperser": {
+    "english_name": "Disperser Recipe",
+    "localized_name": "图纸（散魂剑）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "disperser": {
+    "english_name": "Disperser",
+    "localized_name": "散魂剑",
+    "localized_attributes": [
+      "敏捷 +40",
+      "智力 +10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "抑制",
+        "description": "同时驱散佩戴者和目标。敌方目标会被减速5.0秒，友方目标则会提升移动速度和40%减速抗性，持续5.0秒。施法者总是会获得友军的加成效果。 移动速度减缓和提升效果在状态持续时间内初始均为100%，并且逐渐减少至0。 驱散类型：弱驱散"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "破法",
+        "description": "每次攻击将燃烧目标40点魔法，而且每燃烧一点魔法都会造成1.0点物理伤害。 幻象不会燃烧魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "曾被托付给鲁姆斯克信徒远征军的使徒将军。"
+  },
+  "recipe_ethereal_blade": {
+    "english_name": "Ethereal Blade Recipe",
+    "localized_name": "图纸（虚灵之刃）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ethereal_blade": {
+    "english_name": "Ethereal Blade",
+    "localized_name": "虚灵之刃",
+    "localized_attributes": [
+      "全属性 +24"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "虚化冲击",
+        "description": "发射一道能量波，将目标转变为虚无状态，接下来受到的魔法伤害将会提升-30%，并且无法攻击或被攻击。 如果目标是敌人还将被减速-80%，并额外受到1.0x[自身属性总和]+50点魔法伤害。 持续时间：4.0秒"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "和幽魂权杖以及升级物品共享冷却时间。",
+      "虚无状态下的单位将额外受到-30%的魔法伤害。"
+    ],
+    "localized_lore": "一把忽隐忽现的阴森刀刃，可以在物理和魔法两个位面造成伤害。"
+  },
+  "recipe_soul_ring": {
+    "english_name": "Soul Ring Recipe",
+    "localized_name": "图纸（灵魂之戒）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "soul_ring": {
+    "english_name": "Soul Ring",
+    "localized_name": "灵魂之戒",
+    "localized_attributes": [
+      "力量 +6",
+      "护甲 +2"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "献身",
+        "description": "消耗170点生命值来暂时获取170点魔法值。持续10秒。 如果获得魔法后超过了自身的魔法上限，多出来的魔法会加入上限，并优先被使用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "如果在持续时间结束时没有使用，额外的魔法将会消失。"
+    ],
+    "localized_lore": "一枚能吞噬佩带者灵魂的戒指。"
+  },
+  "recipe_arcane_boots": {
+    "english_name": "Arcane Boots Recipe",
+    "localized_name": "图纸（奥术鞋）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "arcane_boots": {
+    "english_name": "Arcane Boots",
+    "localized_name": "奥术鞋",
+    "localized_attributes": [
+      "移动速度 +45",
+      "魔法恢复 +0.25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "补充",
+        "description": "回复英雄周围友方单位150点魔法。 作用范围：1200"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "王者光环",
+        "description": "提升友方单位1点/秒魔法恢复。 作用范围：1200 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "米波的克隆体不能使用。"
+    ],
+    "localized_lore": "装备这种鞋子的法师在战斗中值得重视。"
+  },
+  "recipe_octarine_core": {
+    "english_name": "Octarine Core Recipe",
+    "localized_name": "图纸（玲珑心）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "octarine_core": {
+    "english_name": "Octarine Core",
+    "localized_name": "玲珑心",
+    "localized_attributes": [
+      "生命值 +450",
+      "魔法值 +450",
+      "魔法恢复 +6"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "位于法术技艺核心的，是只有身负异能之人才能感知的光带。"
+  },
+  "orb_of_venom": {
+    "english_name": "Orb of Venom",
+    "localized_name": "淬毒之珠",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "毒性攻击",
+        "description": "使目标中毒，造成每秒10点魔法伤害。持续3.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不与后续升级物品叠加。"
+    ],
+    "localized_lore": "给你的毒器渡上毒蛇的毒液。"
+  },
+  "blight_stone": {
+    "english_name": "Orb of Blight",
+    "localized_name": "枯萎之珠",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "次级腐蚀",
+        "description": "攻击将降低目标-2点护甲，持续3.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会与升级版物品，黯灭或寂灭叠加。"
+    ],
+    "localized_lore": "一颗让人闻风丧胆的石头，发掘自戮尽之地。"
+  },
+  "orb_of_corrosion": {
+    "english_name": "Orb of Corrosion",
+    "localized_name": "腐蚀之珠",
+    "localized_attributes": [
+      "敏捷 +7"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "腐蚀",
+        "description": "攻击会使目标的护甲减少-2点，远程目标会被减速-16%，近战目标会被减速-8%。生命回复减少16%，持续3.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "护甲降低效果不会与其配件，黯灭或寂灭叠加。"
+    ],
+    "localized_lore": "凶残的屠杀战役过后，从战士之神的伤口渗出的液体被封进一个秘术师的宝珠内。"
+  },
+  "orb_of_frost": {
+    "english_name": "Orb of Frost",
+    "localized_name": "冰霜之珠",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "冰霜",
+        "description": "攻击使远程目标被减速-13%，近战目标被减速-6%。生命回复减少13%。持续3秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "在宇宙伊始就缓慢成长，到了成长完毕的时候它将覆盖万物。"
+  },
+  "recipe_falcon_blade": {
+    "english_name": "Falcon Blade Recipe",
+    "localized_name": "图纸（猎鹰战刃）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "falcon_blade": {
+    "english_name": "Falcon Blade",
+    "localized_name": "猎鹰战刃",
+    "localized_attributes": [
+      "生命值 +200",
+      "魔法恢复 +1.8",
+      "攻击力 +14"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把具有魔力的战刃，多年前让一个无可救药的顽童从乞丐登上王位。"
+  },
+  "mage_slayer": {
+    "english_name": "Mage Slayer",
+    "localized_name": "法师克星",
+    "localized_attributes": [
+      "生命恢复 +5",
+      "魔法恢复 +2.5",
+      "攻击力 +15"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法师克星",
+        "description": "攻击敌人时施加一个负面效果，造成每秒40点物理伤害，并且使目标造成的技能伤害降低40%，持续3秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "在天瑶城的第三纪元由一个秘密教团打造，意图扳倒冒牌的大帝。"
+  },
+  "recipe_ancient_janggo": {
+    "english_name": "Drum of Endurance Recipe",
+    "localized_name": "图纸（韧鼓）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ancient_janggo": {
+    "english_name": "Drum of Endurance",
+    "localized_name": "韧鼓",
+    "localized_attributes": [
+      "力量 +8"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "坚韧",
+        "description": "为周围友军提供+35攻速加成和+13%移动速度加成，持续6秒。 作用范围：1200"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "迅捷光环",
+        "description": "为周围友军提供15移动速度和2.5点/秒生命恢复。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "在危难时刻能鼓舞周围人士气的遗物。"
+  },
+  "boots_of_bearing": {
+    "english_name": "Boots of Bearing",
+    "localized_name": "宽容之靴",
+    "localized_attributes": [
+      "力量 +8",
+      "移动速度 +65",
+      "生命恢复 +18"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "坚韧",
+        "description": "为周围友军提供+50攻速加成和+15%移动速度加成，持续6秒。而且最初1.5秒友军不受减速效果影响。 作用范围：1200"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "迅捷光环",
+        "description": "为周围友军提供20移动速度和2.5点/秒生命恢复。 作用范围：1200 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这双华丽的靴子是为一个古代的先驱打造，是他率先敢于将石堂城的荣光散播到国土的初始边界之外。"
+  },
+  "medallion_of_courage": {
+    "english_name": "Medallion of Courage",
+    "localized_name": "勇气勋章",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "无畏",
+        "description": "根据施放目标为友军或敌人，提升/降低目标7/4点护甲，持续8秒。无法对自身施放。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_solar_crest": {
+    "english_name": "Solar Crest Recipe",
+    "localized_name": "图纸（炎阳纹章）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "solar_crest": {
+    "english_name": "Solar Crest",
+    "localized_name": "炎阳纹章",
+    "localized_attributes": [
+      "护甲 +7",
+      "移动速度 +25",
+      "魔法值 +200",
+      "生命值 +200"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "日耀",
+        "description": "对友军施放可以提供5点护甲，60攻击速度，15%移动速度和350点生命的物理伤害护盾。 对自身施放时不会提供护甲、移动速度和攻击速度加成。 持续时间：7"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "与长盾共享冷却时间。"
+    ],
+    "localized_lore": "为了纪念炎日天空所打造的护符。"
+  },
+  "recipe_pavise": {
+    "english_name": "Pavise Recipe",
+    "localized_name": "图纸（长盾）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "pavise": {
+    "english_name": "Pavise",
+    "localized_name": "长盾",
+    "localized_attributes": [
+      "护甲 +3",
+      "魔法值 +175",
+      "生命值 +175"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "保护",
+        "description": "对友军施放后施加可以吸收250点物理伤害的护盾。持续时间：7秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一位树敌过多的巫师设计之物。"
+  },
+  "smoke_of_deceit": {
+    "english_name": "Smoke of Deceit",
+    "localized_name": "诡计之雾",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "潜行",
+        "description": "施法者和附近1200范围内的友方玩家控制单位在45.0秒内获得隐身效果和15%移动速度加成。他们在小地图上的图标也会消失。 只要施法者还在潜行状态下，任意友军进入他身边300范围内也会获得加成效果。每个诡计之雾只能对一名友军施加一次效果。 发动攻击，或靠近敌方英雄或防御塔1025距离后将打破隐身效果。 潜行的隐身效果不受真实视域影响。 诡计之雾在背包中可以直接使用，换至主物品栏时没有冷却时间。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "招摇撞骗的法师梅丁对奥术唯一真正的贡献。"
+  },
+  "tome_of_knowledge": {
+    "english_name": "Tome of Knowledge",
+    "localized_name": "知识之书",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "启迪",
+        "description": "直接获得750点经验值，而且己方在前两本书后每消耗一本知识之书，将额外获得150点经验。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "让兽变成人，人变成神的东西。"
+  },
+  "recipe_veil_of_discord": {
+    "english_name": "Veil of Discord Recipe",
+    "localized_name": "图纸（纷争面纱）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "veil_of_discord": {
+    "english_name": "Veil of Discord",
+    "localized_name": "纷争面纱",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "法术虚弱",
+        "description": "发出一波弱化冲击，使900范围内敌方英雄受到的技能伤害增加10%。 可以在持续施法期间施放。 持续时间：16.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "法术虚弱不与血精石的法术虚弱光环叠加。"
+    ],
+    "localized_lore": "一个堕落法师的头饰。"
+  },
+  "recipe_revenants_brooch": {
+    "english_name": "Revenant's Brooch Recipe",
+    "localized_name": "图纸（英灵胸针）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "revenants_brooch": {
+    "english_name": "Revenant's Brooch",
+    "localized_name": "英灵胸针",
+    "localized_attributes": [
+      "攻击力 +35",
+      "技能吸血 +15%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "幻影暴击",
+        "description": "每次攻击都有30%几率造成额外的魔法伤害，数值为攻击伤害的80%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "对于其他来源的致命一击也被视为致命一击效果。",
+      "攻击建筑物时不会触发幻影暴击。"
+    ],
+    "localized_lore": "这枚受到诅咒的胸针属于一位堕落的卫士，她永远都在生死之界徘徊。"
+  },
+  "recipe_devastator": {
+    "english_name": "Parasma Recipe",
+    "localized_name": "图纸（圣斧）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "devastator": {
+    "english_name": "Parasma",
+    "localized_name": "圣斧",
+    "localized_attributes": [
+      "智力 +40",
+      "攻击速度 +40",
+      "护甲 +7",
+      "魔法恢复 +1.5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "巫师之刃",
+        "description": "使下次攻击具有克敌机先效果，并且会施加毒素，持续4秒，减缓25%移动速度，并且每秒造成0.75倍智力值的伤害。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "法力腐蚀",
+        "description": "攻击会降低敌人20%魔法抗性，持续4秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "警告：抓到另一头将无药可救。"
+  },
+  "recipe_guardian_greaves": {
+    "english_name": "Guardian Greaves Recipe",
+    "localized_name": "图纸（卫士胫甲）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "guardian_greaves": {
+    "english_name": "Guardian Greaves",
+    "localized_name": "卫士胫甲",
+    "localized_attributes": [
+      "移动速度 +50",
+      "护甲 +5",
+      "魔法恢复 +1.0"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "修复",
+        "description": "使周围友军回复325点生命和200点魔法，并移除施法者身上大部分的负面效果。 作用范围：1200 驱散类型：弱驱散"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "卫士光环",
+        "description": "为周围友军提供2.5点/秒生命恢复和1.5点/秒魔法恢复。如果佩戴者的生命值低于25%，他的生命恢复将提升至14.5点/秒。 作用范围：1200 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "卫士胫甲的冷却时间内回复不能作用于已经被修复或梅肯斯姆的回复作用过的单位。"
+    ],
+    "localized_lore": "为了向全能之神致敬所打造的众多圣器之一。"
+  },
+  "recipe_rod_of_atos": {
+    "english_name": "Rod of Atos Recipe",
+    "localized_name": "图纸（阿托斯之棍）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "rod_of_atos": {
+    "english_name": "Rod of Atos",
+    "localized_name": "阿托斯之棍",
+    "localized_attributes": [
+      "智力 +12",
+      "生命值 +275"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "致残",
+        "description": "缠绕目标，持续2.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "荒芜之王阿托斯将他的精粹储存在这根看似平平无奇的魔杖中。"
+  },
+  "recipe_iron_talon": {
+    "english_name": "Iron Talon Recipe",
+    "localized_name": "图纸（寒铁钢爪）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "iron_talon": {
+    "english_name": "Iron Talon",
+    "localized_name": "寒铁钢爪",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "砍伐",
+        "description": "对非玩家控制的敌方单位使用，移除当前生命值的80%。 对树木施放会立刻将其摧毁。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "对树木使用时冷却时间为4秒。"
+    ],
+    "localized_lore": "简单却有效的武器，为镇压地狱熊怪的起义而设计。"
+  },
+  "recipe_abyssal_blade": {
+    "english_name": "Abyssal Blade Recipe",
+    "localized_name": "图纸（深渊之刃）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "abyssal_blade": {
+    "english_name": "Abyssal Blade",
+    "localized_name": "深渊之刃",
+    "localized_attributes": [
+      "攻击力 +35",
+      "力量 +26",
+      "减速抗性 +25%",
+      "生命恢复和吸血增强 +20%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "强击",
+        "description": "击晕一个敌方目标，持续1.6秒。 无视减益免疫。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "重击",
+        "description": "近战英雄攻击时有25%的概率击晕目标1.2秒，并额外造成120点物理伤害。远程英雄的击晕概率为10%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "眩晕的施法距离与近战单位的攻击距离相同。",
+      "不与其他重击效果叠加，并且米波的克隆体和天穹守望者的风暴双雄不继承重击效果。",
+      "多种伤害格挡物品的效果互不叠加。",
+      "以下英雄无法触发该物品的重击效果：裂魂人，虚空假面，斯拉达和双钗模式下的凯。"
+    ],
+    "localized_lore": "深渊指挥官的失落宝剑，能够轻易刺穿敌人的灵魂。"
+  },
+  "recipe_heavens_halberd": {
+    "english_name": "Heaven's Halberd Recipe",
+    "localized_name": "图纸（天堂之戟）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "heavens_halberd": {
+    "english_name": "Heaven's Halberd",
+    "localized_name": "天堂之戟",
+    "localized_attributes": [
+      "生命恢复 +6"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "缴械",
+        "description": "阻止目标在3.5秒内进行攻击。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把战戟挥动起来如同轻型武器般迅捷，能让持有者赢得决斗的胜利。"
+  },
+  "ring_of_aquila": {
+    "english_name": "Ring of Aquila",
+    "localized_name": "天鹰之戒",
+    "localized_attributes": [
+      "攻击力 +3",
+      "力量 +3",
+      "敏捷 +9",
+      "智力 +3"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "天鹰光环",
+        "description": "给予周围友军额外1点/秒魔法恢复和2点护甲。 作用范围：1200"
+      },
+      {
+        "type": "toggle",
+        "type_label": "开关",
+        "title": "光环",
+        "description": "关闭后不会作用于非英雄单位。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "多个天鹰光环效果不会叠加。"
+    ],
+    "localized_lore": "战将阿奎拉阵亡后他的戒指依然在战场上支援着军队。"
+  },
+  "tranquil_boots": {
+    "english_name": "Tranquil Boots",
+    "localized_name": "静谧之鞋",
+    "localized_attributes": [
+      "移动速度 +65",
+      "生命恢复 +14"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "破损",
+        "description": "只要主动攻击英雄或受到任何单位的攻击，静谧之鞋就会损失14点/秒回复效果，并且移动速度加成降低至40，持续13秒。 多个鞋类物品提供的移动速度加成不叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "虽然延长了穿戴者的寿命，但这鞋子其实并不可靠。"
+  },
+  "shadow_amulet": {
+    "english_name": "Shadow Amulet",
+    "localized_name": "暗影护符",
+    "localized_attributes": [
+      "渐隐时间：1.25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "渐隐",
+        "description": "使自身或友方英雄目标获得隐身效果，持续3.5秒。隐身期间的移动速度减缓35%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "需要3.5秒中的1.25秒才能使英雄完全进入隐身状态。"
+    ],
+    "localized_lore": "一件小小的护符，握住了完全不动就能隔开敌人的感应。"
+  },
+  "recipe_glimmer_cape": {
+    "english_name": "Glimmer Cape Recipe",
+    "localized_name": "图纸（微光披风）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "glimmer_cape": {
+    "english_name": "Glimmer Cape",
+    "localized_name": "微光披风",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "微光",
+        "description": "经过0.5秒延迟后，自身或者友方目标单位进入隐身状态， 获得20移动速度加成和可以吸收最多375点伤害的魔法护盾。持续5秒。 可以在持续施法时施放。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一位幻术大师失窃的披风。"
+  },
+  "river_painter": {
+    "english_name": "River Vial: Chrome",
+    "localized_name": "河水药瓶：液铬",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "river_painter2": {
+    "english_name": "River Vial: Dry",
+    "localized_name": "河水药瓶：干涸",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "river_painter3": {
+    "english_name": "River Vial: Slime",
+    "localized_name": "河水药瓶：烂泥",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "river_painter4": {
+    "english_name": "River Vial: Oil",
+    "localized_name": "河水药瓶：油污",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "river_painter5": {
+    "english_name": "River Vial: Electrified",
+    "localized_name": "河水药瓶：导电",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "river_painter6": {
+    "english_name": "River Vial: Potion",
+    "localized_name": "河水药瓶：魔水",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "river_painter7": {
+    "english_name": "River Vial: Blood",
+    "localized_name": "河水药瓶：血红",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "mutation_tombstone": {
+    "english_name": "Tombstone",
+    "localized_name": "墓碑",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "pocket_tower": {
+    "english_name": "Pocket Tower",
+    "localized_name": "袖珍高塔",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "pocket_roshan": {
+    "english_name": "Pocket Roshan",
+    "localized_name": "袖珍肉山",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "keen_optic": {
+    "english_name": "Keen Optic",
+    "localized_name": "基恩镜片",
+    "localized_attributes": [
+      "魔法恢复 +1.25"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "多年以前窃取自一名修补匠的车间，这片实用的镜片已经服侍过很多主人。"
+  },
+  "grove_bow": {
+    "english_name": "Grove Bow",
+    "localized_name": "林野长弓",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "魔力增强",
+        "description": "攻击敌人的同时降低其20%魔法抗性。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "月之女神在许多年之前赐给了一名她珍视的信徒一件礼物。"
+  },
+  "quickening_charm": {
+    "english_name": "Quickening Charm",
+    "localized_name": "加速护符",
+    "localized_attributes": [
+      "生命恢复 +10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "冷却时间减少",
+        "description": "降低所有技能和物品的冷却时间。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "源自德鲁伊的常青护符。"
+  },
+  "philosophers_stone": {
+    "english_name": "Philosopher's Stone",
+    "localized_name": "贤者石",
+    "localized_attributes": [
+      "额外每分钟金钱 +75 / 100",
+      "魔法值 +200 / 250",
+      "-攻击力"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "轻如无物的饰物，附魔师在创造时心中满是对蛮力的蔑视。"
+  },
+  "force_boots": {
+    "english_name": "Force Boots",
+    "localized_name": "原力鞋",
+    "localized_attributes": [
+      "移动速度 +115",
+      "生命恢复 +30"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "原力",
+        "description": "将目标向面朝的方向推750距离。如果对友军施放还会进行驱散。 驱散类型：弱驱散"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "突破速度",
+        "description": "完全移除佩戴者的速度限制 多个鞋类物品的移动速度加成不会叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "难以捉摸的奇物到了档案室里从来没有成功确定合适的分类。"
+  },
+  "desolator_2": {
+    "english_name": "Stygian Desolator",
+    "localized_name": "寂灭",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "高级腐蚀",
+        "description": "攻击将降低目标-13点护甲，持续7.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "护甲降低效果对建筑有效。"
+    ],
+    "localized_lore": "邪魔最爱的原版，广受欢迎的凡人作品正是以此为设计依据。"
+  },
+  "phoenix_ash": {
+    "english_name": "Phoenix Ash",
+    "localized_name": "凤凰余烬",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "重生",
+        "description": "阻止致命伤害，使携带者的生命值回复到一半，并重置非终极技能的技能冷却。触发后将被消耗。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "seer_stone": {
+    "english_name": "Seer Stone",
+    "localized_name": "先哲之石",
+    "localized_attributes": [
+      "额外视野 +350",
+      "魔法恢复 +10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "揭示",
+        "description": "揭示地图上800范围的区域，持续6秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一名巫师的古怪造物，声称自己来自另一个时代的巫师。"
+  },
+  "elixer": {
+    "english_name": "Elixir",
+    "localized_name": "万灵药水",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "服用",
+        "description": "使目标在6秒内回复500点生命和250点魔法。 受到敌方英雄或肉山攻击时效果会被驱散。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "vampire_fangs": {
+    "english_name": "Vampire Fangs",
+    "localized_name": "吸血鬼獠牙",
+    "localized_attributes": [
+      "技能吸血 +8 / 12 / 16%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "force_field": {
+    "english_name": "Arcanist's Armor",
+    "localized_name": "秘术师铠甲",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "巨盾",
+        "description": "盾护光环提供25%伤害反弹，持续5秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "盾护",
+        "description": "向1200范围内所有友军提供+4点护甲和+8%魔法抗性。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "这个技能造成的伤害被视为反弹伤害。反弹伤害不提供任何吸血，而且无法反弹。"
+    ],
+    "localized_lore": "一件精致的物事，由一位偏执的君王委托打造，在这件物品展现用途前他就被一块水果噎死了。"
+  },
+  "black_powder_bag": {
+    "english_name": "Blast Rig",
+    "localized_name": "雷火弹",
+    "localized_attributes": [
+      "护甲 +7"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "一触即发",
+        "description": "一旦被400范围内的英雄攻击就会爆炸，对400范围内所有敌人造成250点伤害，并施加100%致盲效果，持续2秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "曾属于世外之地的拦路强盗身上的一套自制服装，而它的兄弟姐妹早已在打劫的失败和时间的浪潮中失落。"
+  },
+  "craggy_coat": {
+    "english_name": "Craggy Coat",
+    "localized_name": "崎岖外衣",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "坚强",
+        "description": "以-20移动速度的代价再额外获得6点护甲。持续时间：6秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "greater_faerie_fire": {
+    "english_name": "Greater Faerie Fire",
+    "localized_name": "高级仙灵之火",
+    "localized_attributes": [
+      "攻击力 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞服",
+        "description": "立刻回复250点生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "timeless_relic": {
+    "english_name": "Timeless Relic",
+    "localized_name": "永恒遗物",
+    "localized_attributes": [
+      "技能增强 +10 / 20%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": "提升技能伤害和负面状态的持续时间。",
+    "localized_notes": [],
+    "localized_lore": "一个完好无损的发现，出土自一座古老的巫师学院废墟。"
+  },
+  "mirror_shield": {
+    "english_name": "Mirror Shield",
+    "localized_name": "神镜盾",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "回音坚盾",
+        "description": "每12.0秒抵挡并反弹大多数指向性技能给施法者。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这面战盾很久以前劫走了他早年的一个初时回忆。"
+  },
+  "ironwood_tree": {
+    "english_name": "Ironwood Tree",
+    "localized_name": "铁树之木",
+    "localized_attributes": [
+      "全属性 +5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "种树",
+        "description": "对地面施放，种下一棵快乐的小树，持续20秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "珍贵。而且像野草一样健壮。"
+  },
+  "mango_tree": {
+    "english_name": "Mango Tree",
+    "localized_name": "芒果树",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "种芒果树",
+        "description": "以地面为目标，种下一棵芒果树，可以提供无限的芒果之力。果树每60秒产生一颗魔法芒果，并在区域内提供顺畅视野。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "royal_jelly": {
+    "english_name": "Royal Jelly",
+    "localized_name": "蜂王浆",
+    "localized_attributes": [
+      "生命值 +50",
+      "魔法值 +50"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "服食",
+        "description": "消耗蜂王浆的所有能量点数并向一个目标友方单位提供一个状态效果，每点点数提供+2.5 生命恢复和+1.25 魔法恢复，持续8秒。 如果目标受到来自肉山或敌方英雄的伤害则失去效果。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "对于采集虿蜂浆的人来说，成功的意义不仅仅是获利——常常也是能死里逃生的手段——因为硕大的蜂巢中机警的工蜂出动后随着毒刺而来的摧残只有浆液才能治愈。"
+  },
+  "pupils_gift": {
+    "english_name": "Pupil's Gift",
+    "localized_name": "学徒之礼",
+    "localized_attributes": [
+      "次属性 +15"
+    ],
+    "localized_abilities": [],
+    "localized_desc": "提升了两种非主属性。",
+    "localized_notes": [
+      "对全才英雄提供2/3的全属性"
+    ],
+    "localized_lore": "一盘惊人的水果，取之不尽，又强身健体。"
+  },
+  "tome_of_aghanim": {
+    "english_name": "Tome of Aghanim",
+    "localized_name": "阿哈利姆之书",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "吞服",
+        "description": "使友方目标暂时获得阿哈利姆神杖效果，持续3分钟。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "repair_kit": {
+    "english_name": "Repair Kit",
+    "localized_name": "维修器具",
+    "localized_attributes": [
+      "生命恢复 +25"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "修复建筑",
+        "description": "以建筑为目标，在30秒内回复40%生命值。另外在此期间提供+10点护甲。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "mind_breaker": {
+    "english_name": "Mind Breaker",
+    "localized_name": "智灭",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "沉默打击",
+        "description": "下次攻击将沉默敌人，持续1.5秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把具有魔力的战刃，形态难以确定，而对于意志最为坚韧的敌人，刃锋也能将其心智刺穿。"
+  },
+  "third_eye": {
+    "english_name": "Third Eye",
+    "localized_name": "第三只眼",
+    "localized_attributes": [
+      "额外视野 +300",
+      "全属性 +7"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "真实视域",
+        "description": "携带者自身和周围友方单位可以看见500范围内的隐身单位和守卫。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "能量丢失",
+        "description": "每次阵亡后丢失一点能量，能量全部丢失后物品消失。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "spell_prism": {
+    "english_name": "Spell Prism",
+    "localized_name": "法术棱镜",
+    "localized_attributes": [
+      "全属性 +5",
+      "魔法恢复 +2"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "冷却时间减少",
+        "description": "降低所有技能和物品的冷却时间。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一块法术棱镜之中即使出现再细小的瑕疵都会导致使用者身亡。"
+  },
+  "princes_knife": {
+    "english_name": "Prince's Knife",
+    "localized_name": "亲王短刀",
+    "localized_attributes": [
+      "攻击弹道速度 +60%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "妖术打击",
+        "description": "下次攻击会将击中的敌人变成青蛙，持续1.5秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "witless_shako": {
+    "english_name": "Witless Shako",
+    "localized_name": "无知小帽",
+    "localized_attributes": [
+      "最大生命值提升 +1350",
+      "-最大魔法值"
+    ],
+    "localized_abilities": [],
+    "localized_desc": "提升了穿戴者的最大生命值，但减少了最大魔法值。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "imp_claw": {
+    "english_name": "Imp Claw",
+    "localized_name": "魔童之爪",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "致命一击",
+        "description": "使下一次攻击必定暴击，造成130%伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "尽管恶魔猎人的任务普遍吃力不讨好，但是他们在悲玫城用一些残件做交换也常常获得不菲的收益。"
+  },
+  "flicker": {
+    "english_name": "Flicker",
+    "localized_name": "闪灵",
+    "localized_attributes": [
+      "移动速度 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "闪灵",
+        "description": "驱散负面效果，并且自身向前方闪烁一段200至600的随机距离。施放时若3秒内受到来自玩家的伤害，将会闪烁在原地。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "严格意义上说到做到的“传送装置”，由一个声名狼藉的仙灵欺诈师打造。"
+  },
+  "spy_gadget": {
+    "english_name": "Telescope",
+    "localized_name": "望远镜",
+    "localized_attributes": [
+      "扫描冷却时间减少：50%",
+      "光环的攻击距离加成（仅远程）：75",
+      "光环的施法距离加成：100"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "预知光环",
+        "description": "扫描的冷却时间减少50%。提升1200范围内友军的攻击距离（仅远程）和施法距离。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "可靠的工具，可以让远处的东西变得更近。"
+  },
+  "spider_legs": {
+    "english_name": "Spider Legs",
+    "localized_name": "网虫腿",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "急行",
+        "description": "提供20%移动速度加成，50%转身速率加成和无视地形的移动，持续14秒。经过树木时会导致树木被摧毁。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "亡灵术和制宝工艺的结合，令人恶心却很实用。"
+  },
+  "helm_of_the_undying": {
+    "english_name": "Helm of the Undying",
+    "localized_name": "不朽尸王的头盔",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "死亡延迟",
+        "description": "受到致死打击后额外存活6秒。如果有敌方英雄在1200范围内阵亡，死亡延迟效果延迟5秒。死亡延迟期间不能攻击建筑。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "戴上它的代价会在来世偿还。"
+  },
+  "vambrace": {
+    "english_name": "Vambrace",
+    "localized_name": "臂甲",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "text",
+        "type_label": "Active",
+        "title": "Switch Attributes",
+        "description": "Activate to switch the active attribute between Strength, Agility, and Intelligence. Vambrace provides +10 of the selected attribute and +4 of the other two attributes."
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "令人觊觎的珍宝，莱娅女王的子孙在她死后为它反目成仇，她的王国因此走上了末路。"
+  },
+  "fusion_rune": {
+    "english_name": "Fusion Rune",
+    "localized_name": "聚合神符",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "消耗",
+        "description": "向目标提供所有强化神符的加成效果，持续50秒。每次使用消耗一点能量。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ocean_heart": {
+    "english_name": "Ocean Heart",
+    "localized_name": "海洋之心",
+    "localized_attributes": [
+      "全属性 +5"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "水中恢复",
+        "description": "在河道里提供10点/秒生命恢复和5点/秒魔法恢复。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "苍洋议会祝福过的一个护符。"
+  },
+  "spark_of_courage": {
+    "english_name": "Spark of Courage",
+    "localized_name": "勇气之光",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "勇气",
+        "description": "在拥有者血量高于50%时提供10点攻击力，低于该临界值时提供5点护甲。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "为光之子效力的军队中常见的战斗护身符。"
+  },
+  "broom_handle": {
+    "english_name": "Broom Handle",
+    "localized_name": "扫帚柄",
+    "localized_attributes": [
+      "攻击力 +8",
+      "护甲 +4"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一个异常危险的造物，出自一个对扫帚有着特殊喜好的巫师学徒。"
+  },
+  "trusty_shovel": {
+    "english_name": "Trusty Shovel",
+    "localized_name": "可靠铁铲",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "挖掘",
+        "description": "持续施法1秒。 可以找到一个赏金神符，一瓶治疗药膏，一颗魔法芒果，或一个狗头人。如果在河道中挖掘，必定会挖出圣水神符。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "16%几率挖出赏金神符。",
+      "28%几率分别挖出一瓶治疗药膏，一颗魔法芒果或一个狗头人。",
+      "同一把可靠铁铲不会连续两次挖出同一种奖励。"
+    ],
+    "localized_lore": "原为一个神明年幼时的玩物，是当年他叔叔送给他的礼物。"
+  },
+  "nether_shawl": {
+    "english_name": "Nether Shawl",
+    "localized_name": "幽冥披巾",
+    "localized_attributes": [
+      "技能增强 +6%",
+      "-护甲"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件异世的衣服，通过未知的手段与我们的位面产生维系。"
+  },
+  "dragon_scale": {
+    "english_name": "Dragon Scale",
+    "localized_name": "炎龙之鳞",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "后燃",
+        "description": "使普通攻击烧灼敌人，造成每秒22点伤害，持续3秒。对建筑有效。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "就连最为浩大的宝库在巨龙的遗骸面前也会相形见绌。"
+  },
+  "essence_ring": {
+    "english_name": "Essence Ring",
+    "localized_name": "精华指环",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "生命精华",
+        "description": "当前生命和最大生命提升240点，持续10秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件远古饰物，附有维萝迪希娅之息的祝福。"
+  },
+  "clumsy_net": {
+    "english_name": "Clumsy Net",
+    "localized_name": "笨拙渔网",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "诱捕",
+        "description": "同时诱捕敌方目标和自己，持续1.75秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enchanted_quiver": {
+    "english_name": "Enchanted Quiver",
+    "localized_name": "魔力箭袋",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "必然打击",
+        "description": "下次攻击造成250点额外魔法伤害并且拥有克敌机先。远程攻击者攻击时还将获得+350 攻击距离。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "受到追猎女神赐福的优雅馈赠。"
+  },
+  "ninja_gear": {
+    "english_name": "Ninja Gear",
+    "localized_name": "忍者用具",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "单独伪装",
+        "description": "只对自己施放诡计之雾，持续15.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一位年轻的探险家筛查虚空中漂浮的废料和碎石后找到的珍贵装备。"
+  },
+  "illusionsts_cape": {
+    "english_name": "Illusionist's Cape",
+    "localized_name": "幻术师披风",
+    "localized_attributes": [
+      "镜像持续时间：30",
+      "镜像攻击力：50%",
+      "镜像承受伤害：200%",
+      "敏捷 +14",
+      "力量 +14"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "制造幻象",
+        "description": "制造一个幻象，供你驱使。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "精进幻象",
+        "description": "所有幻象继承的攻击力提升6%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件时髦的披风，它的制造者坚持要叫“幻影斗篷”，而他的助手说的是“幻觉”这种蠢话。"
+  },
+  "havoc_hammer": {
+    "english_name": "Havoc Hammer",
+    "localized_name": "浩劫巨锤",
+    "localized_attributes": [
+      "攻击力 +16",
+      "力量 +14"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "浩劫",
+        "description": "牵引自己身边400范围内的敌人，造成50%减速，持续3秒，并造成175 + 1.5 x 自身力量值的魔法伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "panic_button": {
+    "english_name": "Magic Lamp",
+    "localized_name": "神妙明灯",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "回春",
+        "description": "佩戴者的生命值低于20%时将被施加强驱散，并且被治疗1500点生命。 驱散类型：强驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "apex": {
+    "english_name": "Apex",
+    "localized_name": "极",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "对全才英雄提供+24 全属性。"
+    ],
+    "localized_lore": "三个极具威力的宝珠附在一把权杖之上。"
+  },
+  "ballista": {
+    "english_name": "Ballista",
+    "localized_name": "弩炮",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "击退",
+        "description": "每次普通攻击都会击退敌人50距离，并造成50点纯粹伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "非常朴实的设计，经过一位锻造大师有爱的双手改良后提升颇多。"
+  },
+  "woodland_striders": {
+    "english_name": "Woodland Striders",
+    "localized_name": "林地神行靴",
+    "localized_attributes": [
+      "移动速度 +140",
+      "生命恢复 +60"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "林地神行",
+        "description": "在身后创造一条全是树木的路，持续3秒。树木最多持续15秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "树木穿行",
+        "description": "突破移动速度上限，在树林间可以自由穿行。 多个鞋类物品的移动速度加成不会叠加。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_trident": {
+    "english_name": "Trident Recipe",
+    "localized_name": "图纸（三元重戟）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "demonicon": {
+    "english_name": "Book of the Dead",
+    "localized_name": "冥灵书",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "召唤大恶魔",
+        "description": "召唤2个恶魔战士和2个恶魔射手，持续65秒。战士每次攻击都会燃烧魔法，可以揭示隐形单位，并且对击杀它的单位造成魔法伤害。射手拥有具有减速效果的弱驱散技能，还有被动的移速光环。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "恶魔战士拥有1600点生命，4点护甲，40%魔法抗性，380移动速度，134点攻击力，攻击燃烧50点魔法，死亡时造成800点伤害和1000真实视域范围。",
+      "恶魔射手拥有1300点生命，4点护甲，40%魔法抗性，425移动速度，131点攻击力，15秒冷却时间具有弱驱散效果的减速和9%移速加成的光环。"
+    ],
+    "localized_lore": "记载着最终之战。其中一页被人撕下。"
+  },
+  "fallen_sky": {
+    "english_name": "Fallen Sky",
+    "localized_name": "天崩",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "天崩",
+        "description": "变成一颗陨石，1秒后撞击目标区域，打击315范围内敌人，造成1.6秒眩晕和冲击伤害。对敌方单位和建筑每1.0秒造成一次伤害，持续6秒。 对建筑冲击伤害：75 对建筑持续伤害：60 对非建筑冲击伤害：150 对非建筑持续伤害：60 受到来自敌方英雄或肉山的伤害后3.0秒内无法使用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "龙炉的侍僧为数不多的几个幸存造物之一。"
+  },
+  "pirate_hat": {
+    "english_name": "Pirate Hat",
+    "localized_name": "海盗帽",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "抢劫",
+        "description": "从2400范围内阵亡的敌方英雄身上偷取150金。如果海盗帽的佩戴者是击杀者，那么没有距离限制，而且还会额外偷取400金。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "藏宝",
+        "description": "死亡时损失的金钱减少100%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "咸味颇重的骷髅礼帽，戴上后会深受财运无穷的诅咒。"
+  },
+  "ex_machina": {
+    "english_name": "Ex Machina",
+    "localized_name": "机械之心",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "重置冷却时间",
+        "description": "重置所有物品的冷却时间（刷新球除外）。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一个上古宇宙的残余，保存在一个天球之内。"
+  },
+  "faded_broach": {
+    "english_name": "Faded Broach",
+    "localized_name": "暗淡胸针",
+    "localized_attributes": [
+      "魔法值 +150",
+      "移动速度 +15"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件救命的珠宝，一位善良的维齐尔将其献给了一位年轻的女王。"
+  },
+  "paladin_sword": {
+    "english_name": "Paladin Sword",
+    "localized_name": "骑士剑",
+    "localized_attributes": [
+      "攻击力 +16",
+      "技能吸血 +8%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把徽记之剑曾为一代传奇——高斯瑞的伊荷斯修士所有，后来他遭到排挤被逐出教会时长剑也失去了剑鞘。"
+  },
+  "minotaur_horn": {
+    "english_name": "Minotaur Horn",
+    "localized_name": "恶牛角",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "天仙下凡",
+        "description": "施加弱驱散。提供50%魔法抗性加成，并且免疫反弹和纯粹伤害，持续2秒。持续时间内敌方技能的负面效果不会生效。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "在一只强大野兽的居所深处伏击得手后获得的战利品。"
+  },
+  "orb_of_destruction": {
+    "english_name": "Orb of Destruction",
+    "localized_name": "毁灭灵球",
+    "localized_attributes": [
+      "护甲降低：2",
+      "移动速度减缓（近战）：8%",
+      "移动速度减缓（远程）：4%",
+      "持续时间：3"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "腐蚀阻碍",
+        "description": "攻击会降低目标的护甲和移动速度。减速数值根据携带者为近战或远程而有不同。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一团混沌悬浮在巫师的灵气中，被装进秘术师的灵球里。"
+  },
+  "the_leveller": {
+    "english_name": "The Leveller",
+    "localized_name": "平世剑",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "平世",
+        "description": "攻击对建筑造成的伤害增加35%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "魔性十足的战刃，劈开了索拉纳斯圣所的大门。"
+  },
+  "arcane_ring": {
+    "english_name": "Arcane Ring",
+    "localized_name": "奥术指环",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "回魔",
+        "description": "使附近所有友方单位回复30点魔法 + 3%施法者最大魔法值。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "曾经是一个默默无名的领主家族祖传的珍宝。"
+  },
+  "titan_sliver": {
+    "english_name": "Titan Sliver",
+    "localized_name": "巨神残铁",
+    "localized_attributes": [
+      "基础攻击力 +15 / 25%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "尽管由于肉眼可见的品质，很多人都想得到这块出色的碎片，不过有一门学派还在研究它无限的整体到底是多大的尺寸，又有什么用途。"
+  },
+  "chipped_vest": {
+    "english_name": "Chipped Vest",
+    "localized_name": "碎裂背心",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "碎裂",
+        "description": "每次受到攻击时，反弹30点伤害至英雄，15点伤害至非英雄单位。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "这个技能造成的伤害被视为反弹伤害。反弹伤害不提供任何吸血，而且无法反弹。"
+    ],
+    "localized_lore": "看起来并不厚实，但很奇妙地令人感到舒适。"
+  },
+  "elven_tunic": {
+    "english_name": "Elven Tunic",
+    "localized_name": "精灵外衣",
+    "localized_attributes": [
+      "攻击速度 +26",
+      "移动速度 +7%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "即使是简单的精灵物事似乎也灌注了莫名其妙的功效。"
+  },
+  "cloak_of_flames": {
+    "english_name": "Cloak of Flames",
+    "localized_name": "火焰斗篷",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "献祭",
+        "description": "烧灼375范围内的敌方单位，造成40点每秒伤害。幻象造成25点每秒伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "非常精良的斗篷，可以承载过度防护的活体火焰。"
+  },
+  "trickster_cloak": {
+    "english_name": "Trickster Cloak",
+    "localized_name": "欺诈师斗篷",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "隐形",
+        "description": "使自己变为隐形状态，持续6秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "神奇的衣服，刚制作完毕就被它的创造者弄丢了。"
+  },
+  "possessed_mask": {
+    "english_name": "Possessed Mask",
+    "localized_name": "附魂面具",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "吸血",
+        "description": "攻击者每次攻击都将回复5点生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "对全才英雄提供1/3全属性。"
+    ],
+    "localized_lore": "即使是出于特定的目的和谨慎的态度而遭到丢弃，但这副骇人的面具总有办法让新主人戴上。"
+  },
+  "penta_edged_sword": {
+    "english_name": "Penta-Edged Sword",
+    "localized_name": "五锋长剑",
+    "localized_attributes": [
+      "攻击力 +45"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "残废",
+        "description": "每次攻击有25%几率减缓敌方英雄20%移动速度，60攻击速度，持续3秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "极其虔诚的铁匠生前最后一个作品，邪性十足，制作甫毕就夺走了他自己的性命。"
+  },
+  "bullwhip": {
+    "english_name": "Bullwhip",
+    "localized_name": "凌厉长鞭",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "鞭打",
+        "description": "对友军使用时提供25%移动速度加成，对敌人使用时减缓25%移动速度。持续4秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "原来是臭名昭著的经纪人在从事斗士以及其他行当时青睐的鞭子。"
+  },
+  "psychic_headband": {
+    "english_name": "Psychic Headband",
+    "localized_name": "通灵头带",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "通灵推行",
+        "description": "将敌方目标向自己推远400距离。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "精进念力控制时发生失败的试验品，在其他方面仍然管用。"
+  },
+  "ceremonial_robe": {
+    "english_name": "Ceremonial Robe",
+    "localized_name": "祭礼长袍",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "祭礼光环",
+        "description": "降低敌人10%状态抗性和10%魔法抗性。 作用范围：1200"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "泽伦维尔的圣物箱遭劫时遗失的其中一件物品。"
+  },
+  "quicksilver_amulet": {
+    "english_name": "Quicksilver Amulet",
+    "localized_name": "银闪护符",
+    "localized_attributes": [
+      "移动速度 +4%",
+      "攻击速度 +18",
+      "攻击动作速度 +40%",
+      "攻击弹道速度 +40%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "银闪",
+        "description": "有技能在冷却状态中时额外获得5%移动速度加成和20攻击速度加成。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "带有魔力的挂件，闪耀着神秘的光泽。"
+  },
+  "book_of_shadows": {
+    "english_name": "Book of Shadows",
+    "localized_name": "暗影邪典",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "邪影",
+        "description": "以敌人、队友或自身为目标。使目标无法被敌人选中，但也会被沉默、锁闭和缴械，持续4秒。施加弱驱散。 驱散类型：弱驱散"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "一本不可能存在的书，里面全是难以理解的段落，由不可知的想法组成。"
+  },
+  "giants_ring": {
+    "english_name": "Giant's Ring",
+    "localized_name": "巨人之戒",
+    "localized_attributes": [
+      "模型大小 +60%"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "巨人之足",
+        "description": "可以跨越任何地形，并对自己脚下的单位每秒造成100%力量值的伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "出价购得的珍贵之物，卖家是厄泽王庭本来并不起眼的统治者，他放弃自己的王位后消失得无影无踪。"
+  },
+  "vengeances_shadow": {
+    "english_name": "Shadow of Vengeance",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "stormcrafter": {
+    "english_name": "Stormcrafter",
+    "localized_name": "风暴宝器",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "瓶装闪电",
+        "description": "电击700范围内2个敌方单位，造成70点伤害，并减缓40%移动速度，持续0.4秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "捕捉一个弱小的神明时施下的咒语意外有了副产物。"
+  },
+  "mysterious_hat": {
+    "english_name": "Fairy's Trinket",
+    "localized_name": "仙灵饰品",
+    "localized_attributes": [
+      "生命值 +50",
+      "技能增强 +5%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "较小的配饰，为了酬谢凡人不经意间流露出的善意而注入了仙灵的好运。"
+  },
+  "ascetic_cap": {
+    "english_name": "Ascetic's Cap",
+    "localized_name": "简朴短帽",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "坚韧不拔",
+        "description": "持有者被施加来自玩家控制单位的负面效果就会获得40%状态抗性和40%减速抗性，持续3秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一顶朴素的帽子，看上去源自星隐寺。"
+  },
+  "misericorde": {
+    "english_name": "Brigand's Blade",
+    "localized_name": "飞贼之刃",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "暗黑之仁",
+        "description": "敌人每损失7%生命值，对其发动攻击就会额外造成3点伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把武器来自名声狼藉的刺客，在其拥有者神秘的消亡后，遭到盗窃并走私出了白色尖塔。"
+  },
+  "heavy_blade": {
+    "english_name": "Witchbane",
+    "localized_name": "行巫之祸",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "清洗",
+        "description": "驱散300范围内所有敌人和友军。 驱散类型：弱驱散"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "征服",
+        "description": "攻击时额外造成4%目标最大魔法值的伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "有了方法测试对象后，泰勒庄园的高墙之内已设想出无穷的暴行，并散播到外面的世界。"
+  },
+  "unstable_wand": {
+    "english_name": "Pig Pole",
+    "localized_name": "豚杆",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "小猪出动！",
+        "description": "将拥有者变成一只小动物，持续3秒，并且提供+20%移动速度。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一个凑合使用的护符，被一个热爱和平又有点糊涂的附魔师弄丢了。"
+  },
+  "pogo_stick": {
+    "english_name": "Tumbler's Toy",
+    "localized_name": "杂技玩具",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "跳跃",
+        "description": "使自身向前推进300距离。拥有者在3秒内受到来自玩家的伤害将无法使用杂技玩具。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一件古董玩具，是在一个奥泽尼亚杂技团集市的废墟里找到的。"
+  },
+  "paintball": {
+    "english_name": "Fae Grenade",
+    "localized_name": "仙灵榴弹",
+    "localized_attributes": [
+      "移动速度 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "暗影烙印",
+        "description": "向900范围内一个敌人投掷一个面具，施加一个负面效果，造成每秒40点伤害，并获得该单位的视野，持续7秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会触发法术抵抗或法术反弹。"
+    ],
+    "localized_lore": "被仙灵标记已死的人对暗影之域中的生物来说都是灿烂的存在。"
+  },
+  "seeds_of_serenity": {
+    "english_name": "Seeds of Serenity",
+    "localized_name": "宁静种籽",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "盎然生机",
+        "description": "对400范围的地面施放。对作用范围内所有友方单位提供+8点/秒生命恢复 + 25%施法者施法时生命恢复。持续8秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "常青的嫩芽，被树人视为珍宝，也遭到入侵者的觊觎。"
+  },
+  "lance_of_pursuit": {
+    "english_name": "Lance of Pursuit",
+    "localized_name": "追击之矛",
+    "localized_attributes": [
+      "魔法值 +200"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "追逼",
+        "description": "从敌人的身后发动攻击会造成16%减速（远程英雄造成8%减速），并且额外造成20点伤害。减速效果持续2秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把带着微光的武器来自一位名声不再的骑士，他常年来都在纠结是否向昏君效劳。"
+  },
+  "occult_bracelet": {
+    "english_name": "Occult Bracelet",
+    "localized_name": "玄奥手镯",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "埃罗莎仪式",
+        "description": "每次佩戴者被攻击时都会获得一个0.4点/秒魔法恢复的叠加效果，最多叠加5次。每个叠加效果持续5秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "手镯上的雕像刻的是黑暗女神埃罗莎的不眠之眼。"
+  },
+  "ogre_seal_totem": {
+    "english_name": "Ogre Seal Totem",
+    "localized_name": "食人魔海豹图腾",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "食人魔海豹扑打",
+        "description": "像食人魔海豹一样向前扑打2次，每次扑打对275范围内敌人造成250点伤害和持续1.5秒的-100%减速。400扑跳距离。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "recipe_harpoon": {
+    "english_name": "Harpoon Recipe",
+    "localized_name": "图纸（鱼叉）",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "harpoon": {
+    "english_name": "Harpoon",
+    "localized_name": "鱼叉",
+    "localized_attributes": [
+      "攻击力 +25",
+      "力量 +25",
+      "敏捷 +10",
+      "智力 +10",
+      "魔法恢复 +2.0"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "钩捕",
+        "description": "对敌人使用时向其发射一支鱼叉，将自身和目标牵引到更近的位置，最多牵引自身与目标之间距离的35%。近战英雄总是将目标牵引至他们的攻击距离。以树木为目标总是会把自身牵引至该树木。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "回音一击",
+        "description": "近战攻击可以快速攻击两次。两次攻击都将减缓100%移动速度，第一次持续1.0秒。回音一击冷却时间：5秒"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "完美解决敌人逃跑的问题。"
+  },
+  "defiant_shell": {
+    "english_name": "Defiant Shell",
+    "localized_name": "不羁甲壳",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "互换",
+        "description": "被攻击后英雄会对攻击距离内的一个目标作出反击，伤害为平常攻击伤害的80%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "eye_of_the_vizier": {
+    "english_name": "Eye of the Vizier",
+    "localized_name": "维齐尔之眼",
+    "localized_attributes": [
+      "魔法恢复 +1 / 1.5",
+      "%-最大魔法值"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这枚戒指属于一个狡猾的当朝法师，他将一小撮敌人囚禁后用作他私人的法力储备。"
+  },
+  "dagger_of_ristul": {
+    "english_name": "Dagger of Ristul",
+    "localized_name": "瑞斯图尔尖匕",
+    "localized_attributes": [
+      "攻击速度 +15"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "浸血",
+        "description": "消耗生命值，临时获得25点攻击力。持续8秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "一把险恶的小刀，如果自愿在刀刃上涂上自己鲜血将会得到它的帮助。"
+  },
+  "ofrenda": {
+    "english_name": "Beloved Memory",
+    "localized_name": "挚爱回忆",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "纪念死者",
+        "description": "把这个祭品放到祭坛上，获得生者的回忆来向死者致敬。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "回忆已穿过生死之界的挚爱，给自己一点欣慰。"
+  },
+  "ofrenda_shovel": {
+    "english_name": "Scrying Shovel",
+    "localized_name": "占卜之铲",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "挖掘",
+        "description": "搜索地图去寻找给死者的祭品。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "你不知道它来自何处，但它知道你需要去哪。你需要的就是挖掘。"
+  },
+  "ofrenda_pledge": {
+    "english_name": "Forebearer's Fortune",
+    "localized_name": "先祖的财富",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "永世诺言",
+        "description": "通知其他世界的灵魂，承诺会悼念他们。如果战斗中所有人都在比赛开始前做出永世诺言，往生者也许会愿意聆听。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这件物品看起来不稳定。仿佛很快就会消失。"
+  },
+  "muertas_gun": {
+    "english_name": "Mercy & Grace",
+    "localized_name": "仁慈与恩泽",
+    "localized_attributes": [
+      "施法距离加成：100%",
+      "技能增强：100%",
+      "%生命值惩罚："
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "弹无虚发",
+        "description": "向一个敌方单位或一棵树发射一颗幽灵子弹。子弹击中时将会造成300点伤害并减缓目标-100%移动速度，持续0.5秒，然后沿矢量目标的方向弹去。跳弹将会对穿过的所有单位造成伤害，击中英雄后停下。被跳弹击中的英雄会被恐惧，朝射击方向狂奔2.0秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "被恐惧的敌人为相位状态，无法被减速。",
+      "跳弹的行进距离为弹无虚发施法距离的1倍。"
+    ],
+    "localized_lore": "一把拯救肉体，另一把夺取灵魂。"
+  },
+  "tier1_token": {
+    "english_name": "Tier 1 Token",
+    "localized_name": "第1级代币",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "使用后兑换一件第1级中立物品。兑换后的中立物品无法共享，而且每名英雄每一级代币只能兑换一枚。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "tier2_token": {
+    "english_name": "Tier 2 Token",
+    "localized_name": "第2级代币",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "使用后兑换一件第2级中立物品。兑换后的中立物品无法共享，而且每名英雄每一级代币只能兑换一枚。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "tier3_token": {
+    "english_name": "Tier 3 Token",
+    "localized_name": "第3级代币",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "使用后兑换一件第3级中立物品。兑换后的中立物品无法共享，而且每名英雄每一级代币只能兑换一枚。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "tier4_token": {
+    "english_name": "Tier 4 Token",
+    "localized_name": "第4级代币",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "使用后兑换一件第4级中立物品。兑换后的中立物品无法共享，而且每名英雄每一级代币只能兑换一枚。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "tier5_token": {
+    "english_name": "Tier 5 Token",
+    "localized_name": "第5级代币",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "使用后兑换一件第5级中立物品。兑换后的中立物品无法共享，而且每名英雄每一级代币只能兑换一枚。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "vindicators_axe": {
+    "english_name": "Vindicator's Axe",
+    "localized_name": "正义之斧",
+    "localized_attributes": [
+      "攻击速度 +35"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "复仇",
+        "description": "装备的英雄被沉默时提供30点攻击力，被眩晕时提供20点护甲。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "duelist_gloves": {
+    "english_name": "Duelist Gloves",
+    "localized_name": "决斗家手套",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "英勇",
+        "description": "1200范围内只要有敌方英雄就提供20 攻击速度。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ancient_guardian": {
+    "english_name": "Ancient Guardian",
+    "localized_name": "遗迹守护者",
+    "localized_attributes": [
+      "攻击力 +50"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "遗迹之力",
+        "description": "位于一座遗迹的2000范围内将额外获得50点攻击力。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "safety_bubble": {
+    "english_name": "Safety Bubble",
+    "localized_name": "安全泡泡",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "冒泡",
+        "description": "装备的英雄拥有一个可吸收敌方伤害的100点生命的护盾。 8秒内没有受到伤害后，护盾将恢复至满血。护盾不会吸收自残伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "whisper_of_the_dread": {
+    "english_name": "Whisper of the Dread",
+    "localized_name": "邪道私语",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "孔中窥人",
+        "description": "佩戴者的白天视野减少15%，但是技能伤害提升10%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "空气穿过这个护符时会发出可怕的声音。"
+  },
+  "nemesis_curse": {
+    "english_name": "Nemesis Curse",
+    "localized_name": "天诛之咒",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "玻璃大炮",
+        "description": "英雄受到的所有来源伤害均增加6%。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "玻璃化",
+        "description": "攻击英雄时会施加负面效果，使他们承受的所有伤害增加12%，持续5秒。同一时间只有一个敌人会受到玻璃化的作用。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "avianas_feather": {
+    "english_name": "Aviana's Feather",
+    "localized_name": "艾维娜之羽",
+    "localized_attributes": [
+      "移动速度 +30"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "轻如鸿毛",
+        "description": "装备的英雄血量低于30%时获得飞行移动状态。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "unwavering_condition": {
+    "english_name": "Unwavering Condition",
+    "localized_name": "坚毅之件",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "坚毅",
+        "description": "英雄的最大生命值将定在1800点，不会因其他效果或属性而改变。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "dandelion_amulet": {
+    "english_name": "Dandelion Amulet",
+    "localized_name": "蒲公英护符",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "魔法伤害抵挡",
+        "description": "每隔12秒抵挡300点魔法伤害，只抵挡超过75点的伤害"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "martyrs_plate": {
+    "english_name": "Martyr's Plate",
+    "localized_name": "烈士鳞甲",
+    "localized_attributes": [
+      "生命恢复 +7"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "殉道",
+        "description": "将900范围内友方英雄所受魔法伤害的25%转嫁到自己身上，持续10秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "这个技能造成的伤害被视为反弹伤害。反弹伤害不提供任何吸血，而且无法反弹。"
+    ],
+    "localized_lore": null
+  },
+  "gossamer_cape": {
+    "english_name": "Gossamer Cape",
+    "localized_name": "蛛丝斗篷",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "第六感",
+        "description": "自动躲避来自一名英雄的下次攻击。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "light_collector": {
+    "english_name": "Light Collector",
+    "localized_name": "集光器",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "rattlecage": {
+    "english_name": "Rattlecage",
+    "localized_name": "回响之笼",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "回荡",
+        "description": "受到任意来源的220点伤害后，佩戴者对附近600范围内最多2个随机敌人发射一个弹道，以英雄优先，造成110点物理伤害并降低目标100%移动和攻击速度，持续0.2秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "这个技能造成的伤害被视为反弹伤害。反弹伤害不提供任何吸血，而且无法反弹。"
+    ],
+    "localized_lore": null
+  },
+  "doubloon": {
+    "english_name": "Doubloon",
+    "localized_name": "双面币",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "toggle",
+        "type_label": "切换",
+        "title": "翻转",
+        "description": "切换后把30%默认最大生命值转化为最大魔法值，或者把30%默认最大魔法值转化为最大生命值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "roshans_banner": {
+    "english_name": "Roshan's Banner",
+    "localized_name": "肉山的战旗",
+    "localized_attributes": [
+      "效果作用范围：600 / 900 / 1200",
+      "可攻击次数：6 / 8 / 10"
+    ],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "放置战旗",
+        "description": "在目标地点创造一面旗帜。战旗立起后作用范围内的小兵将免疫伤害。战旗持续120秒。 可以被摧毁。近战英雄对战旗造成2倍伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "black_grimoire": {
+    "english_name": "Black Grimoire\n(Warlock)",
+    "localized_name": "Black Grimoire\n(Warlock)",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "异教学识",
+        "description": "英雄击杀和助攻会增强黑暗魔典，使其获得能量点数。右键点击后将其消耗，每点能量提供200经验。一开始为冷却状态。 这件物品无法丢弃。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "grisgris": {
+    "english_name": "Gris-Gris",
+    "localized_name": "驱邪护符",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "这件物品无法丢弃或放在背包里，但是可以放到主物品栏里。拥有者阵亡时，死亡损失金钱的100%会加入到该物品中，物品被消耗后将退回这些金钱。右键点击可以消耗这件物品，并将其永久移除。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_vast": {
+    "english_name": "Vast",
+    "localized_name": "高远",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_quickened": {
+    "english_name": "Quickened",
+    "localized_name": "迅速",
+    "localized_attributes": [
+      "移动速度 +15 / 20 / 25 / 30",
+      "魔法值 +0 / 100 / 160 / 220"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "cursed_circlet": {
+    "english_name": "Accursed",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ogre_heart": {
+    "english_name": "Restorative",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "neutral_tabi": {
+    "english_name": "Elusive",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_audacious": {
+    "english_name": "Audacious",
+    "localized_name": "冒险",
+    "localized_attributes": [
+      "攻击速度 +100",
+      "魔法攻击伤害 +80",
+      "承受伤害 +10%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_mystical": {
+    "english_name": "Mystical",
+    "localized_name": "神秘",
+    "localized_attributes": [
+      "魔法恢复 +0.8 / 1.6 / 2.4 / 3.2"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_alert": {
+    "english_name": "Alert",
+    "localized_name": "警觉",
+    "localized_attributes": [
+      "攻击速度 +7 / 15 / 23 / 31",
+      "额外夜间视野 +0 / 150 / 225 / 300"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_brawny": {
+    "english_name": "Brawny",
+    "localized_name": "壮实",
+    "localized_attributes": [
+      "生命值 +110 / 150 / 190 / 230",
+      "生命恢复 +0 / 3 / 6 / 9"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_tough": {
+    "english_name": "Tough",
+    "localized_name": "坚强",
+    "localized_attributes": [
+      "攻击力 +7 / 10 / 13 / 16",
+      "护甲 +0 / 4 / 6 / 8",
+      "击退抗性 +0 / 0 / 0 / 40%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_feverish": {
+    "english_name": "Feverish",
+    "localized_name": "狂热",
+    "localized_attributes": [
+      "魔法消耗/魔法损失增加 +7%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_fleetfooted": {
+    "english_name": "Fleetfooted",
+    "localized_name": "捷足",
+    "localized_attributes": [
+      "移动速度 +115"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会与鞋类物品的移动速度加成叠加"
+    ],
+    "localized_lore": null
+  },
+  "enhancement_crude": {
+    "english_name": "Crude",
+    "localized_name": "粗暴",
+    "localized_attributes": [
+      "生命回复 +30 / 40%",
+      "%-基础攻击间隔",
+      "%-智力"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_boundless": {
+    "english_name": "Boundless",
+    "localized_name": "无边",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_wise": {
+    "english_name": "Wise",
+    "localized_name": "睿智",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_timeless": {
+    "english_name": "Timeless",
+    "localized_name": "永恒",
+    "localized_attributes": [
+      "技能增强 +6 / 16%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_greedy": {
+    "english_name": "Greedy",
+    "localized_name": "贪婪",
+    "localized_attributes": [
+      "额外每分钟金钱 +75 / 100",
+      "魔法值 +200 / 250",
+      "-攻击力"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_vampiric": {
+    "english_name": "Vampiric",
+    "localized_name": "吸血鬼",
+    "localized_attributes": [
+      "技能吸血 +20%",
+      "夜间视野 +0 / 0 / 200"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_keen_eyed": {
+    "english_name": "Keen-eyed",
+    "localized_name": "犀利",
+    "localized_attributes": [
+      "魔法恢复 +1 / 1.5 / 2",
+      "%-最大魔法值"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_evolved": {
+    "english_name": "Evolved",
+    "localized_name": "进化",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [
+      "对全才英雄提供+24 全属性。"
+    ],
+    "localized_lore": null
+  },
+  "enhancement_titanic": {
+    "english_name": "Titanic",
+    "localized_name": "巨神",
+    "localized_attributes": [
+      "基础攻击力 +10 / 20%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "unrelenting_eye": {
+    "english_name": "Unrelenting Eye",
+    "localized_name": "不屈之眼",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "不屈",
+        "description": "减速抗性提升50%。佩戴者的攻击距离内每出现一名敌方英雄就会使这个加成效果减少10%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "巨蟒之眼大如蜜瓜（湿度一样）。"
+  },
+  "mana_draught": {
+    "english_name": "Mana Draught",
+    "localized_name": "魔力药水",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "一饮而尽",
+        "description": "在6秒内回复70点魔法 + 3%施法者最大魔法值。承受来自敌方英雄或肉山的伤害会使效果提前结束。 按住Ctrl键可以对友方英雄使用。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "填补",
+        "description": "站立在水里时魔力药水的冷却速度增加30%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "让人为之一振的饮料，最适合与朋友分享。"
+  },
+  "rippers_lash": {
+    "english_name": "Ripper's Lash",
+    "localized_name": "撕裂之鞭",
+    "localized_attributes": [
+      "额外伤害（对英雄）：16",
+      "额外伤害（对非英雄）：4"
+    ],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "剥皮",
+        "description": "把荆棘刺入200范围内所有敌人。在10秒内，他们被攻击时都会承受额外伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "众所周知，瑞文特尔的仙灵园艺师们不断突破异花授粉和安全的界限。"
+  },
+  "crippling_crossbow": {
+    "english_name": "Crippling Crossbow",
+    "localized_name": "致残之弩",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "蹒跚",
+        "description": "击中敌人时造成25点伤害，然后减缓他们50%移动速度，生命回复减少40%，持续4秒。减速效果会在技能持续时间内逐渐减弱。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把弩的木纹上不断渗出树浆，给每支箭都覆盖上强效但短暂的麻醉汁液。"
+  },
+  "gale_guard": {
+    "english_name": "Gale Guard",
+    "localized_name": "烈风护体",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "飓风护盾",
+        "description": "把施法者包裹在225点全伤害护盾中，抵挡75%的所受伤害。最多持续10秒，生效时护盾还会提供50%减速抗性。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "如果能静下心来倾听，就能依靠风来传达自己的意愿。"
+  },
+  "gunpowder_gauntlets": {
+    "english_name": "Gunpowder Gauntlet",
+    "localized_name": "火药手套",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "殴击人群",
+        "description": "下次攻击会额外造成120点魔法伤害，并溅射给250范围内所有敌人，造成攻击伤害和额外魔法伤害的50%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "“无害”的恶作剧，但实在是玩过火了。"
+  },
+  "searing_signet": {
+    "english_name": "Searing Signet",
+    "localized_name": "炽热纹章",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "烧蚀",
+        "description": "单次魔法伤害超过60点会使敌人着火，使他们在6秒内受到80点魔法伤害。对非英雄目标的烧蚀伤害减少50%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "不会点燃2000距离以外的敌人。"
+    ],
+    "localized_lore": "想要折磨魔法的使用者，必须想出非常规的手段。"
+  },
+  "serrated_shiv": {
+    "english_name": "Serrated Shiv",
+    "localized_name": "锯齿短刀",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "悍劲",
+        "description": "攻击拥有20%几率触发克敌机先，并且造成额外物理伤害，数值为8%目标当前生命值。攻击对肉山触发时总是造成固定200点额外伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "这把刀用来执行任务太过危险，它唯一的用途就是卑鄙的谋杀。"
+  },
+  "polliwog_charm": {
+    "english_name": "Pollywog Charm",
+    "localized_name": "蝌蚪护符",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "呱呱",
+        "description": "目标友军的生命恢复提升8点/秒，持续14秒。在水中时，受到福佑的单位还会加速10%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "遇水就会扭动的小饰品。"
+  },
+  "magnifying_monocle": {
+    "english_name": "Magnifying Monocle",
+    "localized_name": "放大单片镜",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "锐利目光",
+        "description": "施法距离提升100，攻击距离提升100（近战/远程）。受到来自玩家控制单位或肉山的伤害超过25点会使该效果在6秒内无效。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "致命的精进。"
+  },
+  "pyrrhic_cloak": {
+    "english_name": "Pyrrhic Cloak",
+    "localized_name": "皮洛士斗篷",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "报应",
+        "description": "在接下来6秒内施法者所受伤害的75%会作为物理伤害反弹至目标单位，只要他们还在1200距离内。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "这个技能造成的伤害被视为反弹伤害。反弹伤害不提供任何吸血，而且无法反弹。"
+    ],
+    "localized_lore": "世上就是有那种不关心部下死活，只想着消灭敌人的将军。"
+  },
+  "madstone_bundle": {
+    "english_name": "Madstone Bundle",
+    "localized_name": "狂石包",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "收集后可制作新的中立物品。",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "crystal_raindrop": {
+    "english_name": "Crystal Raindrop",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "kobold_cup": {
+    "english_name": "Kobold Cup",
+    "localized_name": "狗头人酒杯",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "临行干杯",
+        "description": "提升施法者附近1000范围内所有友方单位10%的移动速度，持续6秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "狗头人之王只要开心了就会喝一口。"
+  },
+  "dormant_curio": {
+    "english_name": "Dormant Curio",
+    "localized_name": "休眠珍品",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "隐藏潜能",
+        "description": "拥有休眠珍品时打造的中立物品会提升30%威力。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "下一件宝物的特定属性会被增强。不会增强冷却时间、魔法消耗和施法距离。"
+    ],
+    "localized_lore": "每个人都有想法，但没有人有头绪。"
+  },
+  "sisters_shroud": {
+    "english_name": "Sister's Shroud",
+    "localized_name": "魅影之衣",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "蒙纱",
+        "description": "每当生命值低于50%就会获得150% 闪避加成，持续5秒。每次成功闪避攻击后这个闪避效果就会减少当前数值的75%。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "临终关怀",
+        "description": "蒙纱的冷却时间只会在佩戴者阵亡或者击杀一名敌方英雄后重置。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "受到来自非玩家控制的非英雄单位的伤害不会触发。"
+    ],
+    "localized_lore": "这面棺罩原先盖着魅影之纱大长老的石棺。"
+  },
+  "jidi_pollen_bag": {
+    "english_name": "Jidi Pollen Bag",
+    "localized_name": "基迪花粉袋",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "授粉",
+        "description": "把花粉播撒给所有700范围内的所有敌方单位，降低50%生命回复，持续9秒，并且在持续时间内造成他们9%最大生命值的伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "伤害不会致死，被归为生命损失。"
+    ],
+    "localized_lore": "非常危险。很难去获得更多。"
+  },
+  "outworld_staff": {
+    "english_name": "Outworld Staff",
+    "localized_name": "殁境法杖",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "自我放逐",
+        "description": "使施法者无敌且被控制，持续0.7秒。施法者回归时会受到5%最大生命值的伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "承受的回归伤害不会致死，会禁用闪烁匕首和其他受到伤害时会被锁闭的物品。"
+    ],
+    "localized_lore": "独孤的哨卫并非总是如此的证明。"
+  },
+  "dezun_bloodrite": {
+    "english_name": "Dezun Bloodrite",
+    "localized_name": "德尊血式",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "血咒",
+        "description": "技能范围提升16%，但是现在还会消耗生命值，数值为魔法消耗的35%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "通往失落血脉的门户，只有鲜血才能打开。"
+  },
+  "giant_maul": {
+    "english_name": "Giant's Maul",
+    "localized_name": "巨人之槌",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "灭顶一击",
+        "description": "下次攻击是致命一击，造成150%伤害。击中敌人后会暂时减缓他们10%移动速度、15%攻击速度和20%施法速度，持续3秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "粗糙但效果很猛。"
+  },
+  "divine_regalia": {
+    "english_name": "Divine Regalia",
+    "localized_name": "天赐华冠",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "尊崇",
+        "description": "伤害输出提升20%。阵亡后这件中立物品会永久失效，而且失去当前附魔。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "太过耀眼，它无法忍受失败。"
+  },
+  "divine_regalia_broken": {
+    "english_name": "Disgraced Regalia",
+    "localized_name": "失节华冠",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "堕落",
+        "description": "你已经阵亡过，因此不会获得任何东西。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "它无法忍受失败。"
+  },
+  "circlet_of_the_flayed_twins": {
+    "english_name": "Circlet of the Flayed Twins",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_fierce": {
+    "english_name": "Fierce",
+    "localized_name": "凶猛",
+    "localized_attributes": [
+      "移动速度 +30",
+      "额外夜间视野 +250",
+      "攻击力 +15"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_dominant": {
+    "english_name": "Dominant",
+    "localized_name": "专横",
+    "localized_attributes": [
+      "攻击速度 +25",
+      "生命值 +205"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_restorative": {
+    "english_name": "Restorative",
+    "localized_name": "滋补",
+    "localized_attributes": [
+      "魔法值 +200",
+      "生命恢复 +8"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_thick": {
+    "english_name": "Thick",
+    "localized_name": "厚重",
+    "localized_attributes": [
+      "生命值 +240",
+      "魔法恢复 +3",
+      "护甲 +7"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "enhancement_curious": {
+    "english_name": "Unleashed",
+    "localized_name": "觉醒",
+    "localized_attributes": [
+      "宝物威力 +30%"
+    ],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "furion_gold_bag": {
+    "english_name": "Bag of Gold",
+    "localized_name": "金袋",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": "内有黄金",
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "specialists_array": {
+    "english_name": "Specialist's Array",
+    "localized_name": "行家阵列",
+    "localized_attributes": [
+      "敏捷 +10",
+      "攻击力 +20"
+    ],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "分裂射击",
+        "description": "远程攻击有30%的概率向非原攻击目标的前方120度角内、攻击距离+150距离内的最多2个附近敌人发射额外弹道。额外弹道造成20 + 75%普通攻击伤害，并且不会触发击中效果。主攻击造成20 + 100%普通攻击伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": "加强扳机的出色器具，源自一位年迈的刺客闲暇时的想法。"
+  },
+  "weighted_dice": {
+    "english_name": "Weighted Dice",
+    "localized_name": "加重骰子",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "欺诈",
+        "description": "最高基础攻击力提升6点。在计算佩戴者针对正补的基础伤害或小兵赏金时，数值会计算2次，并取较高值。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "ash_legion_shield": {
+    "english_name": "Ash Legion Shield",
+    "localized_name": "余烬军团战盾",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "盾墙",
+        "description": "你的移动速度降低20，向800范围内玩家控制的友方单位提供一个160点物理伤害护盾。持续6秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "riftshadow_prism": {
+    "english_name": "Riftshadow Prism",
+    "localized_name": "影墟棱晶",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "折射",
+        "description": "消耗自身8%当前生命值，制造一个满血的幻象，持续20秒。幻象造成50%伤害，承受200%伤害。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "metamorphic_mandible": {
+    "english_name": "Metamorphic Mandible",
+    "localized_name": "变态上颚",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "化蛹",
+        "description": "进入昆虫形态，持续5秒，魔法抗性提升50%，移动速度提升15%。在昆虫形态下模型大小减少，护甲减少45%。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "idol_of_screeauk": {
+    "english_name": "Idol of Scree'auk",
+    "localized_name": "丝奎奥克神像",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "飞天之幻",
+        "description": "提供50%减速抗性、相位移动和25%闪避，持续5秒。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "flayers_bota": {
+    "english_name": "Flayer's Bota",
+    "localized_name": "剥皮血囊",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "active",
+        "type_label": "主动",
+        "title": "嗜血渴望",
+        "description": "获得15%基础攻击力，30攻击速度，持续6秒。"
+      },
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "鲜血之激",
+        "description": "只要敌方英雄在1200范围内阵亡，嗜血渴望的冷却时间就会重置。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "diffusal_blade_2": {
+    "english_name": "Diffusal Blade",
+    "localized_name": null,
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "foragers_kit": {
+    "english_name": "Forager's Kit",
+    "localized_name": "采菌套具",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "passive",
+        "type_label": "被动",
+        "title": "采菌",
+        "description": "这件物品不在冷却时，附近能采到蘑菇的树木就会出现。在这样的树木旁站1秒后就能采到植物、蘑菇或包含30金的金袋。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  },
+  "foragers_health": {
+    "english_name": "Vital Toadstool",
+    "localized_name": "活力伞菌",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "咀嚼",
+        "description": "向目标提供1%/秒最大生命值恢复，持续10秒。 受到敌方英雄或肉山攻击时效果会被驱散。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键点击附近友方英雄可以对其使用。"
+    ],
+    "localized_lore": null
+  },
+  "foragers_stats": {
+    "english_name": "Ironwood Nut",
+    "localized_name": "铁树坚果",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "咀嚼",
+        "description": "永久获得1点主属性。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "全才英雄获得0.4点额外全属性。"
+    ],
+    "localized_lore": null
+  },
+  "foragers_mana": {
+    "english_name": "Tomo'kan Ringcap",
+    "localized_name": "托莫干伞盖",
+    "localized_attributes": [],
+    "localized_abilities": [
+      {
+        "type": "use",
+        "type_label": "使用",
+        "title": "咀嚼",
+        "description": "消耗后立刻回复50 + 5%目标最大魔法值的魔法。"
+      }
+    ],
+    "localized_desc": null,
+    "localized_notes": [
+      "按住Ctrl键点击附近友方英雄可以对其使用。"
+    ],
+    "localized_lore": null
+  },
+  "splintmail": {
+    "english_name": "Splintmail",
+    "localized_name": "片甲",
+    "localized_attributes": [],
+    "localized_abilities": [],
+    "localized_desc": null,
+    "localized_notes": [],
+    "localized_lore": null
+  }
+}

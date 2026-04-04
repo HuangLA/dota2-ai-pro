@@ -1798,19 +1798,19 @@ export function TeamProfilePage({
   };
 
   return (
-    <div className="workspace-page bg-dota-bg">
+    <div className="workspace-page">
       <div className="workspace-stack">
-        <div className="workspace-header border-amber-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]">
+        <div className="workspace-header">
           <div className="workspace-header-row">
             <div>
-              <p className="workspace-eyebrow text-amber-300/80">Team Archive</p>
-              <h1 className="workspace-title text-dota-gold">战队档案</h1>
+              <p className="workspace-eyebrow">Team Archive</p>
+              <h1 className="workspace-title text-white">战队档案</h1>
               <p className="workspace-description">
                 基于 OpenDota 同步比赛的战队档案视图，更适合长期跟踪某支战队的联赛分布、可见比赛动作和回放准备情况。
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 xl:min-w-[420px] xl:items-end">
+            <div className="flex flex-col gap-3 xl:items-end">
               {onBackHome && (
                 <button
                   onClick={onBackHome}

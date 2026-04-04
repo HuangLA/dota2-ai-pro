@@ -9,6 +9,7 @@ True Sight 是一个本地优先（local-first）的 Dota 2 录像分析平台�
 ## 项目状态
 
 - 当前阶段：Phase 4 已完成，Phase 4.5 重构进行中
+- 当前支持补丁版本：Dota 2 `7.41`
 - 进度基线：`PROGRESS.md`
 - API 契约：`docs/api_specification.md`
 

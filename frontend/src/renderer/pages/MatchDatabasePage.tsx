@@ -660,11 +660,11 @@ export function MatchDatabasePage({
   return (
     <div className="workspace-page relative bg-dota-bg">
       <div className="workspace-stack">
-        <div className="workspace-header border-dota-primary/20 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.16),_transparent_34%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]">
+        <div className="workspace-header">
           <div className="workspace-header-row">
             <div>
-              <p className="workspace-eyebrow text-cyan-300/80">Match Database</p>
-              <h1 className="workspace-title text-dota-gold">比赛数据库</h1>
+              <p className="workspace-eyebrow">Match Database</p>
+              <h1 className="workspace-title">比赛数据库</h1>
               <p className="workspace-description">
                 先筛出目标比赛，再决定下载、查看任务或直接进入回放。默认仅展示职业联赛。
               </p>
@@ -699,7 +699,7 @@ export function MatchDatabasePage({
               当前偏移 {offset}
             </span>
             {filters.professionalOnly && (
-              <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-200">
+              <span className="rounded-sm border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-200">
                 仅职业联赛
               </span>
             )}
@@ -839,7 +839,7 @@ export function MatchDatabasePage({
                     先勾选比赛，再执行批量下载。回放入口只会对已准备好的录像开放。
                   </p>
                 </div>
-                <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+                <span className="rounded-sm border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
                   已勾选 {selectedMatchCount}
                 </span>
               </div>
@@ -921,7 +921,7 @@ export function MatchDatabasePage({
                   <h2 className="text-lg font-semibold text-gray-100">失败项处理</h2>
                   <p className="mt-1 text-sm text-gray-400">批量下载失败后，可直接复制或导出失败明细。</p>
                 </div>
-                <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+                <span className="rounded-sm border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
                   {lastBatchFailures.length} 条
                 </span>
               </div>
@@ -1033,7 +1033,7 @@ export function MatchDatabasePage({
                           className="h-4 w-4 accent-dota-primary disabled:opacity-40"
                         />
                       </td>
-                      <td className="px-4 py-3 font-mono text-dota-gold font-semibold whitespace-nowrap">{match.match_id}</td>
+                      <td className="px-4 py-3 font-mono font-semibold whitespace-nowrap">{match.match_id}</td>
                       <td
                         className="px-4 py-3 text-gray-300 whitespace-nowrap"
                         title={match.start_time !== undefined && match.start_time !== null ? String(match.start_time) : '--'}
@@ -1053,7 +1053,7 @@ export function MatchDatabasePage({
                       <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                         <span
                           data-testid={`download-status-${match.match_id}`}
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${getDownloadStatusMeta(match.download_status).className
+                          className={`inline-flex items-center rounded-sm border px-2.5 py-1 text-xs font-semibold tracking-wide ${getDownloadStatusMeta(match.download_status).className
                             }`}
                           title={normalizeDownloadStatus(match.download_status)}
                         >

@@ -480,7 +480,7 @@ export class DotaMapRenderer {
     
     // 拖拽状态
     let dragging = false;
-    let dragOffset = { x: 0, y: 0 };
+    const dragOffset = { x: 0, y: 0 };
     
     // 拖拽开始
     markerContainer.on('pointerdown', (event: PIXI.FederatedPointerEvent) => {

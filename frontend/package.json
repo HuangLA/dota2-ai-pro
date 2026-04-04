@@ -8,6 +8,7 @@
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "assets:sync:dota": "node scripts/sync-dota-game-assets.js",
+    "assets:generate:item-tooltips": "node scripts/generate-item-tooltip-localizations.mjs",
     "assets:render:dota-minimap": "node scripts/render-dota-world-minimap.mjs",
     "build": "tsc --noEmit && vite build",
     "build:main": "tsc -p tsconfig.main.json",

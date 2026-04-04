@@ -348,24 +348,23 @@ function LeagueArtwork({
 
   if (!assetUrl || broken) {
     return (
-      <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-[22px] border border-amber-500/25 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_40%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]">
-        <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(rgba(148,163,184,0.06)_1px,transparent_1px)] [background-size:22px_22px]" />
-        <div className="relative flex min-h-[148px] items-end p-4">
+      <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-sm border border-zinc-800 bg-zinc-900/50 shadow-inner">
+        <div className="relative flex min-h-[148px] items-end p-6">
           <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap gap-2">
-              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tagShellClass}`}>
+            <div className="mb-4 flex flex-wrap gap-2">
+              <span className={`inline-flex items-center border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tagShellClass}`}>
                 {archiveLabel}
               </span>
               {match.leagueid ? (
-                <span className="inline-flex items-center rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-white/85">
-                  联赛 {match.leagueid}
+                <span className="inline-flex items-center border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  ID {match.leagueid}
                 </span>
               ) : null}
             </div>
-            <p className="max-w-[560px] text-[18px] font-semibold leading-6 text-white" title={leagueName}>
+            <p className="max-w-[560px] text-lg font-bold leading-tight text-white uppercase tracking-tight" title={leagueName}>
               {leagueName}
             </p>
-            <p className="mt-1 text-xs leading-5 tracking-[0.06em] text-slate-300">{subtitle}</p>
+            <p className="mt-1 text-[10px] font-mono leading-none text-zinc-500 uppercase tracking-[0.1em]">{subtitle}</p>
           </div>
         </div>
       </div>
@@ -373,17 +372,16 @@ function LeagueArtwork({
   }
 
   return (
-    <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-[22px] border border-amber-500/25 bg-slate-950/90">
+    <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-sm border border-zinc-800 bg-zinc-950">
       <img
         src={assetUrl}
         alt={`${leagueName} 背景`}
-        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-28 blur-2xl"
+        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-20"
         loading="lazy"
         referrerPolicy="no-referrer"
         onError={() => setBroken(true)}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92),rgba(2,6,23,0.58)_42%,rgba(2,6,23,0.84))]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.2),transparent_42%)]" />
+      <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/60 to-zinc-950/90" />
       <div className="relative flex aspect-[1024/400] min-h-[146px] items-stretch">
         <div
           className={`min-w-0 flex-1 ${

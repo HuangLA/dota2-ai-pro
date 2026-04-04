@@ -50,6 +50,8 @@ const EXTRACTION_FILTERS = {
     'resource/localization/abilities_english.txt',
     'resource/localization/abilities_schinese.txt',
     'scripts/items/items_game.txt',
+    'scripts/npc/items.txt',
+    'scripts/npc/neutral_items.txt',
   ],
 };
 
@@ -516,6 +518,8 @@ function syncTextAssets(extractedRoot) {
     ['abilities_english.txt', path.join(outputRoot, 'resource', 'localization', 'abilities_english.txt')],
     ['abilities_schinese.txt', path.join(outputRoot, 'resource', 'localization', 'abilities_schinese.txt')],
     ['items_game.txt', path.join(outputRoot, 'scripts', 'items', 'items_game.txt')],
+    ['items.txt', path.join(outputRoot, 'scripts', 'npc', 'items.txt')],
+    ['neutral_items.txt', path.join(outputRoot, 'scripts', 'npc', 'neutral_items.txt')],
   ];
 
   const copied = [];
@@ -556,6 +560,8 @@ function inspect(entries, options, metadata) {
     overviewEntries: byPrefix('materials/overviews/'),
     localizationEntries: byPrefix('resource/localization/'),
     itemsGameExists: entries.some((entry) => entry.path === 'scripts/items/items_game.txt'),
+    npcItemsExists: entries.some((entry) => entry.path === 'scripts/npc/items.txt'),
+    neutralItemsExists: entries.some((entry) => entry.path === 'scripts/npc/neutral_items.txt'),
   };
 
   console.log(JSON.stringify(summary, null, 2));
@@ -570,6 +576,8 @@ function inspect(entries, options, metadata) {
     'resource/localization/dota_schinese.txt',
     'resource/localization/abilities_schinese.txt',
     'scripts/items/items_game.txt',
+    'scripts/npc/items.txt',
+    'scripts/npc/neutral_items.txt',
     'panorama/images/items/blink_png.vtex_c',
     'panorama/images/items/ultimate_scepter_png.vtex_c',
   ];

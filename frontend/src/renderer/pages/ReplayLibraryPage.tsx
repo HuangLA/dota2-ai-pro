@@ -289,18 +289,18 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
   const activeRemoteFilterCount = [appliedFilters.playerId, appliedFilters.leagueId].filter((value) => value.trim().length > 0).length;
 
   return (
-    <div className="workspace-page bg-dota-bg">
+    <div className="workspace-page">
       <div className="workspace-stack">
-        <div className="workspace-header border-emerald-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(22,101,52,0.18),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))]">
+        <div className="workspace-header">
           <div className="workspace-header-row">
             <div>
-              <p className="workspace-eyebrow text-emerald-300/80">Replay Workspace</p>
-              <h1 className="workspace-title text-dota-gold">录像库与远端发现</h1>
-              <p className="workspace-description text-emerald-100/75">
+              <p className="workspace-eyebrow">Replay Workspace</p>
+              <h1 className="workspace-title text-white">录像库与远端发现</h1>
+              <p className="workspace-description">
                 本地库负责直接回放，`player_id` 和 `leagueid` 会额外直连 OpenDota 搜索可下载比赛。
               </p>
             </div>
-            <div className="workspace-kpi-grid xl:min-w-[420px]">
+            <div className="workspace-kpi-grid">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">本地可回放</p>
                 <p className="workspace-kpi-value">{localReadyCount}</p>

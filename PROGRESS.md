@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4/4.5 已完成 ✅ + 文档对齐更新，准备进入 Phase 5 🚀 |
-| 最后更新 | 2026-03-26 |
+| 最后更新 | 2026-04-03 |
 | 更新者 | Codex |
 
 ---
@@ -31,6 +31,68 @@
 ---
 
 ## 当前进展摘要（2026-03-20）
+
+### 最新完成任务（2026-04-03）
+**✅ README 已补充当前支持补丁版本 7.41**
+- 根目录 `README.md` 已明确写明当前支持的 Dota 2 补丁版本为 `7.41`，避免后续在分支合并或对外交付时还需要额外口头说明版本范围。
+
+### 最新完成任务（2026-04-03）
+**✅ 按用户要求回退到其修改前的 RealMatchViewer 基线版本**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已按用户最新要求直接恢复到仓库基线版，也就是此前备份 `RealMatchViewer.tsx.user-broken-20260403` 之前用于止血的那版“录像主工作区 / MAP WORKSPACE”实现，而不是 Tactical Console 558 行实验版。
+- 当前工作区状态已确认：`RealMatchViewer.tsx` 不再有未提交改动，仅保留 `PROGRESS.md` 的记录更新，避免后续再次把“用户原始实验版”和“仓库稳定基线版”混淆。
+- 本次验证：`cd frontend && npm run build` → 通过；Playwright 打开 `http://127.0.0.1:5173/#/match` → 正常渲染，可见 `录像主工作区`、`MAP WORKSPACE`、HUD、主地图、时间轴与工作台折叠按钮，无白屏、无 `pageerror`。
+
+### 最新完成任务（2026-04-03）
+**✅ 保留用户原始 Tactical Console UI，同时补齐当前仓库兼容层并恢复可运行状态**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 不再使用此前的大型工作台实现，而是回到用户自己的 558 行 Tactical Console 页面骨架；在此基础上，仅补了当前仓库所需的最小兼容层，包括：
+- 接入当前 `App.tsx` 仍会传入的 `initialMatchId / replayEntryContext` props；
+- 用现有 `useMatchStore + usePlaybackStore + backendAPI` 替代旧版 `matchStore / navigationStore` 契约；
+- 本地补回 `formatDurationLabel / formatTimeDisplay / TeamHeroPortrait / WardPlacementRecord` 等旧页面依赖；
+- 复用当前 `backendAPI` 拉取 `matches / match detail / players / ticks / wards / objectives / hud metrics`，把数据喂回用户原始的头部、HUD、地图、时间轴和眼位浮窗 UI；
+- 把 `MapViewer` 眼位 hover / click 回调从旧的 `(wards, x, y)` 适配到现在的 `WardInteractionPayload`，并恢复当前眼位浮窗的交互能力。
+- 结果上，页面已重新回到用户原本的 `TRUE SIGHT / TACTICAL CONSOLE` 三栏布局与简洁地图面板风格，不再保留之前那版“地图工作台”主结构。
+- 本次验证：`cd frontend && npm run build` → 通过；Playwright 打开 `http://127.0.0.1:5173/#/match` → 页面正常渲染，无 `pageerror`，可见头部、RADIANT/DIRE HUD、`LIVE TACTICAL FEED`、时间轴和底部快捷键区。
+
+### 最新完成任务（2026-04-03）
+**✅ 按用户要求将回放页整份恢复到原始备份版本（当前验证为不兼容现仓库接口）**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已按用户要求直接恢复为 `/tmp/RealMatchViewer.tsx.user-broken-20260403` 中的 558 行原始备份版，不再保留此前的“稳定数据链路 + 局部样式并回”方案。
+- 当前验证结果表明，这份原始备份仍然与现仓库接口存在明显漂移：`App.tsx` / 测试仍向 `RealMatchViewer` 传入 `initialMatchId / replayEntryContext`，但备份组件不接收这些 props；`utils/gameClock.ts` 中也不存在备份版依赖的 `formatDurationLabel / formatTimeDisplay` 导出；同时 `../types` 缺失，`useMatchStore / useNavigationStore` 的数据结构已与备份实现不一致。
+- 本次验证：`cd frontend && npm run build` → 失败。主要错误集中在组件 props、旧 store 契约、缺失导出以及 ward 交互回调签名不兼容，因此“原样恢复”已完成，但在当前代码基线上会重新引发构建失败/白屏风险。
+
+### 最新完成任务（2026-04-03）
+**✅ 修复用户改动后前端整站白屏的问题**
+- 已定位根因为 `frontend/src/renderer/pages/RealMatchViewer.tsx` 被替换成了一份与当前仓库基线严重脱节的旧版/实验版实现，导致它和现有的 `App.tsx`、`store/*`、`utils/gameClock.ts`、`types`、`MapViewer` 回调签名都不再兼容。
+- 直接症状是浏览器在应用入口加载时抛出模块错误：`/src/renderer/utils/gameClock.ts does not provide an export named 'formatDurationLabel'`。由于 `App.tsx` 顶层会 import `RealMatchViewer`，即便用户停留在首页，这个模块解析错误也会把整站打成白屏。
+- 当前已先把用户修改前的损坏版本备份到 `/tmp/RealMatchViewer.tsx.user-broken-20260403`，随后先用基线版本止住白屏；在此基础上，没有继续整份回退，而是把用户这版里最明显的“战术控制台”视觉改动重新并回到当前稳定实现上，包括 `TRUE SIGHT / TACTICAL CONSOLE` 头部、比赛控制台信息条和底部快捷键页脚。
+- 这次处理的策略是“保留视觉改动，修正断开的接口层”：继续使用当前稳定的 `usePlaybackStore + backendAPI + gameClock mapper + MapViewer` 数据链路，只把用户定制过的头部/页脚控制台样式重新接回去，避免再次因为整文件替换而打断运行时逻辑。
+- 同步补回了用户自定义的眼位 hover / pin 浮窗视觉：`renderWardPreviewPopover()` 已从旧的圆角信息卡样式切回为更硬朗的技术面板风格，恢复紧凑边框、`眼位详情 (n)` 标题、`UNPIN` 按钮和双列表格信息排布，同时保留当前稳定实现里的插眼者与消失方式数据。
+- 进一步把主工作区默认可见的 HUD / 地图容器重新向用户版式对齐：当前 `RealMatchViewer` 已恢复更扁平的 `RADIANT / DIRE` 控制台式 HUD 卡片、直边地图主容器、`LIVE TACTICAL FEED` 标题和 `FOCUS / INSIGHT / LEGEND / GRID` 工具条按钮文案，同时继续复用现有稳定逻辑和测试锚点，不再因样式回迁导致白屏。
+- 本次验证：`cd frontend && npm run build` → 通过；使用 Playwright 打开 `http://127.0.0.1:5173/` 确认首页恢复渲染；再注入持久化 `match-store` 状态后打开 `http://127.0.0.1:5173/#/match`，确认回放主工作区、地图、HUD、时间轴与用户保留的控制台头部样式都可正常显示，不再白屏。
+
+### 最新完成任务（2026-04-03）
+**✅ 修复回放主工作区仅显示深蓝背景的问题**
+- 已定位根因为 `frontend/src/renderer/pages/RealMatchViewer.tsx` 在 HUD 英雄卡片区域使用了 `clsx(...)`，但文件顶部遗漏了 `import clsx from 'clsx'`。由于回放页组件渲染时会直接执行这些分支，浏览器会抛出 `ReferenceError: clsx is not defined`，导致 React 在 `/match` 路由下整块工作区崩溃，视觉上只剩外层深蓝色背景壳。
+- 当前已补回 `clsx` 导入，回放页恢复正常渲染；首页工作台和 `#/match` 路由均可正常进入，不再出现“只剩背景色”的空白故障。
+- 本次验证：`cd frontend && npm run build` → 通过；使用 Playwright 打开 `http://127.0.0.1:5173/#/match`，确认不再出现 `clsx is not defined` 页面异常，回放 HUD / 地图 / 控制区均正常渲染。
+
+### 最新完成任务（2026-03-28）
+**✅ 录像主工作区物品 tooltip 已切到纯官方中文链路，不再混用旧英文规则翻译**
+- 已复核“中英混杂、文案不像官方原文”的根因：`frontend/src/renderer/data/items.ts` 之前会把官方本地化文本和旧的英文 tooltip 规则翻译结果混合使用；一旦本地化条目里有 `%placeholder%` 未替换，前端就会整段回退到旧的正则/词典翻译，所以同一个 tooltip 里会同时出现官方中文、规则翻译中文甚至残留 HTML / 占位符。
+- `frontend/scripts/generate-item-tooltip-localizations.mjs` 现已扩展为同时读取 `frontend/extracted/dota/source/resource/localization/abilities_english.txt`、`abilities_schinese.txt` 与新接入的 `frontend/extracted/dota/source/scripts/npc/items.txt`。脚本会直接用官方 `npc/items.txt` 的 AbilityValues / AbilityCastRange / AbilityChannelTime / AbilityHealthCost 等数值来替换 tooltip 占位符，并修复带转义引号的本地化行解析，因此 `manta / black_king_bar / holy_locket / soul_ring / foragers_* / trusty_shovel / tango / bloodstone / medallion_of_courage` 这类此前容易混杂或残留标记的物品现在都能落成完整官方中文说明。
+- 同一条生成链路现已额外产出 `localized_attributes`：会优先套用 `abilities_schinese.txt` 里的官方属性模板，再结合 `npc/items.txt` 的实际数值补全最终展示文本，像 `相位鞋 / 动力鞋 / 慧光 / 散慧对剑 / 银月之晶 / 远行鞋 / 古之忍耐姜歌 / 卫士胫甲强化版` 这类此前“属性”栏容易出现 `%+技能增强`、`+攻击力（近战）`、`智力 +0` 之类半成品模板的物品，现在都能直接生成更接近游戏内展示的完整中文属性行。
+- 前端 `frontend/src/renderer/data/items.ts` 也已同步收口为“官方文本优先且不再混用旧翻译”：只要存在官方本地化条目，就只展示官方中文的名称、效果、注释和 lore；对于仓库里没有官方本地化条目的少量旧/特殊物品，前端现在宁可留空对应说明，也不再退回旧的英文规则翻译，从而彻底避免中英混杂。
+- `frontend/src/renderer/data/items.ts` 现已优先消费这批 `localized_attributes` 作为 tooltip 的属性栏来源；只有官方属性模板缺失时，才会回退到旧的属性组装逻辑，因此 `blink` 这类没有官方属性键的物品仍能保留基础属性信息，但大多数常见装备已经不再显示旧规则翻译出来的混合文案。
+- 已同步扩充前端物品别名归一化，补齐 replay 样本里实际命中的旧内部名与特殊名，例如：`battlefury -> bfury`、`assault_cuirass -> assault`、`manta_style -> manta`、`refresher_orb_shard -> refresher_shard`、`forage_health -> foragers_health`、`splint_mail -> splintmail`、`drum_of_endurance -> ancient_janggo`。这样主工作区装备图标会继续固定走本地 `frontend/public/assets/dota/items/*.png`，不再因为命名不一致而缺图。
+- `frontend/scripts/sync-dota-game-assets.js` 与 `docs/dota_asset_sync.md` 也已补齐 `scripts/npc/items.txt / neutral_items.txt` 的提取和说明，后续重新同步本地 Dota 资源时，这条官方 tooltip 文本链路不会再漏掉底层 KV 数值源。
+- 本次验证：`cd frontend && npm run assets:generate:item-tooltips` → 重新生成 `475` 条本地化条目，并扫描确认生成结果里 `placeholder / HTML residue / class=\` 残留数量已降到 `0`；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/data/items.test.ts --reporter=verbose` → `4 passed`；`cd frontend && npm run build` → 通过；额外对本地 `backend/data/matches/*/positions.parquet` 的现有 replay 样本重新做物品归一化比对后，`replay_missing_icons = 0`。
+
+### 最新完成任务（2026-03-28）
+**✅ 录像主工作区的实时装备图标已切到仓库内本地静态资源，不再运行时请求远端**
+- 已复核主工作区 HUD 装备图标链路：`frontend/src/renderer/pages/RealMatchViewer.tsx` 的 `ItemIcon` 组件通过 `frontend/src/renderer/data/items.ts` 的 `getItemIconCandidates()` 解析物品图标地址。变更前这里会按“本地静态资源 -> 后端 `/api/v1/assets/items/*` 代理 -> Steam CDN”顺序逐级回退，因此浏览录像时一旦本地命中失败，页面仍会继续请求远端。
+- 当前仓库内 `frontend/public/assets/dota/items/` 已存在 `601` 张物品图标，并且 `blink / tpscroll / ward_observer / ward_sentry / branches / power_treads / travel_boots` 等前端归一化后会命中的别名文件也都已落盘，因此录像主工作区已经具备“纯本地读取”条件。
+- `frontend/src/renderer/data/items.ts` 现已把实时装备图标候选地址收口为单一的 `/assets/dota/items/{normalized}.png`；本地资源若缺失，`RealMatchViewer` 会直接退回已有的文字缩写占位，不再请求后端缓存代理与 Steam CDN。
+- `frontend/src/renderer/data/items.test.ts` 已同步更新回归，`docs/dota_asset_sync.md` 也已把录像主工作区物品图标策略改写为“固定读取仓库内静态资源”。
+- 本次验证：`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/data/items.test.ts --reporter=verbose` → `4 passed`；`cd frontend && npm run build` → 通过。
 
 ### 最新完成任务（2026-03-28）
 **✅ minimap 建筑图标已切到“外塔跟随对应高地塔样式”，并加上阵营着色**

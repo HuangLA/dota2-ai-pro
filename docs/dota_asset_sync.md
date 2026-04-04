@@ -13,7 +13,7 @@
 - 提取源优先使用本地 Dota 2 安装目录
 - 资源产物落盘到项目目录
 - 前端优先消费仓库内静态资源
-- 远程 CDN 只保留为兜底，不作为主来源
+- 录像主工作区的物品图标只使用仓库内静态资源，不再运行时回退到远端 CDN
 
 ## 输出目录
 
@@ -29,11 +29,16 @@
 - `frontend/extracted/dota/source/`
 - `frontend/extracted/dota/manifest.json`
 
+基于提取文本生成的前端物品 tooltip 本地化数据会落到：
+
+- `frontend/src/renderer/data/itemTooltipLocalization.generated.json`
+
 ## 工具能力
 
 脚本路径：
 
 - `frontend/scripts/sync-dota-game-assets.js`
+- `frontend/scripts/generate-item-tooltip-localizations.mjs`
 - `frontend/scripts/render-dota-world-minimap.mjs`
 
 当前脚本支持：
@@ -48,6 +53,9 @@
 - `dota_*.txt`
 - `abilities_*.txt`
 - `scripts/items/items_game.txt`
+- `scripts/npc/items.txt`
+- `scripts/npc/neutral_items.txt`
+- 基于 `abilities_english.txt / abilities_schinese.txt` 与 `scripts/npc/items.txt` 生成物品中文名、描述、注释、背景故事的前端数据文件，并用官方 KV 数值替换 tooltip 占位符
 
 当前小地图提取约定：
 
@@ -133,6 +141,13 @@ SOURCE2VIEWER_CLI=/absolute/path/to/Source2Viewer-CLI \
   npm run assets:sync:dota -- --patch 7.41 --language schinese
 ```
 
+提取文本后刷新前端物品 tooltip 本地化数据：
+
+```bash
+cd frontend
+npm run assets:generate:item-tooltips
+```
+
 在 macOS Apple Silicon 上下载官方 CLI 的一个示例：
 
 ```bash
@@ -185,7 +200,7 @@ SOURCE2VIEWER_CLI=/absolute/path/to/Source2Viewer-CLI \
 - `frontend/public/assets/dota/minimap/reference/base_group.png`
 - `frontend/public/assets/dota/minimap/minimap_minimal.png`
 
-## 当前前端资源回退逻辑
+## 当前前端资源读取逻辑
 
 - 地图优先读取 `frontend/public/assets/dota/minimap/minimap.png`
 - `minimap.png` 现在由基础提取脚本自动生成，不再依赖 world 渲染
@@ -193,8 +208,8 @@ SOURCE2VIEWER_CLI=/absolute/path/to/Source2Viewer-CLI \
 - 游戏内 `400x400` 原图保留在 `frontend/public/assets/dota/minimap/minimap_game.png`
 - 当前前端默认把 `minimap.png` 视为无透明边的整图坐标空间，优先回退到 `minimap_source.png / minimap_game.png / minimap_simple.png`
 - 若新资产尚未提取，会自动回退到现有的 `minimap_740.png` / `minimap.jpg`
-- 物品图标优先读取 `frontend/public/assets/dota/items/*.png`
-- 若本地静态资源缺失，再回退到后端缓存代理与 Steam CDN
+- 录像主工作区的物品图标固定读取 `frontend/public/assets/dota/items/*.png`
+- 若本地静态资源缺失，前端直接退回文字缩写占位，不再请求后端缓存代理与 Steam CDN
 
 ## 备注
 

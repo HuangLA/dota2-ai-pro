@@ -1,5 +1,5 @@
-import { buildApiUrl } from '../api/apiBase';
 import itemTooltipSource from './itemTooltipData.generated.json';
+import itemTooltipLocalizationSource from './itemTooltipLocalization.generated.json';
 
 type RawTooltipAttrib = {
   key: string;
@@ -27,6 +27,23 @@ type RawTooltipEntry = {
   tier: number | null;
 };
 
+type RawLocalizedTooltipAbility = {
+  type: string;
+  type_label: string;
+  title: string;
+  description: string;
+};
+
+type RawLocalizedTooltipEntry = {
+  english_name: string | null;
+  localized_name: string | null;
+  localized_attributes: string[];
+  localized_abilities: RawLocalizedTooltipAbility[];
+  localized_desc: string | null;
+  localized_notes: string[];
+  localized_lore: string | null;
+};
+
 export interface LocalizedTooltipAbility {
   typeLabel: string;
   title: string;
@@ -49,27 +66,51 @@ export interface LocalizedItemTooltip {
 }
 
 const RAW_ITEM_TOOLTIPS = itemTooltipSource as Record<string, RawTooltipEntry>;
+const RAW_ITEM_TOOLTIP_LOCALIZATIONS = itemTooltipLocalizationSource as Record<string, RawLocalizedTooltipEntry>;
 
 const ITEM_ALIASES: Record<string, string> = {
   aghanims_scepter: 'ultimate_scepter',
   aghanims_blessing: 'ultimate_scepter_roshan',
   aegis_of_the_immortal: 'aegis',
-  ancient_janggo: 'drum_of_endurance',
+  assault_cuirass: 'assault',
+  battlefury: 'bfury',
   blink_dagger: 'blink',
+  boots_of_elven: 'boots_of_elves',
   boots_of_travel: 'travel_boots',
   boots_of_travel_2: 'travel_boots_2',
   boots_of_speed: 'boots',
+  chain_mail: 'chainmail',
+  cranium_basher: 'basher',
   dust_of_appearance: 'dust',
   dustof_appearance: 'dust',
+  drum_of_endurance: 'ancient_janggo',
+  eaglehorn: 'eagle',
   empty_bottle: 'bottle',
+  enhancement_timelss: 'enhancement_timeless',
+  forage_health: 'foragers_health',
+  forage_mana: 'foragers_mana',
+  forage_stats: 'foragers_stats',
   guardian_shell: 'defiant_shell',
   greater_critical: 'greater_crit',
+  invisibility_edge: 'silver_edge',
   lesser_critical: 'lesser_crit',
+  manta_style: 'manta',
+  mask_of_death: 'lifesteal',
+  moonshard: 'moon_shard',
   observer_ward: 'ward_observer',
+  orchid_malevolence: 'orchid',
+  perseverance: 'pers',
+  plate_mail: 'platemail',
+  refresher_orb: 'refresher',
+  refresher_orb_shard: 'refresher_shard',
+  ring_of_regeneration: 'ring_of_regen',
   robe_of_magi: 'robe',
   robe_of_the_magi: 'robe',
+  sacred_relic: 'relic',
   sentry_ward: 'ward_sentry',
+  sheep_stick: 'sheepstick',
   ironwood_branch: 'branches',
+  splint_mail: 'splintmail',
   teleport_scroll: 'tpscroll',
   dagon_upgraded: 'dagon',
   planeswalkers_cloak: 'cloak',
@@ -210,15 +251,6 @@ const ABILITY_TYPE_LABELS: Record<string, string> = {
   use: '使用',
   upgrade: '升级',
   text: '效果',
-};
-
-const ABILITY_TITLE_OVERRIDES: Record<string, string> = {
-  blink: '闪烁',
-  reciprocity: '反击',
-  life_essence: '生命精华',
-  ribbit: '呱鸣',
-  cooldown_reduction: '冷却缩减',
-  damage_return: '伤害反弹',
 };
 
 const ATTRIBUTE_TEMPLATE_OVERRIDES: Record<string, (value: string) => string> = {
@@ -621,6 +653,10 @@ function cleanupTranslation(text: string): string {
     .trim();
 }
 
+function getRawLocalizedTooltip(normalizedName: string): RawLocalizedTooltipEntry | null {
+  return RAW_ITEM_TOOLTIP_LOCALIZATIONS[normalizedName] ?? null;
+}
+
 function translateUiText(text: string): string {
   if (!text.trim()) {
     return '';
@@ -645,6 +681,11 @@ function translateUiText(text: string): string {
 }
 
 function localizeItemName(englishName: string, normalizedName: string): string {
+  const localized = getRawLocalizedTooltip(normalizedName);
+  if (localized?.localized_name) {
+    return localized.localized_name;
+  }
+
   if (ITEM_ZH_NAME_OVERRIDES[normalizedName]) {
     return ITEM_ZH_NAME_OVERRIDES[normalizedName];
   }
@@ -669,6 +710,11 @@ function localizeItemName(englishName: string, normalizedName: string): string {
 }
 
 function deriveEnglishItemName(normalizedName: string): string {
+  const localized = getRawLocalizedTooltip(normalizedName);
+  if (localized?.english_name) {
+    return localized.english_name;
+  }
+
   if (ITEM_LABEL_OVERRIDES[normalizedName]) {
     return ITEM_LABEL_OVERRIDES[normalizedName];
   }
@@ -679,44 +725,6 @@ function deriveEnglishItemName(normalizedName: string): string {
   }
 
   return titleCaseItemKey(normalizedName);
-}
-
-function localizeAbilityTitle(title: string, type: string): string {
-  const normalizedTitle = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  if (ABILITY_TITLE_OVERRIDES[normalizedTitle]) {
-    return ABILITY_TITLE_OVERRIDES[normalizedTitle];
-  }
-
-  const translated = translateUiText(title);
-  if (translated && !containsLatin(translated)) {
-    return translated;
-  }
-
-  return ABILITY_TYPE_LABELS[type] ?? '效果';
-}
-
-function extractAbilitySummary(description: string): string | null {
-  const firstSentence = description
-    .replace(/\r/g, '')
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .find(Boolean);
-
-  if (!firstSentence) {
-    return null;
-  }
-
-  const translated = translateUiText(firstSentence);
-  if (!translated || containsLatin(translated)) {
-    return null;
-  }
-
-  return translated;
 }
 
 function formatAttributeValue(value: string, key: string): string {
@@ -776,10 +784,11 @@ function formatAttributeLine(attribute: RawTooltipAttrib): string {
 
 function buildLocalizedTooltip(normalizedName: string, enhancementName?: string | null): LocalizedItemTooltip | null {
   const raw = RAW_ITEM_TOOLTIPS[normalizedName];
+  const localized = getRawLocalizedTooltip(normalizedName);
   const englishName = deriveEnglishItemName(normalizedName);
   const localizedName = localizeItemName(englishName, normalizedName);
 
-  if (!raw) {
+  if (!raw && !localized) {
     return {
       normalizedName,
       name: localizedName,
@@ -800,38 +809,51 @@ function buildLocalizedTooltip(normalizedName: string, enhancementName?: string 
     };
   }
 
-  const fallbackAbility = raw.desc
-    ? [{ type: 'text', title: '效果', description: raw.desc }]
+  const localizedFallbackAbilities = localized?.localized_desc
+    ? [
+        {
+          type: 'text',
+          type_label: '效果',
+          title: '效果',
+          description: localized.localized_desc,
+        },
+      ]
     : [];
-  const abilityEntries = raw.abilities.length > 0 ? raw.abilities : fallbackAbility;
+  const officialAbilities =
+    localized?.localized_abilities.length ? localized.localized_abilities : localizedFallbackAbilities;
 
-  const localizedAbilities = abilityEntries.map((ability) => ({
-    typeLabel: ABILITY_TYPE_LABELS[ability.type] ?? '效果',
-    title: localizeAbilityTitle(ability.title || '效果', ability.type),
-    summary: extractAbilitySummary(ability.description),
-  }));
+  const localizedAbilities =
+    officialAbilities.length > 0
+      ? officialAbilities.map((ability) => ({
+          typeLabel: ability.type_label || (ABILITY_TYPE_LABELS[ability.type] ?? '效果'),
+          title: ability.title || (ABILITY_TYPE_LABELS[ability.type] ?? '效果'),
+          summary: ability.description || null,
+        }))
+      : [];
 
-  const notes = [...raw.hint, raw.notes].filter((entry): entry is string => Boolean(entry)).map((entry) => translateUiText(entry)).filter((entry) => entry && !containsLatin(entry));
-  const lore = raw.lore ? translateUiText(raw.lore) : null;
+  const notes = localized?.localized_notes ?? [];
+  const lore = localized?.localized_lore ?? null;
+  const localizedAttributes = localized?.localized_attributes ?? [];
+  const fallbackAttributes = (raw?.attrib ?? []).map(formatAttributeLine).filter(Boolean);
 
   return {
     normalizedName,
     name: localizedName,
     categoryLabel: isEnhancementItem(normalizedName)
       ? '附魔'
-      : raw.tier !== null
+      : typeof raw?.tier === 'number'
         ? '中立物品'
         : normalizedName === 'recipe'
           ? '配方'
           : '商店物品',
-    tierLabel: raw.tier !== null ? `第 ${raw.tier} 级中立物品` : null,
-    costLabel: typeof raw.cost === 'number' && raw.cost > 0 ? `${raw.cost} 金` : null,
-    manaCostLabel: typeof raw.mc === 'number' && raw.mc > 0 ? `${raw.mc}` : null,
-    cooldownLabel: typeof raw.cd === 'number' && raw.cd > 0 ? `${raw.cd} 秒` : null,
-    attributes: raw.attrib.map(formatAttributeLine).filter(Boolean),
+    tierLabel: typeof raw?.tier === 'number' ? `第 ${raw.tier} 级中立物品` : null,
+    costLabel: typeof raw?.cost === 'number' && raw.cost > 0 ? `${raw.cost} 金` : null,
+    manaCostLabel: typeof raw?.mc === 'number' && raw.mc > 0 ? `${raw.mc}` : null,
+    cooldownLabel: typeof raw?.cd === 'number' && raw.cd > 0 ? `${raw.cd} 秒` : null,
+    attributes: localizedAttributes.length > 0 ? localizedAttributes : fallbackAttributes,
     abilities: localizedAbilities,
     notes,
-    lore: lore && !containsLatin(lore) ? lore : null,
+    lore: lore || null,
     enhancement:
       enhancementName && normalizeItemName(enhancementName) !== normalizedName
         ? buildLocalizedTooltip(normalizeItemName(enhancementName))
@@ -849,15 +871,7 @@ export function getItemIconCandidates(itemName: string): string[] {
     return [];
   }
 
-  const basePaths = [
-    `/assets/dota/items/${normalized}.png`,
-    buildApiUrl(`/api/v1/assets/items/${normalized}.png`),
-    `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${normalized}.png`,
-    `https://cdn.akamai.steamstatic.com/apps/dota2/images/dota_react/items/${normalized}.png`,
-    `https://steamcdn-a.akamaihd.net/apps/dota2/images/dota_react/items/${normalized}.png`,
-  ];
-
-  return Array.from(new Set(basePaths));
+  return [`/assets/dota/items/${normalized}.png`];
 }
 
 export function getItemLabel(itemName: string): string {
