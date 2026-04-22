@@ -3009,7 +3009,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     };
 
     return (
-      <div className={`rounded-2xl border p-2.5 shadow-[0_18px_48px_rgba(2,6,23,0.32)] ${accentClass}`}>
+      <div className={`rounded-2xl border p-2.5 shadow-[0_18px_42px_rgba(0,0,0,0.24)] ${accentClass}`}>
         <div className="mb-2 flex items-start gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 px-2.5 py-1.5">
           <div className="min-w-0 flex-1">
             <p className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.24em] ${accentTextClass}`}>
@@ -3814,9 +3814,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   };
 
   return (
-    <div className="min-h-screen bg-dota-bg px-4 py-4 lg:px-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(108,144,163,0.14),_transparent_32%),radial-gradient(circle_at_82%_0%,_rgba(194,148,85,0.12),_transparent_20%),linear-gradient(180deg,#081018_0%,#0b1117_46%,#0d141b_100%)] px-4 py-4 lg:px-6">
       <div className="mx-auto max-w-[1820px] space-y-3">
-        <div className="rounded-3xl border border-slate-800/90 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.92),_rgba(7,10,21,0.98))] p-2.5 shadow-[0_18px_42px_rgba(2,6,23,0.38)]">
+        <div className="rounded-3xl border border-[#26313a]/90 bg-[radial-gradient(circle_at_top,_rgba(39,54,66,0.92),_rgba(10,15,21,0.98))] p-2.5 shadow-[0_22px_48px_rgba(0,0,0,0.28)]">
           <div
             data-testid="replay-viewer-header"
             className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_360px] 2xl:items-center"
@@ -3884,7 +3884,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   <span
                     className={`rounded-full border px-2 py-0.5 ${
                       replayEntryContext?.source === 'match_database'
-                        ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
+                        ? 'border-dota-primary/45 bg-dota-primary/12 text-slate-100'
                         : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
                     }`}
                   >
@@ -3904,7 +3904,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   </span>
                 )}
                 {isReparseTaskActive && reparseTask && (
-                  <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">
+                  <span className="rounded-full border border-dota-primary/45 bg-dota-primary/12 px-2 py-0.5 text-[#d8ecf0]">
                     重新解析 {Math.round(reparseTask.progress ?? 0)}%
                   </span>
                 )}
@@ -3936,7 +3936,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
               data-testid="replay-viewer-header-selection"
               className="w-full 2xl:max-w-[360px] 2xl:justify-self-end"
             >
-              <div className="rounded-xl border border-slate-700/80 bg-slate-950/70 p-2">
+              <div className="rounded-xl border border-[#36434e]/70 bg-[rgba(9,14,19,0.56)] p-2">
                 {matches.length === 0 ? (
                   <div className="text-xs text-slate-400">
                     暂无已解析的比赛。
@@ -3952,7 +3952,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                         setReplayContextWarning(null);
                         setSelectedMatch(nextMatchId);
                       }}
-                      className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[13px] text-white focus:border-cyan-500 focus:outline-none"
+                      className="min-w-0 flex-1 rounded-xl border border-[#465764] bg-[rgba(12,18,24,0.94)] px-3 py-2 text-[13px] text-white focus:border-dota-gold/70 focus:outline-none"
                     >
                       {matches.map((match) => {
                         const optionRadiantName = match.radiant_team_name || match.radiant_team || '天辉';
@@ -3967,7 +3967,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     </select>
                     <button
                       onClick={loadMatches}
-                      className="shrink-0 rounded-full border border-cyan-500/50 bg-cyan-600/15 px-2.5 py-1 text-[10px] font-medium text-cyan-100 transition hover:bg-cyan-500/25"
+                      className="shrink-0 rounded-full border border-[#73929d]/45 bg-[#274255]/28 px-2.5 py-1 text-[10px] font-medium text-[#d7edf0] transition hover:border-[#98bac2]/58 hover:bg-[#31556a]/32"
                     >
                       刷新
                     </button>
@@ -4013,7 +4013,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           )}
         </div>
 
-        <div className="rounded-3xl border border-slate-800/90 bg-gradient-to-b from-slate-900/95 via-slate-950/98 to-slate-950 p-3.5 shadow-[0_24px_60px_rgba(2,6,23,0.5)]">
+        <div className="rounded-3xl border border-[#27313b]/90 bg-[linear-gradient(180deg,rgba(17,24,32,0.96),rgba(10,15,21,0.98))] p-3.5 shadow-[0_28px_64px_rgba(0,0,0,0.32)]">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -4029,7 +4029,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
                     mapWorkbenchExpanded
                       ? 'border-amber-500/45 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
-                      : 'border-cyan-500/55 bg-cyan-500/15 text-cyan-50 shadow-[0_10px_28px_rgba(34,211,238,0.18)] hover:border-cyan-300/70'
+                      : 'border-[#7f9da5]/50 bg-[#27404d]/28 text-[#d6edf0] shadow-[0_12px_24px_rgba(15,33,41,0.18)] hover:border-[#a3c4ca]/62'
                   }`}
                 >
                   {mapWorkbenchExpanded ? '工作台已展开 · 点击收起' : '工作台已折叠 · 点击展开'}
@@ -4045,7 +4045,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
               <span>蓝色稀疏</span>
-              <div className="h-2 w-24 rounded-full bg-[linear-gradient(90deg,#2563eb_0%,#06b6d4_35%,#fde047_70%,#ef4444_100%)]" />
+              <div className="h-2 w-24 rounded-full bg-[linear-gradient(90deg,#36546c_0%,#5f8b92_35%,#c7a25f_68%,#a65b52_100%)]" />
               <span>红色最密</span>
             </div>
           </div>

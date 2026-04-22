@@ -291,16 +291,17 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
   return (
     <div className="workspace-page">
       <div className="workspace-stack">
-        <div className="workspace-header">
+        <div className="workspace-header workspace-header-compact">
           <div className="workspace-header-row">
-            <div>
+            <div className="workspace-header-copy">
               <p className="workspace-eyebrow">Replay Workspace</p>
               <h1 className="workspace-title text-white">录像库与远端发现</h1>
               <p className="workspace-description">
                 本地库负责直接回放，`player_id` 和 `leagueid` 会额外直连 OpenDota 搜索可下载比赛。
               </p>
             </div>
-            <div className="workspace-kpi-grid">
+            <div className="workspace-header-rail">
+              <div className="workspace-kpi-grid workspace-kpi-grid-compact">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">本地可回放</p>
                 <p className="workspace-kpi-value">{localReadyCount}</p>
@@ -316,28 +317,32 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
                 <p className="workspace-kpi-value">{remoteActionableCount}</p>
                 <p className="workspace-kpi-hint">未下载且可触发流水线</p>
               </div>
+              </div>
             </div>
           </div>
 
-          <div className="workspace-pill-row">
-            <span className="workspace-pill">
+          <div className="workspace-pill-row workspace-pill-row-compact">
+            <span className="workspace-pill workspace-pill-accent">
               本地分页 {matches.length} / 总数 {total}
             </span>
             <span className="workspace-pill">
               远端激活筛选 {activeRemoteFilterCount}
             </span>
-            <span className="workspace-pill">
+            <span className="workspace-pill workspace-pill-gold">
               远端可回放 {remoteReadyCount}
             </span>
           </div>
         </div>
 
         <div className="workspace-panel">
-          <div className="workspace-panel-header">
-            <h2 className="workspace-panel-title">筛选与发现</h2>
-            <p className="workspace-panel-description">
-              `team_id` 只过滤本地已解析录像；`player_id`、`leagueid` 会同步检索 OpenDota 候选比赛。
-            </p>
+          <div className="workspace-panel-header-inline">
+            <div className="workspace-panel-header !mb-0">
+              <h2 className="workspace-panel-title">筛选与发现</h2>
+              <p className="workspace-panel-description">
+                `team_id` 只过滤本地已解析录像；`player_id`、`leagueid` 会同步检索 OpenDota 候选比赛。
+              </p>
+            </div>
+            <span className="workspace-panel-badge">Local + Remote</span>
           </div>
           <form
             onSubmit={(event) => {
@@ -346,48 +351,68 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
               setAppliedFilters(filters);
               setFeedback(null);
             }}
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+            className="workspace-filter-shell"
           >
-            <input
-              aria-label="team_id"
-              value={filters.teamId}
-              onChange={(event) => setFilters((current) => ({ ...current, teamId: event.target.value }))}
-              placeholder="team_id（本地过滤）"
-              className="workspace-input focus:border-emerald-500"
-            />
-            <input
-              aria-label="player_id"
-              value={filters.playerId}
-              onChange={(event) => setFilters((current) => ({ ...current, playerId: event.target.value }))}
-              placeholder="player_id（OpenDota 搜索）"
-              className="workspace-input focus:border-emerald-500"
-            />
-            <input
-              aria-label="leagueid"
-              value={filters.leagueId}
-              onChange={(event) => setFilters((current) => ({ ...current, leagueId: event.target.value }))}
-              placeholder="leagueid（OpenDota 搜索）"
-              className="workspace-input focus:border-emerald-500"
-            />
-            <div className="workspace-action-row md:col-span-2 xl:col-span-3">
-              <button
-                type="submit"
-                className="workspace-action-button min-w-[112px] border border-emerald-500/60 bg-emerald-700 text-white transition hover:bg-emerald-600"
-              >
-                查询
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters(DEFAULT_FILTERS);
-                  setAppliedFilters(DEFAULT_FILTERS);
-                  setOffset(0);
-                  setFeedback(null);
-                }}
-                className="workspace-action-button min-w-[112px] border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600"
-              >
-                清空
-              </button>
+            <div className="workspace-filter-grid workspace-filter-grid-3">
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">本地 team_id</span>
+                <input
+                  aria-label="team_id"
+                  value={filters.teamId}
+                  onChange={(event) => setFilters((current) => ({ ...current, teamId: event.target.value }))}
+                  placeholder="team_id（本地过滤）"
+                  className="workspace-input focus:border-emerald-500"
+                />
+                <span className="workspace-field-hint">只过滤本地已解析录像。</span>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">OpenDota player_id</span>
+                <input
+                  aria-label="player_id"
+                  value={filters.playerId}
+                  onChange={(event) => setFilters((current) => ({ ...current, playerId: event.target.value }))}
+                  placeholder="player_id（OpenDota 搜索）"
+                  className="workspace-input focus:border-emerald-500"
+                />
+                <span className="workspace-field-hint">命中后会补出可下载比赛。</span>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">OpenDota leagueid</span>
+                <input
+                  aria-label="leagueid"
+                  value={filters.leagueId}
+                  onChange={(event) => setFilters((current) => ({ ...current, leagueId: event.target.value }))}
+                  placeholder="leagueid（OpenDota 搜索）"
+                  className="workspace-input focus:border-emerald-500"
+                />
+                <span className="workspace-field-hint">适合按联赛检索待入库比赛。</span>
+              </label>
+            </div>
+            <div className="workspace-filter-footer">
+              <div className="workspace-filter-meta">
+                <span className="workspace-pill">本地分页 {matches.length} / {total}</span>
+                <span className="workspace-pill">远端激活 {activeRemoteFilterCount}</span>
+              </div>
+              <div className="workspace-action-row">
+                <button
+                  type="submit"
+                  className="workspace-action-button min-w-[112px] border border-emerald-500/60 bg-emerald-700 text-white transition hover:bg-emerald-600"
+                >
+                  查询
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setAppliedFilters(DEFAULT_FILTERS);
+                    setOffset(0);
+                    setFeedback(null);
+                  }}
+                  className="workspace-action-button min-w-[112px] border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600"
+                >
+                  清空
+                </button>
+              </div>
             </div>
           </form>
         </div>

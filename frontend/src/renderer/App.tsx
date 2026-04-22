@@ -55,7 +55,10 @@ function App() {
       <Route
         path="/match"
         element={
-          <div data-testid="replay-viewer-shell" className="flex h-screen flex-col bg-dota-bg">
+          <div
+            data-testid="replay-viewer-shell"
+            className="flex h-screen flex-col bg-[radial-gradient(circle_at_top,_rgba(108,144,163,0.16),_transparent_30%),radial-gradient(circle_at_82%_0%,_rgba(194,148,85,0.12),_transparent_22%),linear-gradient(180deg,#070b10_0%,#0b1117_46%,#0d141b_100%)]"
+          >
             <div
               data-testid="replay-viewer-topbar"
               className="flex flex-none items-center px-4 pt-4 lg:px-6"
@@ -65,13 +68,13 @@ function App() {
                 aria-label="← 返回"
                 title="返回工作台"
                 data-testid="return-to-workspace-button"
-                className="flex max-w-[15rem] items-center gap-2 rounded-2xl border border-slate-700/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,41,59,0.72))] px-3 py-2.5 text-left text-white shadow-[0_18px_34px_rgba(2,6,23,0.34)] backdrop-blur-xl transition hover:border-cyan-400/40 hover:bg-[linear-gradient(135deg,rgba(8,47,73,0.88),rgba(15,23,42,0.92))] 2xl:gap-3 2xl:px-4 2xl:py-3 2xl:shadow-[0_20px_40px_rgba(2,6,23,0.4)] 2xl:max-w-none"
+                className="flex max-w-[15rem] items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-white backdrop-blur-xl transition 2xl:max-w-none 2xl:gap-3 2xl:px-4 2xl:py-3"
               >
-                <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 p-2 text-cyan-200">
+                <div className="rounded-xl border p-2">
                   <ArrowLeft className="h-4 w-4" />
                 </div>
                 <div data-testid="replay-back-button-label" className="hidden 2xl:block">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9fadb7]">
                     <LayoutDashboard className="h-3.5 w-3.5" />
                     Workspace
                   </div>

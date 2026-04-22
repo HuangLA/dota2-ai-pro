@@ -1800,9 +1800,9 @@ export function TeamProfilePage({
   return (
     <div className="workspace-page">
       <div className="workspace-stack">
-        <div className="workspace-header">
+        <div className="workspace-header workspace-header-compact">
           <div className="workspace-header-row">
-            <div>
+            <div className="workspace-header-copy">
               <p className="workspace-eyebrow">Team Archive</p>
               <h1 className="workspace-title text-white">战队档案</h1>
               <p className="workspace-description">
@@ -1810,7 +1810,7 @@ export function TeamProfilePage({
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 xl:items-end">
+            <div className="workspace-header-rail xl:items-end">
               {onBackHome && (
                 <button
                   onClick={onBackHome}
@@ -1821,7 +1821,7 @@ export function TeamProfilePage({
               )}
 
               {currentTeamId !== null ? (
-                <div className="workspace-kpi-grid w-full">
+                <div className="workspace-kpi-grid workspace-kpi-grid-compact w-full">
                   <div className="workspace-kpi">
                     <p className="workspace-kpi-label">战队 ID</p>
                     <p className="workspace-kpi-value">{currentTeamId}</p>
@@ -1839,31 +1839,35 @@ export function TeamProfilePage({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-800/80 bg-slate-950/60 px-4 py-4 text-sm text-slate-400">
+                <div className="workspace-filter-note">
                   输入战队 ID 后，这里会切换成战队级概览。
                 </div>
               )}
             </div>
           </div>
 
-          <div className="workspace-pill-row">
+          <div className="workspace-pill-row workspace-pill-row-compact">
             <span className="workspace-pill">快照 {quickSnapshots.length}</span>
             <span className="workspace-pill">历史动作 {visibleActionHistory.length}</span>
-            <span className="workspace-pill">联赛筛选 {selectedLeagueFilterKey === 'all' ? '全部' : selectedLeagueFilterKey}</span>
-            {focusLatestLeague && <span className="rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-1.5 text-xs text-fuchsia-200">聚焦最近联赛</span>}
+            <span className="workspace-pill workspace-pill-accent">联赛筛选 {selectedLeagueFilterKey === 'all' ? '全部' : selectedLeagueFilterKey}</span>
+            {focusLatestLeague && <span className="workspace-pill workspace-pill-gold">聚焦最近联赛</span>}
           </div>
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_380px]">
           <div className="workspace-panel">
-            <div className="workspace-panel-header">
-              <h2 className="workspace-panel-title">战队查询与视角</h2>
-              <p className="workspace-panel-description">先确定战队和样本范围，再决定是按联赛筛选、按下载状态过滤，还是直接跳去准备回放。</p>
+            <div className="workspace-panel-header-inline">
+              <div className="workspace-panel-header !mb-0">
+                <h2 className="workspace-panel-title">战队查询与视角</h2>
+                <p className="workspace-panel-description">先确定战队和样本范围，再决定是按联赛筛选、按下载状态过滤，还是直接跳去准备回放。</p>
+              </div>
+              <span className="workspace-panel-badge">Team Focus</span>
             </div>
 
-            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_minmax(120px,auto)]">
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
+            <form onSubmit={handleSearch} className="workspace-filter-shell">
+              <div className="workspace-filter-grid md:grid-cols-[1fr_1fr_minmax(120px,auto)]">
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">战队 ID</span>
                 <input
                   aria-label="战队 ID"
                   value={teamIdInput}
@@ -1871,9 +1875,9 @@ export function TeamProfilePage({
                   placeholder="例如 15"
                   className="workspace-input focus:border-dota-primary"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">数量上限</label>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">数量上限</span>
                 <input
                   aria-label="数量上限"
                   value={limitInput}
@@ -1881,7 +1885,7 @@ export function TeamProfilePage({
                   placeholder="20"
                   className="workspace-input focus:border-dota-primary"
                 />
-              </div>
+              </label>
               <div className="flex items-end">
                 <button
                   type="submit"
@@ -1890,9 +1894,10 @@ export function TeamProfilePage({
                   查询
                 </button>
               </div>
-            </form>
+              </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="workspace-toolbar-panel mt-4">
+                <div className="workspace-toolbar-grid">
               <label className="workspace-checkpanel text-sm text-gray-300">
                 <input
                   aria-label="仅显示有下载状态"
@@ -1941,7 +1946,9 @@ export function TeamProfilePage({
                 />
                 聚焦：最近联赛
               </label>
-            </div>
+                </div>
+              </div>
+            </form>
           </div>
 
           <div className="space-y-4">

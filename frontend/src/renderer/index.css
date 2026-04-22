@@ -4,11 +4,31 @@
 
 /* Custom base styles */
 @layer base {
+  :root {
+    color-scheme: dark;
+    --ts-bg: #0b1117;
+    --ts-bg-elevated: #111821;
+    --ts-panel: rgba(18, 25, 33, 0.78);
+    --ts-panel-strong: rgba(17, 24, 32, 0.94);
+    --ts-panel-soft: rgba(24, 33, 43, 0.58);
+    --ts-border: rgba(120, 138, 152, 0.18);
+    --ts-border-strong: rgba(144, 166, 181, 0.28);
+    --ts-text-muted: #88939d;
+    --ts-text-soft: #67727b;
+    --ts-teal: #8ab3ba;
+    --ts-teal-strong: #d5ebee;
+    --ts-gold: #d9b978;
+    --ts-gold-soft: #8b6a3b;
+    --ts-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  }
+
   body {
     @apply text-zinc-100 antialiased;
     font-family: 'Inter', 'PingFang SC', 'SF Pro Display', system-ui, sans-serif;
-    /* Deep charcoal background for tactical console feel */
-    background: #09090b;
+    background:
+      radial-gradient(circle at top, rgba(108, 144, 163, 0.18), transparent 34%),
+      radial-gradient(circle at 82% 8%, rgba(194, 148, 85, 0.11), transparent 24%),
+      linear-gradient(180deg, #070b10 0%, var(--ts-bg) 46%, #0d141b 100%);
     background-attachment: fixed;
   }
 
@@ -23,35 +43,61 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-zinc-800;
+    background: rgba(83, 99, 112, 0.75);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-zinc-700;
+    background: rgba(112, 132, 146, 0.82);
   }
 }
 
 /* Component classes */
 @layer components {
   .btn-primary {
-    @apply px-4 py-2 bg-cyan-600 text-white rounded-sm shadow-sm
-           hover:bg-cyan-500 transition-all duration-200
-           focus:outline-none focus:ring-1 focus:ring-cyan-500 active:scale-[0.98];
+    @apply rounded-sm border px-4 py-2 text-white transition-all duration-200
+           focus:outline-none focus:ring-1 active:scale-[0.98];
+    border-color: rgba(122, 156, 174, 0.48);
+    background: linear-gradient(180deg, rgba(67, 102, 124, 0.92), rgba(47, 74, 91, 0.94));
+    box-shadow: 0 10px 24px rgba(18, 32, 43, 0.2);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(180deg, rgba(85, 123, 146, 0.96), rgba(57, 87, 106, 0.98));
+  }
+
+  .btn-primary:focus-visible {
+    --tw-ring-color: rgba(138, 179, 186, 0.42);
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-zinc-900 text-zinc-300 rounded-sm border border-zinc-800
-           hover:bg-zinc-800 hover:text-white transition-colors duration-200
-           focus:outline-none focus:ring-1 focus:ring-zinc-700;
+    @apply rounded-sm border px-4 py-2 text-zinc-300 transition-colors duration-200
+           hover:text-white focus:outline-none focus:ring-1;
+    border-color: rgba(113, 129, 141, 0.24);
+    background: rgba(14, 19, 25, 0.78);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(22, 31, 40, 0.92);
+  }
+
+  .btn-secondary:focus-visible {
+    --tw-ring-color: rgba(126, 145, 159, 0.32);
   }
 
   /* Sharp technical pane */
   .card, .pane {
-    @apply bg-zinc-900/40 p-5 rounded-sm border border-zinc-800/80;
+    @apply rounded-sm border p-5;
+    border-color: var(--ts-border);
+    background: linear-gradient(180deg, rgba(18, 25, 33, 0.86), rgba(12, 17, 23, 0.9));
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.2);
   }
 
   .workspace-page {
     @apply min-h-full text-white;
+    background:
+      radial-gradient(circle at top, rgba(103, 137, 153, 0.13), transparent 32%),
+      radial-gradient(circle at 86% 0%, rgba(192, 147, 86, 0.1), transparent 22%),
+      linear-gradient(180deg, #080d12 0%, var(--ts-bg) 48%, #0d141b 100%);
   }
 
   .workspace-stack {
@@ -59,16 +105,34 @@
   }
 
   .workspace-header {
-    @apply border-b border-zinc-800 bg-zinc-900/30 p-6;
-    background-image: linear-gradient(to bottom, rgba(24, 24, 27, 0.4), transparent);
+    @apply border-b p-6;
+    border-color: var(--ts-border);
+    background:
+      linear-gradient(180deg, rgba(21, 29, 37, 0.92), rgba(13, 18, 24, 0.82)),
+      radial-gradient(circle at top left, rgba(138, 179, 186, 0.08), transparent 32%);
+  }
+
+  .workspace-header-compact {
+    @apply rounded-[26px] border px-5 py-5 lg:px-6 lg:py-6;
+    border-color: rgba(120, 138, 152, 0.18);
+    box-shadow: 0 22px 52px rgba(0, 0, 0, 0.18);
   }
 
   .workspace-header-row {
-    @apply flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between;
+    @apply flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between;
+  }
+
+  .workspace-header-copy {
+    @apply min-w-0 max-w-3xl;
+  }
+
+  .workspace-header-rail {
+    @apply flex w-full flex-col gap-3 xl:w-auto xl:min-w-[320px];
   }
 
   .workspace-eyebrow {
-    @apply text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-500/80;
+    @apply text-[10px] font-bold uppercase tracking-[0.3em];
+    color: var(--ts-teal);
   }
 
   .workspace-title {
@@ -76,43 +140,88 @@
   }
 
   .workspace-description {
-    @apply mt-1 max-w-3xl text-sm leading-relaxed text-zinc-500;
+    @apply mt-1 max-w-3xl text-sm leading-relaxed;
+    color: var(--ts-text-muted);
   }
 
   .workspace-kpi-grid {
-    @apply grid gap-px bg-zinc-800/50 md:grid-cols-3;
+    @apply grid gap-px rounded-2xl md:grid-cols-3;
+    background: rgba(109, 125, 138, 0.12);
+  }
+
+  .workspace-kpi-grid-compact {
+    @apply overflow-hidden;
   }
 
   .workspace-kpi {
-    @apply bg-zinc-900/50 px-5 py-4;
+    @apply px-5 py-4;
+    background: linear-gradient(180deg, rgba(20, 28, 36, 0.96), rgba(14, 20, 27, 0.92));
+  }
+
+  .workspace-kpi-grid-compact .workspace-kpi {
+    @apply px-4 py-3;
   }
 
   .workspace-kpi-label {
-    @apply text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500;
+    @apply text-[10px] font-bold uppercase tracking-[0.2em];
+    color: #7e8993;
   }
 
   .workspace-kpi-value {
     @apply mt-1 text-xl font-mono font-bold text-white;
   }
 
+  .workspace-kpi-grid-compact .workspace-kpi-value {
+    @apply text-lg;
+  }
+
   .workspace-kpi-hint {
-    @apply mt-0.5 text-[10px] text-zinc-600 font-mono;
+    @apply mt-0.5 text-[10px] font-mono;
+    color: var(--ts-text-soft);
+  }
+
+  .workspace-kpi-grid-compact .workspace-kpi-hint {
+    @apply mt-1 text-[9px];
   }
 
   .workspace-pill-row {
     @apply mt-4 flex flex-wrap gap-2 text-[10px];
   }
 
+  .workspace-pill-row-compact {
+    @apply mt-3 gap-1.5;
+  }
+
   .workspace-pill {
-    @apply rounded-none border border-zinc-800 bg-zinc-950/80 px-2.5 py-1 text-zinc-400 font-mono;
+    @apply border px-2.5 py-1 font-mono;
+    border-color: rgba(116, 132, 145, 0.18);
+    background: rgba(10, 14, 19, 0.72);
+    color: #909ca6;
+  }
+
+  .workspace-pill-accent {
+    border-color: rgba(138, 179, 186, 0.22);
+    background: rgba(36, 58, 67, 0.22);
+    color: #d8ecef;
+  }
+
+  .workspace-pill-gold {
+    border-color: rgba(217, 185, 120, 0.24);
+    background: rgba(120, 90, 47, 0.18);
+    color: #e6d2a7;
   }
 
   .workspace-panel {
-    @apply border-b border-zinc-800 bg-zinc-900/20 p-6;
+    @apply border-b p-6;
+    border-color: var(--ts-border);
+    background: linear-gradient(180deg, rgba(14, 20, 27, 0.72), rgba(11, 16, 22, 0.52));
   }
 
   .workspace-split-grid {
-    @apply grid items-start gap-0 divide-x divide-zinc-800 border-b border-zinc-800;
+    @apply grid items-start gap-0 divide-x border-b;
+    border-color: var(--ts-border);
+    --tw-divide-opacity: 1;
+    --tw-divide-color: rgba(109, 124, 138, 0.18);
   }
 
   .workspace-side-rail {
@@ -123,64 +232,253 @@
     @apply mb-4 flex flex-col gap-0.5;
   }
 
+  .workspace-panel-header-inline {
+    @apply mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between;
+  }
+
   .workspace-panel-title {
-    @apply text-sm font-bold uppercase tracking-wider text-zinc-200;
+    @apply text-sm font-bold uppercase tracking-wider text-zinc-100;
   }
 
   .workspace-panel-description {
-    @apply text-xs text-zinc-500;
+    @apply text-xs;
+    color: var(--ts-text-muted);
   }
 
   .workspace-table-shell {
-    @apply border-zinc-800 bg-black/20;
+    @apply overflow-hidden rounded-2xl border;
+    border-color: var(--ts-border);
+    background: linear-gradient(180deg, rgba(17, 24, 32, 0.88), rgba(12, 17, 24, 0.92));
+    box-shadow: var(--ts-shadow);
+  }
+
+  .workspace-filter-shell {
+    @apply rounded-[24px] border p-4 lg:p-5;
+    border-color: rgba(120, 138, 152, 0.16);
+    background:
+      linear-gradient(180deg, rgba(18, 26, 34, 0.84), rgba(10, 15, 21, 0.88)),
+      radial-gradient(circle at top left, rgba(138, 179, 186, 0.05), transparent 34%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .workspace-filter-grid {
+    @apply grid gap-3;
+  }
+
+  .workspace-filter-grid-3 {
+    @apply md:grid-cols-2 xl:grid-cols-3;
+  }
+
+  .workspace-filter-grid-4 {
+    @apply md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .workspace-filter-grid-6 {
+    @apply md:grid-cols-2 xl:grid-cols-6;
+  }
+
+  .workspace-field-stack {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .workspace-field-stack .workspace-field-label {
+    @apply mb-0;
+  }
+
+  .workspace-field-surface {
+    @apply rounded-[18px] border p-3;
+    border-color: rgba(110, 126, 138, 0.14);
+    background: rgba(10, 15, 20, 0.32);
+  }
+
+  .workspace-filter-footer {
+    @apply mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between;
+  }
+
+  .workspace-filter-meta {
+    @apply flex flex-wrap gap-2 text-[10px];
+  }
+
+  .workspace-filter-note {
+    @apply rounded-[18px] border px-3.5 py-3 text-xs leading-relaxed;
+    border-color: rgba(110, 126, 138, 0.14);
+    background: rgba(10, 15, 20, 0.42);
+    color: var(--ts-text-muted);
+  }
+
+  .workspace-toolbar-panel {
+    @apply rounded-[20px] border p-3.5;
+    border-color: rgba(110, 126, 138, 0.16);
+    background: rgba(10, 15, 20, 0.38);
+  }
+
+  .workspace-toolbar-grid {
+    @apply grid gap-3 md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .workspace-panel-badge {
+    @apply rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em];
+    border-color: rgba(116, 132, 145, 0.18);
+    background: rgba(10, 14, 19, 0.72);
+    color: #aab5bd;
   }
 
   .workspace-input {
-    @apply h-10 w-full rounded-sm border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-cyan-600 focus:outline-none transition-colors;
+    @apply h-10 w-full rounded-sm border px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none transition-colors;
+    border-color: rgba(107, 121, 133, 0.24);
+    background: rgba(10, 15, 20, 0.88);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .workspace-input:focus {
+    border-color: rgba(138, 179, 186, 0.58);
   }
 
   .workspace-select {
-    @apply h-10 w-full rounded-sm border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-cyan-600 focus:outline-none transition-colors;
+    @apply h-10 w-full rounded-sm border px-3 py-2 text-sm text-white focus:outline-none transition-colors;
+    border-color: rgba(107, 121, 133, 0.24);
+    background: rgba(10, 15, 20, 0.88);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .workspace-select:focus {
+    border-color: rgba(138, 179, 186, 0.58);
   }
 
   .workspace-checkpanel {
-    @apply flex h-10 items-center gap-2 rounded-sm border border-zinc-800 bg-zinc-950 px-3;
+    @apply flex h-10 items-center gap-2 rounded-sm border px-3;
+    border-color: rgba(107, 121, 133, 0.24);
+    background: rgba(10, 15, 20, 0.88);
   }
 
   .workspace-field-label {
-    @apply mb-1.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500;
+    @apply mb-1.5 block text-[10px] font-bold uppercase tracking-[0.2em];
+    color: #7e8993;
   }
 
   .workspace-field-hint {
-    @apply mt-2 text-[10px] leading-relaxed text-zinc-600 font-mono;
+    @apply mt-2 text-[10px] leading-relaxed font-mono;
+    color: var(--ts-text-soft);
   }
 
   .workspace-action-row {
-    @apply flex flex-wrap items-center gap-px bg-zinc-800;
+    @apply flex flex-wrap items-center gap-px rounded-xl;
+    background: rgba(97, 113, 126, 0.12);
+  }
+
+  .workspace-action-row-soft {
+    background: rgba(97, 113, 126, 0.08);
   }
 
   .workspace-action-button {
-    @apply inline-flex h-10 items-center justify-center whitespace-nowrap bg-zinc-900 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors;
+    @apply inline-flex h-10 items-center justify-center whitespace-nowrap px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors;
+    background: rgba(17, 24, 32, 0.96);
+    color: #c6d0d8;
+  }
+
+  .workspace-action-button:hover {
+    background: rgba(26, 37, 47, 0.98);
+    color: white;
   }
 
   .workspace-chip-button {
-    @apply inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider;
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-sm border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors;
+    border-color: rgba(118, 135, 148, 0.24);
+    background: rgba(16, 22, 29, 0.76);
   }
 
   .workspace-subtle-button {
-    @apply inline-flex h-10 items-center justify-center whitespace-nowrap rounded-sm border border-zinc-800 bg-zinc-950 px-4 py-2 text-xs text-zinc-400 transition hover:border-zinc-600 hover:text-white;
+    @apply inline-flex h-10 items-center justify-center whitespace-nowrap rounded-sm border px-4 py-2 text-xs transition;
+    border-color: rgba(112, 128, 141, 0.24);
+    background: rgba(10, 15, 20, 0.88);
+    color: #97a3ad;
+  }
+
+  .workspace-subtle-button:hover {
+    border-color: rgba(149, 169, 183, 0.38);
+    color: white;
   }
 
   /* Glassmorphism panel - redefined to be more tactical */
   .glass-panel {
-    @apply bg-zinc-900/60 backdrop-blur-md border border-zinc-800 shadow-2xl;
+    @apply border backdrop-blur-md;
+    border-color: var(--ts-border-strong);
+    background: rgba(17, 24, 32, 0.72);
+    box-shadow: var(--ts-shadow);
   }
 
   .input {
-    @apply w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-sm
-           transition-colors duration-200
-           focus:outline-none focus:ring-1 focus:ring-cyan-600
-           placeholder-zinc-600 text-zinc-200 hover:bg-zinc-900;
+    @apply w-full rounded-sm border px-3 py-2 text-zinc-200 placeholder-zinc-600
+           transition-colors duration-200 focus:outline-none focus:ring-1;
+    border-color: rgba(107, 121, 133, 0.24);
+    background: rgba(10, 15, 20, 0.88);
+  }
+
+  .input:hover {
+    background: rgba(15, 20, 27, 0.92);
+  }
+
+  .input:focus {
+    --tw-ring-color: rgba(138, 179, 186, 0.42);
+    border-color: rgba(138, 179, 186, 0.58);
+  }
+
+  [data-testid="return-to-workspace-button"] {
+    border-color: rgba(124, 145, 159, 0.2) !important;
+    background: linear-gradient(135deg, rgba(18, 25, 32, 0.95), rgba(12, 16, 22, 0.84)) !important;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  [data-testid="return-to-workspace-button"]:hover {
+    border-color: rgba(145, 169, 183, 0.34) !important;
+    background: linear-gradient(135deg, rgba(28, 40, 50, 0.92), rgba(15, 22, 30, 0.96)) !important;
+  }
+
+  [data-testid="return-to-workspace-button"] > div:first-child {
+    border-color: rgba(112, 128, 142, 0.28) !important;
+    background: rgba(10, 15, 20, 0.72) !important;
+    color: var(--ts-gold) !important;
+  }
+
+  [data-testid^="hud-hero-card-"] {
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  [data-testid^="hud-hero-card-"][aria-expanded="true"] {
+    background: linear-gradient(180deg, rgba(18, 25, 33, 0.97), rgba(10, 15, 20, 0.98)) !important;
+    box-shadow: 0 0 0 1px rgba(129, 149, 163, 0.08), 0 18px 36px rgba(0, 0, 0, 0.26) !important;
+  }
+
+  [data-testid^="hud-hero-card-"][data-highlighted="true"] {
+    box-shadow: 0 0 0 1px rgba(206, 170, 108, 0.14), 0 18px 38px rgba(34, 25, 14, 0.22) !important;
+  }
+
+  [data-testid^="hud-player-display-"] {
+    color: #ddc89b !important;
+    filter: none !important;
+  }
+
+  [data-testid^="hud-hero-card-"][data-highlighted="true"] [data-testid^="hud-player-display-"] {
+    color: #d6ecef !important;
+  }
+
+  [data-testid^="hud-player-meta-"] {
+    border-color: rgba(217, 185, 120, 0.46) !important;
+    background: rgba(143, 111, 63, 0.14) !important;
+    color: #ead8b4 !important;
+    box-shadow: none !important;
+  }
+
+  [data-testid^="hud-hero-card-"][data-highlighted="true"] [data-testid^="hud-player-meta-"] {
+    border-color: rgba(138, 179, 186, 0.48) !important;
+    background: rgba(60, 87, 93, 0.22) !important;
+    color: var(--ts-teal-strong) !important;
+  }
+
+  [data-testid="ward-detail-popover"] > div {
+    border-color: rgba(124, 145, 159, 0.24) !important;
+    background: linear-gradient(180deg, rgba(19, 26, 34, 0.96), rgba(9, 14, 19, 0.98)) !important;
+    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.34) !important;
   }
 }
 

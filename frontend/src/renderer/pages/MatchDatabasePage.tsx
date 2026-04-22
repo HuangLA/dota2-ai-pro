@@ -660,16 +660,17 @@ export function MatchDatabasePage({
   return (
     <div className="workspace-page relative bg-dota-bg">
       <div className="workspace-stack">
-        <div className="workspace-header">
+        <div className="workspace-header workspace-header-compact">
           <div className="workspace-header-row">
-            <div>
+            <div className="workspace-header-copy">
               <p className="workspace-eyebrow">Match Database</p>
               <h1 className="workspace-title">比赛数据库</h1>
               <p className="workspace-description">
                 先筛出目标比赛，再决定下载、查看任务或直接进入回放。默认仅展示职业联赛。
               </p>
             </div>
-            <div className="workspace-kpi-grid xl:min-w-[420px]">
+            <div className="workspace-header-rail">
+              <div className="workspace-kpi-grid workspace-kpi-grid-compact xl:min-w-[420px]">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">当前页</p>
                 <p className="workspace-kpi-value">{actionableMatches.length}</p>
@@ -685,21 +686,22 @@ export function MatchDatabasePage({
                 <p className="workspace-kpi-value">{readyReplayCount}</p>
                 <p className="workspace-kpi-hint">当前页已下载完成</p>
               </div>
+              </div>
             </div>
           </div>
 
-          <div className="workspace-pill-row">
+          <div className="workspace-pill-row workspace-pill-row-compact">
             <span className="workspace-pill">
               激活筛选 {activeFilterCount}
             </span>
-            <span className="workspace-pill">
+            <span className="workspace-pill workspace-pill-accent">
               总记录 {total}
             </span>
             <span className="workspace-pill">
               当前偏移 {offset}
             </span>
             {filters.professionalOnly && (
-              <span className="rounded-sm border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-200">
+              <span className="workspace-pill workspace-pill-gold">
                 仅职业联赛
               </span>
             )}
@@ -708,16 +710,20 @@ export function MatchDatabasePage({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.95fr)]">
           <div className="workspace-panel">
-            <div className="workspace-panel-header">
-              <h2 className="workspace-panel-title">查找比赛</h2>
-              <p className="workspace-panel-description">
-                适合先用战队、联赛和时间范围缩小集合，再做下载或进入回放。
-              </p>
+            <div className="workspace-panel-header-inline">
+              <div className="workspace-panel-header !mb-0">
+                <h2 className="workspace-panel-title">查找比赛</h2>
+                <p className="workspace-panel-description">
+                  适合先用战队、联赛和时间范围缩小集合，再做下载或进入回放。
+                </p>
+              </div>
+              <span className="workspace-panel-badge">Structured Filter</span>
             </div>
 
-            <form onSubmit={handleSearch} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">战队 ID</label>
+            <form onSubmit={handleSearch} className="workspace-filter-shell">
+              <div className="workspace-filter-grid workspace-filter-grid-6">
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">战队 ID</span>
                 <input
                   aria-label="战队 ID"
                   value={filters.teamId}
@@ -725,9 +731,9 @@ export function MatchDatabasePage({
                   placeholder="例如 15"
                   className="workspace-input focus:border-dota-primary"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">联赛 ID</label>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">联赛 ID</span>
                 <input
                   aria-label="联赛 ID"
                   value={filters.leagueId}
@@ -735,9 +741,9 @@ export function MatchDatabasePage({
                   placeholder="例如 15475"
                   className="workspace-input focus:border-dota-primary"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">开始时间（起）</label>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">开始时间（起）</span>
                 <input
                   aria-label="开始时间（起）"
                   type="datetime-local"
@@ -747,9 +753,9 @@ export function MatchDatabasePage({
                   }
                   className="workspace-input focus:border-dota-primary"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">开始时间（止）</label>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">开始时间（止）</span>
                 <input
                   aria-label="开始时间（止）"
                   type="datetime-local"
@@ -759,9 +765,9 @@ export function MatchDatabasePage({
                   }
                   className="workspace-input focus:border-dota-primary"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">是否已有下载任务</label>
+              </label>
+              <label className="workspace-field-stack">
+                <span className="workspace-field-label">是否已有下载任务</span>
                 <select
                   aria-label="是否已有下载任务"
                   value={filters.hasDownload}
@@ -777,9 +783,9 @@ export function MatchDatabasePage({
                   <option value="true">是</option>
                   <option value="false">否</option>
                 </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm text-gray-400">仅职业联赛</label>
+              </label>
+              <div className="workspace-field-stack">
+                <span className="workspace-field-label">样本范围</span>
                 <label className="workspace-checkpanel h-[46px] w-full cursor-pointer text-white">
                   <input
                     aria-label="仅职业联赛"
@@ -796,7 +802,13 @@ export function MatchDatabasePage({
                   <span className="text-sm text-gray-200">仅显示职业联赛</span>
                 </label>
               </div>
-              <div className="workspace-action-row xl:col-span-6">
+              </div>
+              <div className="workspace-filter-footer">
+                <div className="workspace-filter-meta">
+                  <span className="workspace-pill">激活筛选 {activeFilterCount}</span>
+                  <span className="workspace-pill">总记录 {total}</span>
+                </div>
+                <div className="workspace-action-row">
                 <button
                   type="submit"
                   className="workspace-action-button min-w-[112px] bg-dota-primary text-white transition-colors hover:bg-blue-600"
@@ -826,6 +838,7 @@ export function MatchDatabasePage({
                 >
                   清空
                 </button>
+                </div>
               </div>
             </form>
           </div>

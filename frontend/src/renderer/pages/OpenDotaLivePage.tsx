@@ -357,7 +357,7 @@ function LeagueArtwork({
               </span>
               {match.leagueid ? (
                 <span className="inline-flex items-center border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  ID {match.leagueid}
+                  联赛 {match.leagueid}
                 </span>
               ) : null}
             </div>
@@ -1054,16 +1054,17 @@ export function OpenDotaLivePage() {
   return (
     <div className="workspace-page bg-dota-bg">
       <div className="workspace-stack">
-        <div className="workspace-header rounded-[22px] border-cyan-500/20 p-3.5 lg:rounded-[24px] lg:p-4">
+        <div className="workspace-header workspace-header-compact">
           <div className="workspace-header-row">
-            <div>
-              <p className="workspace-eyebrow text-cyan-300/80">OpenDota Live Intake</p>
+            <div className="workspace-header-copy">
+              <p className="workspace-eyebrow">OpenDota Live Intake</p>
               <h1 className="workspace-title text-dota-gold">OpenDota 职业比赛台</h1>
-              <p className="workspace-description text-cyan-100/75">
+              <p className="workspace-description">
                 默认只展示职业比赛；搜索时仍可用一个输入框查比赛、联赛、玩家名字和 ID，继续保留职业与路人的统一搜索体验。
               </p>
             </div>
-            <div className="workspace-kpi-grid 2xl:min-w-[392px]">
+            <div className="workspace-header-rail">
+              <div className="workspace-kpi-grid workspace-kpi-grid-compact 2xl:min-w-[392px]">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">流水线进行中</p>
                 <p className="workspace-kpi-value">{activePipelineCount}</p>
@@ -1079,12 +1080,13 @@ export function OpenDotaLivePage() {
                 <p className="workspace-kpi-value">{selectedMatchIds.length}</p>
                 <p className="workspace-kpi-hint">准备批量入库</p>
               </div>
+              </div>
             </div>
           </div>
 
-          <div className="workspace-pill-row">
+          <div className="workspace-pill-row workspace-pill-row-compact">
             <span className="workspace-pill">自动同步 每 1 分钟</span>
-            <span className="workspace-pill">模式 {searchModeLabel}</span>
+            <span className="workspace-pill workspace-pill-accent">模式 {searchModeLabel}</span>
             <span className="workspace-pill">激活筛选 {activeFilterCount}</span>
             <span className="workspace-pill">当前页 {matches.length} / 总数 {total}</span>
             <button
@@ -1092,7 +1094,7 @@ export function OpenDotaLivePage() {
                 void handleManualSync();
               }}
               disabled={syncing}
-              className="workspace-chip-button border border-cyan-500/50 bg-cyan-600/15 text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+              className="workspace-chip-button border border-dota-primary/50 bg-dota-primary/15 text-[#d8ecf0] transition hover:bg-dota-primary/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {syncing ? '同步中...' : '立即同步远端列表'}
             </button>
@@ -1101,15 +1103,18 @@ export function OpenDotaLivePage() {
 
         <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.18fr)_320px]">
           <div className="workspace-panel">
-            <div className="workspace-panel-header">
-              <h2 className="workspace-panel-title">统一搜索</h2>
-              <p className="workspace-panel-description">
-                直接输入 `8735428765`、`Ame`、`DreamLeague`，或者用 `比赛/玩家/联赛`、`match/player/league` 前缀显式指定；默认列表只保留职业比赛。
-              </p>
+            <div className="workspace-panel-header-inline">
+              <div className="workspace-panel-header !mb-0">
+                <h2 className="workspace-panel-title">统一搜索</h2>
+                <p className="workspace-panel-description">
+                  直接输入 `8735428765`、`Ame`、`DreamLeague`，或者用 `比赛/玩家/联赛`、`match/player/league` 前缀显式指定；默认列表只保留职业比赛。
+                </p>
+              </div>
+              <span className="workspace-panel-badge">Single Query</span>
             </div>
 
-            <form onSubmit={handleSearch} className="space-y-3">
-              <div className="rounded-[22px] border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(8,47,73,0.2),rgba(2,6,23,0.76))] p-4">
+            <form onSubmit={handleSearch} className="workspace-filter-shell">
+              <div className="workspace-field-stack">
                 <label className="workspace-field-label">搜索词</label>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                   <input
@@ -1122,7 +1127,7 @@ export function OpenDotaLivePage() {
                   <div className="workspace-action-row lg:flex-nowrap">
                     <button
                       type="submit"
-                      className="workspace-action-button min-w-[112px] flex-1 border border-cyan-500/60 bg-cyan-700 text-white transition hover:bg-cyan-600 sm:flex-none"
+                      className="workspace-action-button min-w-[112px] flex-1 border border-dota-primary/60 bg-dota-primary text-white transition hover:bg-[#557a92] sm:flex-none"
                     >
                       查询
                     </button>
@@ -1135,8 +1140,9 @@ export function OpenDotaLivePage() {
                     </button>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                   <SearchPresetButton value="8735428765" onPick={setSearchText}>
                     比赛 8735428765
                   </SearchPresetButton>
@@ -1149,21 +1155,29 @@ export function OpenDotaLivePage() {
                   <SearchPresetButton value="联赛 15475" onPick={setSearchText}>
                     联赛 15475
                   </SearchPresetButton>
-                </div>
+              </div>
 
-                <p className="workspace-field-hint">
+              <div className="workspace-filter-footer">
+                <p className="workspace-field-hint max-w-3xl">
                   默认会把文字同时拿去匹配玩家和联赛；纯数字会先按常见 ID 规则判断。想强制指定类型时，可以加 `比赛/玩家/联赛` 或 `match/player/league` 前缀。
                 </p>
+                <div className="workspace-filter-meta">
+                  <span className="workspace-pill">模式 {searchModeLabel}</span>
+                  <span className="workspace-pill">激活筛选 {activeFilterCount}</span>
+                </div>
               </div>
             </form>
           </div>
 
           <div className="workspace-panel">
-            <div className="workspace-panel-header">
-              <h2 className="workspace-panel-title">批量入库</h2>
-              <p className="workspace-panel-description">勾选比赛后，会顺序执行下载和解析；可随时查看单场状态详情。</p>
+            <div className="workspace-panel-header-inline">
+              <div className="workspace-panel-header !mb-0">
+                <h2 className="workspace-panel-title">批量入库</h2>
+                <p className="workspace-panel-description">勾选比赛后，会顺序执行下载和解析；可随时查看单场状态详情。</p>
+              </div>
+              <span className="workspace-panel-badge">Batch Intake</span>
             </div>
-            <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-4">
+            <div className="workspace-filter-shell">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between 2xl:flex-col 2xl:items-start">
                 <div>
                   <p className="text-xs uppercase tracking-[0.22em] text-slate-500">当前选择</p>
@@ -1176,7 +1190,7 @@ export function OpenDotaLivePage() {
                   下载后会自动进入解析阶段
                 </span>
               </div>
-              <div data-testid="live-batch-button-row" className="mt-4 workspace-action-row">
+              <div data-testid="live-batch-button-row" className="mt-4 workspace-action-row workspace-action-row-soft">
                 <button
                   onClick={() => {
                     void handleIngest(selectedMatchIds);

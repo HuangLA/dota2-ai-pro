@@ -32,6 +32,19 @@
 
 ## 当前进展摘要（2026-03-20）
 
+### 最新完成任务（2026-04-22）
+**✅ 统一各工作页头部与筛选区布局，降低头部臃肿感并细化筛选控件质感**
+- 已在 `frontend/src/renderer/index.css` 新增一组共享工作台样式，包括更紧凑的 `workspace-header-compact`、更清晰的 `workspace-filter-shell`、更轻量的 `workspace-panel-header-inline` 与字段/底部工具条样式，用于统一各页面的页头结构、KPI 轨道、筛选表单与操作区层级。
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx`、`ReplayLibraryPage.tsx`、`MatchDatabasePage.tsx`、`TeamProfilePage.tsx`、`MatchListPage.tsx` 已完成第二轮统一：页头文案与指标区更收敛，筛选区域改为更规整的字段栈与柔和面板容器，按钮与状态提示的留白、对齐和分组也更精致，整体减少“厚重大块头部”观感。
+- 同步修正了 `OpenDotaLivePage` 联赛占位徽标文案，以匹配现有测试断言并保持回退态显示一致性。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx src/renderer/pages/ReplayLibraryPage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx --reporter=dot` → `75 passed`。
+
+### 最新完成任务（2026-04-22）
+**✅ 收敛前端整体配色，统一桌面壳层与回放页视觉语气**
+- 已将前端主题主色从“多套并行的深蓝 / 亮青 / 高饱和金色”收敛为更统一的深石墨底色、雾蓝面板与柔和青铜金强调，减少页面之间的色温冲突。
+- `frontend/tailwind.config.js` 已更新 `dota.bg / surface / primary / accent / gold` 调色板；`frontend/src/renderer/index.css` 已同步重写工作台壳层、输入、按钮、表格与回放页关键覆盖样式，让导航、工作区页头、筛选区和回放 HUD 更接近同一套战术台语言。
+- `frontend/src/renderer/components/DesktopLayout.tsx`、`frontend/src/renderer/App.tsx` 与 `frontend/src/renderer/pages/RealMatchViewer.tsx` 也已一起做了壳层和重点控件调色，重点降低返回按钮、地图工作台和页头区域的霓虹感，同时保留原有信息层级与交互结构。
+
 ### 最新完成任务（2026-04-03）
 **✅ README 已补充当前支持补丁版本 7.41**
 - 根目录 `README.md` 已明确写明当前支持的 Dota 2 补丁版本为 `7.41`，避免后续在分支合并或对外交付时还需要额外口头说明版本范围。

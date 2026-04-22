@@ -179,14 +179,15 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
   return (
     <div className="workspace-page bg-dota-bg">
       <div className="workspace-stack">
-        <div className="workspace-header">
+        <div className="workspace-header workspace-header-compact">
           <div className="workspace-header-row">
-            <div>
-              <p className="workspace-eyebrow text-cyan-300/80">Legacy Match List</p>
+            <div className="workspace-header-copy">
+              <p className="workspace-eyebrow">Legacy Match List</p>
               <h1 className="workspace-title text-dota-gold">比赛管理</h1>
               <p className="workspace-description">上传录像、搜索比赛、管理你的游戏数据。这是保留的旧版入口，但现在也使用同一套桌面工作区视觉。</p>
             </div>
-            <div className="workspace-kpi-grid xl:min-w-[420px]">
+            <div className="workspace-header-rail">
+              <div className="workspace-kpi-grid workspace-kpi-grid-compact xl:min-w-[420px]">
               <div className="workspace-kpi">
                 <p className="workspace-kpi-label">当前结果</p>
                 <p className="workspace-kpi-value">{matches.length}</p>
@@ -202,6 +203,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                 <p className="workspace-kpi-value">{total}</p>
                 <p className="workspace-kpi-hint">命中总比赛</p>
               </div>
+              </div>
             </div>
           </div>
         </div>
@@ -211,10 +213,17 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
 
         {/* Search Bar */}
         <div className="workspace-panel">
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">搜索筛选</h2>
-          <form onSubmit={handleSearch} className="flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-sm text-gray-400 mb-1.5">比赛 ID</label>
+          <div className="workspace-panel-header-inline">
+            <div className="workspace-panel-header !mb-0">
+              <h2 className="workspace-panel-title">搜索筛选</h2>
+              <p className="workspace-panel-description">旧版入口也收敛到同一套筛选结构，方便快速按比赛、玩家或英雄定位。</p>
+            </div>
+            <span className="workspace-panel-badge">Legacy Search</span>
+          </div>
+          <form onSubmit={handleSearch} className="workspace-filter-shell">
+            <div className="workspace-filter-grid workspace-filter-grid-3">
+            <label className="workspace-field-stack">
+              <span className="workspace-field-label">比赛 ID</span>
               <input
                 type="text"
                 value={matchIdInput}
@@ -222,10 +231,10 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                 placeholder="e.g., 8478202"
                 className="workspace-input focus:border-dota-primary"
               />
-            </div>
+            </label>
 
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-sm text-gray-400 mb-1.5">玩家账号 ID</label>
+            <label className="workspace-field-stack">
+              <span className="workspace-field-label">玩家账号 ID</span>
               <input
                 type="text"
                 value={accountIdInput}
@@ -233,10 +242,10 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                 placeholder="e.g., 87278757"
                 className="workspace-input focus:border-dota-primary"
               />
-            </div>
+            </label>
 
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm text-gray-400 mb-1.5">英雄筛选</label>
+            <label className="workspace-field-stack">
+              <span className="workspace-field-label">英雄筛选</span>
               <select
                 value={selectedHeroId || ''}
                 onChange={(e) => setSelectedHeroId(e.target.value ? parseInt(e.target.value) : undefined)}
@@ -249,36 +258,37 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
                   </option>
                 ))}
               </select>
+            </label>
             </div>
 
-            <button
-              type="submit"
-              className="bg-dota-primary hover:bg-blue-600 text-white px-6 py-2 rounded transition-colors font-medium shadow-md hover:shadow-lg"
-            >
-              搜索
-            </button>
+            <div className="workspace-filter-footer">
+              <div className="workspace-filter-note">
+                比赛 ID 为精确搜索，玩家与英雄筛选为全局搜索。筛选条件可组合使用，例如“指定英雄 + 玩家”。
+              </div>
+              <div className="workspace-action-row">
+                <button
+                  type="submit"
+                  className="workspace-action-button min-w-[112px] bg-dota-primary text-white transition hover:bg-blue-600"
+                >
+                  搜索
+                </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMatchIdInput('');
-                setAccountIdInput('');
-                setSelectedHeroId(undefined);
-                setOffset(0);
-                setSearchTrigger(prev => prev + 1); // React 18 批处理确保所有 state 更新后再触发 useEffect
-              }}
-              className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded transition-colors text-sm"
-            >
-              清除筛选
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMatchIdInput('');
+                    setAccountIdInput('');
+                    setSelectedHeroId(undefined);
+                    setOffset(0);
+                    setSearchTrigger(prev => prev + 1); // React 18 批处理确保所有 state 更新后再触发 useEffect
+                  }}
+                  className="workspace-action-button min-w-[112px] bg-gray-600 text-white transition hover:bg-gray-500"
+                >
+                  清除筛选
+                </button>
+              </div>
+            </div>
           </form>
-
-          {/* Search tips */}
-          <div className="mt-4 text-xs text-gray-500 bg-gray-800/50 p-3 rounded">
-            <span className="font-semibold text-gray-400">提示:</span>
-            {' '}比赛 ID 为精确搜索。玩家/英雄筛选为全局搜索。
-            {' '}筛选条件可组合使用（例如指定英雄 + 玩家）。
-          </div>
         </div>
 
         {/* Error Message */}
