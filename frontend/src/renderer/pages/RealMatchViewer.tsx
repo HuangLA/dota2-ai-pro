@@ -273,7 +273,7 @@ function createDefaultMapOverlayPanels(mapViewportSize: number): Record<MapOverl
     insight: {
       x: MAP_OVERLAY_PANEL_MARGIN,
       y: MAP_OVERLAY_PANEL_MARGIN,
-      open: true,
+      open: false,
     },
     legend: {
       x: Math.max(
@@ -728,10 +728,10 @@ function getWardPopoverPosition(anchorX: number, anchorY: number, wardCount: num
 
   const viewportPadding = 16;
   const estimatedWidth = Math.min(
-    wardCount > 1 ? 780 : 360,
+    wardCount > 1 ? 660 : 360,
     Math.max(320, window.innerWidth - viewportPadding * 2)
   );
-  const estimatedHeight = wardCount > 1 ? 380 : 320;
+  const estimatedHeight = Math.min(wardCount > 1 ? 440 : 280, window.innerHeight - viewportPadding * 2);
   const placeAbove = anchorY + estimatedHeight + WARD_TOOLTIP_OFFSET_PX > window.innerHeight - viewportPadding;
   const alignRight = anchorX + estimatedWidth + WARD_TOOLTIP_OFFSET_PX > window.innerWidth - viewportPadding;
   const left = alignRight
@@ -1617,7 +1617,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
 
 
-  const [showCalibration, setShowCalibration] = useState(false);
+  const [showCalibration] = useState(false);
   const [timeBasisSource, setTimeBasisSource] = useState<'game_time' | 'fallback'>('fallback');
   const [, setTimeBasisStrategy] = useState<GameClockMapper['strategy']>('fallback_pre_game_anchor');
   const [timeBasisOffsetSeconds, setTimeBasisOffsetSeconds] = useState(0);
@@ -1656,8 +1656,10 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const [hoveredWardPreview, setHoveredWardPreview] = useState<WardPopoverState | null>(null);
   const [pinnedWardPreview, setPinnedWardPreview] = useState<WardPopoverState | null>(null);
   const [cleanMapForHeroFocus, setCleanMapForHeroFocus] = useState(true);
-  const [expandedHudHeroes, setExpandedHudHeroes] = useState<Record<number, boolean>>({});
   const [mapWorkbenchExpanded, setMapWorkbenchExpanded] = useState(false);
+  const [mapWorkbenchRendered, setMapWorkbenchRendered] = useState(false);
+  const [matchPickerOpen, setMatchPickerOpen] = useState(false);
+  const [matchPickerQuery, setMatchPickerQuery] = useState('');
   const [replayContextWarning, setReplayContextWarning] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1440
@@ -1685,6 +1687,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const hudRequestSequenceRef = useRef(0);
   const hasHudMetricsDataRef = useRef(false);
   const mapOverlayContainerRef = useRef<HTMLDivElement | null>(null);
+  const matchPickerRef = useRef<HTMLDivElement | null>(null);
   const mapOverlayPanelRefs = useRef<Record<MapOverlayPanelKey, HTMLDivElement | null>>({
     insight: null,
     legend: null,
@@ -1705,6 +1708,45 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (mapWorkbenchExpanded) {
+      setMapWorkbenchRendered(true);
+      return;
+    }
+
+    if (!mapWorkbenchRendered) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setMapWorkbenchRendered(false), 240);
+    return () => window.clearTimeout(timeoutId);
+  }, [mapWorkbenchExpanded, mapWorkbenchRendered]);
+
+  useEffect(() => {
+    if (!matchPickerOpen || typeof window === 'undefined') {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!matchPickerRef.current?.contains(event.target as Node)) {
+        setMatchPickerOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMatchPickerOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [matchPickerOpen]);
 
   useEffect(() => {
     selectedMatchRef.current = selectedMatch ?? null;
@@ -1866,7 +1908,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const loadMatches = async () => {
     setLoading(true);
     try {
-      const matchList = await backendAPI.getMatchList(10, 0);
+      const matchList = await backendAPI.getMatchList(100, 0);
       setMatches(matchList);
 
       const nextSelectedMatchId = resolvePreferredMatchId(matchList);
@@ -2076,10 +2118,6 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   useEffect(() => {
     setReparseTask(null);
     setReparseFeedback(null);
-  }, [selectedMatch]);
-
-  useEffect(() => {
-    setExpandedHudHeroes({});
   }, [selectedMatch]);
 
   const handleRefreshCurrentMatch = () => {
@@ -2640,6 +2678,50 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   const selectedReplayFileName = selectedReplayPath
     ? selectedReplayPath.split(/[\\/]/).filter(Boolean).pop() ?? selectedReplayPath
     : null;
+  const formatMatchPickerOption = useCallback((match: Match) => {
+    const optionRadiantName = match.radiant_team_name || match.radiant_team || '天辉';
+    const optionDireName = match.dire_team_name || match.dire_team || '夜魇';
+    const sourceLabel = match.source ? String(match.source).toUpperCase() : 'LOCAL';
+    const statusParts = [
+      match.is_professional ? '职业' : null,
+      match.duration ? formatGameClockTime(match.duration) : null,
+      match.parsed_at ? new Date(match.parsed_at).toLocaleDateString() : null,
+    ].filter(Boolean);
+
+    return {
+      id: match.match_id,
+      label: `${optionRadiantName} vs ${optionDireName}`,
+      meta: statusParts.length > 0 ? statusParts.join(' · ') : sourceLabel,
+      sourceLabel,
+      searchText: `${optionRadiantName} ${optionDireName} ${match.match_id} ${sourceLabel} ${statusParts.join(' ')}`.toLowerCase(),
+    };
+  }, []);
+  const selectedMatchPickerOption = selectedMatchRecord
+    ? formatMatchPickerOption(selectedMatchRecord)
+    : selectedMatch
+      ? {
+          id: selectedMatch,
+          label: `比赛 ${selectedMatch}`,
+          meta: '当前选择',
+          sourceLabel: 'LOCAL',
+          searchText: `${selectedMatch}`,
+        }
+      : null;
+  const filteredMatchPickerOptions = useMemo(() => {
+    const normalizedQuery = matchPickerQuery.trim().toLowerCase();
+    return matches
+      .map(formatMatchPickerOption)
+      .filter((option) => !normalizedQuery || option.searchText.includes(normalizedQuery))
+      .slice(0, 80);
+  }, [formatMatchPickerOption, matchPickerQuery, matches]);
+  const selectReplayMatch = useCallback((nextMatchId: number) => {
+    selectedMatchRef.current = nextMatchId;
+    preferredMatchIdRef.current = nextMatchId;
+    setReplayContextWarning(null);
+    setSelectedMatch(nextMatchId);
+    setMatchPickerOpen(false);
+    setMatchPickerQuery('');
+  }, [setSelectedMatch]);
   const hasLegacyItemSlotWarning = hudMetricsWarnings.some((warning) =>
     warning.toLowerCase().includes(LEGACY_ITEM_SLOT_WARNING_SNIPPET)
   );
@@ -2647,16 +2729,19 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
   const mapViewportSize = (() => {
     if (viewportWidth >= 1600) {
-      return mapWorkbenchExpanded ? 820 : 920;
+      return 760;
+    }
+    if (viewportWidth >= 1500) {
+      return 700;
     }
     if (viewportWidth >= 1400) {
-      return mapWorkbenchExpanded ? 760 : 860;
+      return 660;
     }
     if (viewportWidth >= 1200) {
-      return mapWorkbenchExpanded ? 700 : 780;
+      return 580;
     }
     if (viewportWidth >= 1024) {
-      return 620;
+      return 500;
     }
     return Math.max(320, Math.min(680, viewportWidth - 48));
   })();
@@ -2970,69 +3055,23 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
     return metricsMap;
   })();
 
-  const toggleHudHeroExpanded = useCallback((heroKey: number) => {
-    setExpandedHudHeroes((current) => ({
-      ...current,
-      [heroKey]: !current[heroKey],
-    }));
-  }, []);
-
   const renderHudLane = (team: 'radiant' | 'dire') => {
-    const teamLabel = team === 'radiant' ? '天辉 HUD' : '夜魇 HUD';
-    const accentClass =
-      team === 'radiant'
-        ? 'border-emerald-500/30 bg-gradient-to-b from-emerald-950/30 via-slate-900/95 to-slate-950/95'
-        : 'border-rose-500/30 bg-gradient-to-b from-rose-950/30 via-slate-900/95 to-slate-950/95';
+    const teamLabel = team === 'radiant' ? '天辉' : '夜魇';
+    const laneClass = team === 'radiant' ? 'replay-hud-lane-radiant' : 'replay-hud-lane-dire';
     const accentTextClass = team === 'radiant' ? 'text-emerald-300' : 'text-rose-300';
     const healthBarClass = team === 'radiant' ? 'bg-emerald-400/95' : 'bg-rose-400/95';
     const laneHeroes = team === 'radiant' ? teamLineups.radiant : teamLineups.dire;
     const slots = Array.from({ length: TEAM_HERO_COUNT }, (_, index) => laneHeroes[index] ?? null);
-    const visibleHeroKeys = slots.map((hero) => hero?.key).filter((heroKey): heroKey is number => typeof heroKey === 'number');
-    const allVisibleHeroesExpanded =
-      visibleHeroKeys.length > 0 && visibleHeroKeys.every((heroKey) => Boolean(expandedHudHeroes[heroKey]));
-
-    const toggleAllVisibleHeroesExpanded = () => {
-      if (visibleHeroKeys.length === 0) {
-        return;
-      }
-
-      setExpandedHudHeroes((current) => {
-        const next = { ...current };
-        const shouldExpand = !visibleHeroKeys.every((heroKey) => Boolean(current[heroKey]));
-
-        for (const heroKey of visibleHeroKeys) {
-          next[heroKey] = shouldExpand;
-        }
-
-        return next;
-      });
-    };
 
     return (
-      <div className={`rounded-2xl border p-2.5 shadow-[0_18px_42px_rgba(0,0,0,0.24)] ${accentClass}`}>
-        <div className="mb-2 flex items-start gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 px-2.5 py-1.5">
-          <div className="min-w-0 flex-1">
-            <p className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.24em] ${accentTextClass}`}>
-              {teamLabel}
-            </p>
-            <p className="mt-0.5 min-w-0 whitespace-normal text-[10px] leading-snug text-slate-400">
-              先看英雄名、玩家和 KDA，悬停看提示，点击卡片展开细节。
-            </p>
-          </div>
-          <button
-            type="button"
-            data-testid={`toggle-hud-lane-${team}`}
-            onClick={toggleAllVisibleHeroesExpanded}
-            disabled={visibleHeroKeys.length === 0}
-            aria-label={allVisibleHeroesExpanded ? '全部收起' : '全部展开'}
-            title={allVisibleHeroesExpanded ? '收起本行所有英雄卡' : '展开本行所有英雄卡'}
-            className="shrink-0 rounded-full border border-slate-700/80 bg-slate-950/90 px-2.5 py-1 text-[10px] font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-600"
-          >
-            {allVisibleHeroesExpanded ? '全部收起' : '全部展开'}
-          </button>
+      <div className={`replay-hud-lane ${laneClass}`}>
+        <div className="replay-hud-lane-header">
+          <p className={`shrink-0 text-[11px] font-semibold uppercase tracking-[0.2em] ${accentTextClass}`}>
+            {teamLabel}
+          </p>
         </div>
 
-        <div className="space-y-2" data-testid={team === 'radiant' ? 'hud-radiant' : 'hud-dire'}>
+        <div className="space-y-1.5" data-testid={team === 'radiant' ? 'hud-radiant' : 'hud-dire'}>
           {slots.map((hero, index) => {
             if (!hero) {
               return (
@@ -3056,28 +3095,23 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             const healthCurrent = Math.max(0, Math.round(heroStatus?.hp ?? 0));
             const healthMax = Math.max(0, Math.round(heroStatus?.maxHp ?? 0));
             const itemSlots = extractHudItemSlots(Array.isArray(metric?.items) ? metric.items : []);
-            const heroExpanded = Boolean(expandedHudHeroes[hero.key]);
+            const heroExpanded = true;
             const isHighlighted = highlightedHudHeroKeys.has(getTeamHeroKey(team, hero.heroName));
             const respawnLabel = isDead && typeof heroStatus?.respawnRemainingSeconds === 'number'
               ? `${heroStatus.respawnRemainingSeconds}s 后复活`
               : `${healthCurrent}/${healthMax} HP`;
-            const cardStateClass = heroExpanded
-              ? 'border-cyan-500/45 bg-slate-950/96 shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_18px_36px_rgba(8,15,34,0.26)]'
-              : 'border-slate-700/70 bg-slate-950/85 hover:border-slate-500/80 hover:bg-slate-900/90';
+            const cardStateClass = 'border-cyan-500/45 bg-slate-950/96 shadow-[0_0_0_1px_rgba(34,211,238,0.12),0_18px_36px_rgba(8,15,34,0.26)]';
 
             return (
-              <button
+              <div
                 key={hero.key}
-                type="button"
                 data-testid={`hud-hero-card-${team}-${hero.key}`}
                 data-highlighted={isHighlighted ? 'true' : 'false'}
                 aria-expanded={heroExpanded}
-                aria-label={`${heroLabel}${playerDisplayName ? ` ${playerDisplayName}` : ''}，${heroExpanded ? '收起详情' : '展开详情'}`}
-                title={`${heroLabel}${playerDisplayName ? ` / ${playerDisplayName}` : ''} · 点击${heroExpanded ? '收起' : '展开'}详情`}
-                onClick={() => toggleHudHeroExpanded(hero.key)}
-                className={`group relative w-full rounded-xl border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 ${
-                  heroExpanded ? 'p-2' : 'p-1.5'
-                } ${cardStateClass} ${
+                role="group"
+                aria-label={`${heroLabel}${playerDisplayName ? ` ${playerDisplayName}` : ''}，详情已展开`}
+                title={`${heroLabel}${playerDisplayName ? ` / ${playerDisplayName}` : ''} · 详情常显`}
+                className={`replay-hud-hero-row group relative w-full rounded-xl border p-2 text-left transition ${cardStateClass} ${
                   isHighlighted
                     ? team === 'radiant'
                       ? 'shadow-[0_0_0_1px_rgba(74,222,128,0.16),0_20px_40px_rgba(5,150,105,0.18)]'
@@ -3085,11 +3119,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   : ''
                 }`}
               >
-                <div className={`flex ${heroExpanded ? 'gap-2.5 pr-2' : 'items-center gap-2 pr-2'}`}>
+                <div className="replay-hud-hero-shell">
                   <div className="relative shrink-0">
-                    <div className={`overflow-hidden rounded-lg border bg-slate-950/95 ${
-                      heroExpanded ? 'h-12 w-12' : 'h-10 w-10'
-                    } ${team === 'radiant' ? 'border-emerald-500/45' : 'border-rose-500/45'}`}>
+                    <div className={`h-12 w-12 overflow-hidden rounded-lg border bg-slate-950/95 ${team === 'radiant' ? 'border-emerald-500/45' : 'border-rose-500/45'}`}>
                       <img
                         src={hero.portraitUrl}
                         alt={heroLabel}
@@ -3101,85 +3133,87 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     </span>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-semibold text-slate-50">{heroLabel}</p>
-                        {playerDisplayName && (
-                          <p
-                            data-testid={`hud-player-display-${team}-${hero.key}`}
-                            className={`mt-0.5 truncate text-[11px] font-semibold leading-tight transition-[color,filter] duration-200 ${
-                              isHighlighted
-                                ? 'text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.55)]'
-                                : 'text-amber-200 drop-shadow-[0_0_7px_rgba(251,191,36,0.3)]'
-                            }`}
-                            title={playerDisplayName}
-                          >
-                            {playerDisplayName}
+                  <div className="replay-hud-hero-main">
+                    <div className="replay-hud-hero-summary">
+                      <div className="replay-hud-hero-topline flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-semibold text-slate-50">{heroLabel}</p>
+                          {playerDisplayName && (
+                            <p
+                              data-testid={`hud-player-display-${team}-${hero.key}`}
+                              className={`mt-0.5 truncate text-[11px] font-semibold leading-tight transition-[color,filter] duration-200 ${
+                                isHighlighted
+                                  ? 'text-cyan-100 drop-shadow-[0_0_10px_rgba(34,211,238,0.55)]'
+                                  : 'text-amber-200 drop-shadow-[0_0_7px_rgba(251,191,36,0.3)]'
+                              }`}
+                              title={playerDisplayName}
+                            >
+                              {playerDisplayName}
+                            </p>
+                          )}
+                          <p className={`text-[10px] font-medium ${isDead ? 'text-amber-300' : 'text-slate-400'}`}>
+                            {respawnLabel}
                           </p>
-                        )}
-                        <p className={`text-[10px] font-medium ${isDead ? 'text-amber-300' : 'text-slate-400'}`}>
-                          {respawnLabel}
-                        </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-mono text-[11px] font-semibold text-slate-100">
+                            {metric ? `${formatHudValue(metric.kills)}/${formatHudValue(metric.deaths)}/${formatHudValue(metric.assists)}` : '-/-/-'}
+                          </p>
+                          <p className="text-[9px] uppercase tracking-[0.18em] text-slate-500">KDA</p>
+                        </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="font-mono text-[11px] font-semibold text-slate-100">
-                          {metric ? `${formatHudValue(metric.kills)}/${formatHudValue(metric.deaths)}/${formatHudValue(metric.assists)}` : '-/-/-'}
-                        </p>
-                        <p className="text-[9px] uppercase tracking-[0.18em] text-slate-500">KDA</p>
-                      </div>
-                    </div>
 
-                    <div
-                      data-testid={`hud-hero-health-${team}-${hero.key}`}
-                      className="mt-1.5 h-1.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90"
-                    >
                       <div
-                        className={`h-full transition-[width,opacity] duration-200 ${healthBarClass} ${isDead ? 'opacity-60' : ''}`}
-                        style={{ width: `${healthPercent}%` }}
-                      />
-                    </div>
-
-                    {playerDisplayMeta && (
-                      <div className="mt-1.5">
-                        <span
-                          data-testid={`hud-player-meta-${team}-${hero.key}`}
-                          className={`rounded-full border px-2 py-0.5 text-[9px] font-medium transition-[background-color,border-color,color,box-shadow] duration-200 ${
-                            isHighlighted
-                              ? 'border-cyan-100/80 bg-cyan-400/30 text-white ring-1 ring-cyan-300/35 shadow-[0_0_20px_rgba(34,211,238,0.28)]'
-                              : 'border-amber-200/65 bg-amber-300/18 text-amber-50 ring-1 ring-amber-200/20 shadow-[0_0_14px_rgba(251,191,36,0.16)]'
-                          }`}
-                        >
-                          {playerDisplayMeta}
-                        </span>
+                        data-testid={`hud-hero-health-${team}-${hero.key}`}
+                        className="replay-hud-healthbar mt-1.5 h-1.5 overflow-hidden rounded-full border border-slate-700/80 bg-slate-900/90"
+                      >
+                        <div
+                          className={`h-full transition-[width,opacity] duration-200 ${healthBarClass} ${isDead ? 'opacity-60' : ''}`}
+                          style={{ width: `${healthPercent}%` }}
+                        />
                       </div>
-                    )}
+
+                      {playerDisplayMeta && (
+                        <div className="replay-hud-player-meta-wrap mt-1.5">
+                          <span
+                            data-testid={`hud-player-meta-${team}-${hero.key}`}
+                            className={`rounded-full border px-2 py-0.5 text-[9px] font-medium transition-[background-color,border-color,color,box-shadow] duration-200 ${
+                              isHighlighted
+                                ? 'border-cyan-100/80 bg-cyan-400/30 text-white ring-1 ring-cyan-300/35 shadow-[0_0_20px_rgba(34,211,238,0.28)]'
+                                : 'border-amber-200/65 bg-amber-300/18 text-amber-50 ring-1 ring-amber-200/20 shadow-[0_0_14px_rgba(251,191,36,0.16)]'
+                            }`}
+                          >
+                            {playerDisplayMeta}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
                     {heroExpanded && (
-                      <>
-                        <div className="mt-1.5 grid grid-cols-3 gap-1 text-[9px]">
-                          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-1.5 py-1">
+                      <div className="replay-hud-row-details">
+                        <div className="replay-hud-row-stats">
+                          <div className="border border-slate-800/80 bg-slate-900/70">
                             <p className="text-slate-500">NW</p>
                             <p
-                              className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-100"
+                              className="mt-0.5 font-mono text-[11px] font-semibold text-slate-100"
                               title={metric ? formatHudValue(metric.net_worth) : '-'}
                             >
                               {metric ? formatHudStatValue(metric.net_worth) : '-'}
                             </p>
                           </div>
-                          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-1.5 py-1">
+                          <div className="border border-slate-800/80 bg-slate-900/70">
                             <p className="text-slate-500">GPM</p>
                             <p
-                              className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-100"
+                              className="mt-0.5 font-mono text-[11px] font-semibold text-slate-100"
                               title={metric ? formatHudValue(metric.gpm) : '-'}
                             >
                               {metric ? formatHudStatValue(metric.gpm) : '-'}
                             </p>
                           </div>
-                          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-1.5 py-1">
+                          <div className="border border-slate-800/80 bg-slate-900/70">
                             <p className="text-slate-500">XPM</p>
                             <p
-                              className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-100"
+                              className="mt-0.5 font-mono text-[11px] font-semibold text-slate-100"
                               title={metric ? formatHudValue(metric.xpm) : '-'}
                             >
                               {metric ? formatHudStatValue(metric.xpm) : '-'}
@@ -3187,7 +3221,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                           </div>
                         </div>
 
-                        <div className="mt-2 rounded-xl border border-slate-800/70 bg-slate-950/50 p-1.5">
+                        <div className="replay-hud-row-items rounded-xl border border-slate-800/70 bg-slate-950/50 p-1">
                           <div className="grid gap-1.5">
                             <div
                               className="grid grid-cols-3 gap-1.5"
@@ -3227,11 +3261,11 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                             </div>
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -3278,7 +3312,17 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   }, []);
 
   const restoreDefaultMapOverlays = useCallback(() => {
-    setMapOverlayPanels(createDefaultMapOverlayPanels(mapViewportSize));
+    const defaultPanels = createDefaultMapOverlayPanels(mapViewportSize);
+    setMapOverlayPanels({
+      insight: {
+        ...defaultPanels.insight,
+        open: true,
+      },
+      legend: {
+        ...defaultPanels.legend,
+        open: false,
+      },
+    });
   }, [mapViewportSize]);
 
   const resetMapOverlayPositions = useCallback(() => {
@@ -3731,25 +3775,24 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           transform: position.placeAbove ? 'translateY(-100%)' : undefined,
         }}
       >
-        <div className="rounded-3xl border border-cyan-500/20 bg-slate-950/96 p-3 shadow-[0_26px_60px_rgba(2,6,23,0.6)] backdrop-blur-md">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="ward-popover-panel">
+          <div className="ward-popover-header">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300/80">
+              <p className="ward-popover-eyebrow">
                 {pinnedWardPreview ? '已固定眼位详情' : '眼位详情'}
               </p>
-              <p className="mt-1 text-xs text-slate-300">
+              <p className="ward-popover-note">
                 {pinnedWardPreview ? '点击地图空白处可取消固定。' : '悬停查看，点击地图即可固定当前窗口。'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2.5 py-1 text-[10px] text-slate-300">
+            <div className="ward-popover-actions">
+              <span>
                 {formatHudValue(activeWardPreview.wards.length)} 个眼位
               </span>
               {pinnedWardPreview && (
                 <button
                   type="button"
                   onClick={handleUnpinWardPreview}
-                  className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-[10px] font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
                 >
                   取消固定
                 </button>
@@ -3757,53 +3800,48 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-3">
+          <div className="ward-popover-list">
             {activeWardPreview.wards.map((record) => (
               <div
                 key={record.instanceKey}
                 data-testid={`selected-ward-card-${record.instanceKey}`}
-                className="min-w-[250px] flex-1 rounded-2xl border border-slate-800/80 bg-slate-900/70 p-3"
+                className="ward-detail-row"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-100">{getWardPlacementLabel(record)}</p>
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      坐标 {getWardCoordinateLabel(record)}
-                    </p>
+                <div className="ward-detail-main">
+                  <div className="ward-detail-title">
+                    <strong>{getWardPlacementLabel(record)}</strong>
+                    <span>坐标 {getWardCoordinateLabel(record)}</span>
                   </div>
-                  <span className={`rounded-full border px-2.5 py-1 text-[10px] ${
+                  <span className={`ward-type-badge ${
                     record.type === 'observer'
-                      ? 'border-amber-500/35 bg-amber-500/10 text-amber-100'
-                      : 'border-violet-500/35 bg-violet-500/10 text-violet-100'
+                      ? 'ward-type-badge-observer'
+                      : 'ward-type-badge-sentry'
                   }`}>
                     {record.type === 'observer' ? '假眼' : '真眼'}
                   </span>
                 </div>
 
-                <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
-                    <p className="text-slate-500">插下时间</p>
-                    <p className="mt-1 font-semibold text-slate-100">
+                <div className="ward-detail-meta">
+                  <span>
+                    <small>插下</small>
+                    <strong>
                       {formatGameClockTime(record.placedGameTime)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
-                    <p className="text-slate-500">持续时间</p>
-                    <p className="mt-1 font-semibold text-slate-100">
+                    </strong>
+                  </span>
+                  <span>
+                    <small>持续</small>
+                    <strong>
                       {formatDurationLabel(record.lifetimeSeconds)}
-                    </p>
-                  </div>
+                    </strong>
+                  </span>
                 </div>
 
-                <div className="mt-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
-                  <p className="text-[11px] text-slate-500">{getWardPlacerFieldLabel(record)}</p>
-                  <p className="mt-1 text-sm font-medium text-slate-100">{getWardPlacerDisplayName(record)}</p>
-                </div>
-
-                <div className="mt-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2.5 py-2">
-                  <p className="text-[11px] text-slate-500">消失方式</p>
-                  <p className="mt-1 text-sm font-medium text-slate-100">{getWardRemovalLabel(record)}</p>
-                </div>
+                <p className="ward-detail-line">
+                  {getWardPlacerFieldLabel(record)}：{getWardPlacerDisplayName(record)}
+                </p>
+                <p className="ward-detail-line ward-detail-removal">
+                  {getWardRemovalLabel(record)}
+                </p>
               </div>
             ))}
           </div>
@@ -3814,78 +3852,56 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(108,144,163,0.14),_transparent_32%),radial-gradient(circle_at_82%_0%,_rgba(194,148,85,0.12),_transparent_20%),linear-gradient(180deg,#081018_0%,#0b1117_46%,#0d141b_100%)] px-4 py-4 lg:px-6">
-      <div className="mx-auto max-w-[1820px] space-y-3">
-        <div className="rounded-3xl border border-[#26313a]/90 bg-[radial-gradient(circle_at_top,_rgba(39,54,66,0.92),_rgba(10,15,21,0.98))] p-2.5 shadow-[0_22px_48px_rgba(0,0,0,0.28)]">
+    <div className="replay-workspace-page">
+      <div className="replay-workspace-inner">
+        <div className="replay-command-panel">
           <div
             data-testid="replay-viewer-header"
-            className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_360px] 2xl:items-center"
+            className="replay-command-compact"
           >
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <h1 className="text-lg font-bold text-dota-gold">录像主工作区</h1>
-                    {selectedMatch && (
-                      <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-[10px] font-mono text-slate-200">
-                        match_id {selectedMatch}
-                      </span>
-                    )}
-                    {winnerLabel && (
-                      <span
-                        data-testid="match-winner-badge"
-                        className={`rounded-full border px-2.5 py-0.5 text-[10px] ${
-                          winnerTeam === 'radiant'
-                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                            : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                        }`}
-                      >
-                        胜者 {winnerLabel}
-                      </span>
-                    )}
-                  </div>
-                </div>
+            <div className="replay-command-primary">
+              <div className="replay-command-title-row">
+                <h1>录像主工作区</h1>
+                {selectedMatch && (
+                  <span className="replay-command-token font-mono">
+                    match_id {selectedMatch}
+                  </span>
+                )}
+                {winnerLabel && (
+                  <span
+                    data-testid="match-winner-badge"
+                    className={`replay-command-token ${
+                      winnerTeam === 'radiant'
+                        ? 'replay-command-token-radiant'
+                        : 'replay-command-token-dire'
+                    }`}
+                  >
+                    胜者 {winnerLabel}
+                  </span>
+                )}
               </div>
 
               {selectedMatch && (
-                <div className="flex flex-wrap items-center gap-1.5 2xl:max-w-[760px]">
-                  <div className={`min-w-0 flex-1 rounded-xl border px-3 py-1.5 ${
-                    winnerTeam === 'radiant'
-                      ? 'border-emerald-400/45 bg-emerald-500/14'
-                      : 'border-emerald-500/25 bg-emerald-500/10'
-                  }`}>
-                    <p data-testid="match-radiant-name" className="truncate text-[11px] font-semibold text-white">
-                      {radiantTeamName}
-                    </p>
-                    {winnerTeam === 'radiant' && (
-                      <p className="mt-0.5 text-[10px] text-emerald-100/85">胜方</p>
-                    )}
-                  </div>
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-800/80 bg-slate-950/70 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    VS
-                  </div>
-                  <div className={`min-w-0 flex-1 rounded-xl border px-3 py-1.5 ${
-                    winnerTeam === 'dire'
-                      ? 'border-rose-400/45 bg-rose-500/14'
-                      : 'border-rose-500/25 bg-rose-500/10'
-                  }`}>
-                    <p data-testid="match-dire-name" className="truncate text-[11px] font-semibold text-white">
-                      {direTeamName}
-                    </p>
-                    {winnerTeam === 'dire' && (
-                      <p className="mt-0.5 text-[10px] text-rose-100/85">胜方</p>
-                    )}
-                  </div>
+                <div className="replay-command-teams">
+                  <p data-testid="match-radiant-name" className="truncate">
+                    {radiantTeamName}
+                  </p>
+                  {winnerTeam === 'radiant' && <span>胜方</span>}
+                  <strong>VS</strong>
+                  <p data-testid="match-dire-name" className="truncate">
+                    {direTeamName}
+                  </p>
+                  {winnerTeam === 'dire' && <span>胜方</span>}
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-1.5 text-[10px]">
+              <div className="replay-command-meta">
                 {(replayEntryContext?.source === 'match_database' || replayEntryContext?.source === 'replay_library') && (
                   <span
-                    className={`rounded-full border px-2 py-0.5 ${
+                    className={`replay-command-token ${
                       replayEntryContext?.source === 'match_database'
-                        ? 'border-dota-primary/45 bg-dota-primary/12 text-slate-100'
-                        : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                        ? 'replay-command-token-accent'
+                        : 'replay-command-token-radiant'
                     }`}
                   >
                     {replayEntryContext?.source === 'match_database'
@@ -3894,35 +3910,32 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   </span>
                 )}
                 {timeBasisSource === 'fallback' && (
-                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-200">
+                  <span className="replay-command-token replay-command-token-warning">
                     回退时间基准
                   </span>
                 )}
                 {matchSourceLabel && (
-                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2 py-0.5 text-slate-300">
+                  <span className="replay-command-token">
                     {isProfessionalMatch ? '职业比赛' : '路人比赛'} · {matchSourceLabel}
                   </span>
                 )}
                 {isReparseTaskActive && reparseTask && (
-                  <span className="rounded-full border border-dota-primary/45 bg-dota-primary/12 px-2 py-0.5 text-[#d8ecf0]">
+                  <span className="replay-command-token replay-command-token-accent">
                     重新解析 {Math.round(reparseTask.progress ?? 0)}%
                   </span>
                 )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                 {selectedReplayFileName && (
-                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
+                  <span className="replay-command-token">
                     replay {selectedReplayFileName}
                   </span>
                 )}
                 {selectedMatchDetail?.parse_status && (
-                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
+                  <span className="replay-command-token">
                     解析 {selectedMatchDetail.parse_status}
                   </span>
                 )}
                 {(selectedMatchDetail?.parsed_at ?? selectedMatchRecord?.parsed_at) && (
-                  <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-0.5 text-slate-300">
+                  <span className="replay-command-token">
                     最近解析{' '}
                     {new Date(
                       selectedMatchDetail?.parsed_at ?? selectedMatchRecord?.parsed_at ?? ''
@@ -3934,46 +3947,76 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
 
             <div
               data-testid="replay-viewer-header-selection"
-              className="w-full 2xl:max-w-[360px] 2xl:justify-self-end"
+              className="replay-command-select"
             >
-              <div className="rounded-xl border border-[#36434e]/70 bg-[rgba(9,14,19,0.56)] p-2">
-                {matches.length === 0 ? (
-                  <div className="text-xs text-slate-400">
-                    暂无已解析的比赛。
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedMatch || ''}
-                      onChange={(e) => {
-                        const nextMatchId = Number(e.target.value);
-                        selectedMatchRef.current = nextMatchId;
-                        preferredMatchIdRef.current = nextMatchId;
-                        setReplayContextWarning(null);
-                        setSelectedMatch(nextMatchId);
-                      }}
-                      className="min-w-0 flex-1 rounded-xl border border-[#465764] bg-[rgba(12,18,24,0.94)] px-3 py-2 text-[13px] text-white focus:border-dota-gold/70 focus:outline-none"
-                    >
-                      {matches.map((match) => {
-                        const optionRadiantName = match.radiant_team_name || match.radiant_team || '天辉';
-                        const optionDireName = match.dire_team_name || match.dire_team || '夜魇';
-
-                        return (
-                          <option key={match.match_id} value={match.match_id}>
-                            {optionRadiantName} vs {optionDireName} · {match.match_id}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <button
-                      onClick={loadMatches}
-                      className="shrink-0 rounded-full border border-[#73929d]/45 bg-[#274255]/28 px-2.5 py-1 text-[10px] font-medium text-[#d7edf0] transition hover:border-[#98bac2]/58 hover:bg-[#31556a]/32"
-                    >
-                      刷新
-                    </button>
-                  </div>
-                )}
-              </div>
+              {matches.length === 0 ? (
+                <div className="text-xs text-slate-400">
+                  暂无已解析的比赛。
+                </div>
+              ) : (
+                <div className="replay-match-picker" ref={matchPickerRef}>
+                  <button
+                    type="button"
+                    data-testid="match-picker-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={matchPickerOpen}
+                    onClick={() => setMatchPickerOpen((current) => !current)}
+                    className="replay-match-picker-trigger"
+                  >
+                    <span className="replay-match-picker-title">
+                      {selectedMatchPickerOption?.label ?? '选择比赛'}
+                    </span>
+                    <span className="replay-match-picker-meta">
+                      {selectedMatchPickerOption
+                        ? `${selectedMatchPickerOption.id} · ${selectedMatchPickerOption.meta}`
+                        : `${matches.length} 场已解析`}
+                    </span>
+                  </button>
+                  {matchPickerOpen && (
+                    <div className="replay-match-picker-panel" role="dialog" aria-label="选择比赛录像">
+                      <div className="replay-match-picker-search">
+                        <input
+                          type="search"
+                          value={matchPickerQuery}
+                          autoFocus
+                          onChange={(event) => setMatchPickerQuery(event.target.value)}
+                          placeholder="搜索队名或 match id"
+                          aria-label="搜索比赛录像"
+                        />
+                        <span>{filteredMatchPickerOptions.length}/{matches.length}</span>
+                      </div>
+                      <div className="replay-match-picker-list" role="listbox" aria-label="比赛录像列表">
+                        {filteredMatchPickerOptions.length === 0 ? (
+                          <div className="replay-match-picker-empty">没有匹配的录像</div>
+                        ) : (
+                          filteredMatchPickerOptions.map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              role="option"
+                              aria-selected={option.id === selectedMatch}
+                              className="replay-match-picker-option"
+                              onClick={() => selectReplayMatch(option.id)}
+                            >
+                              <span>
+                                <strong>{option.label}</strong>
+                                <small>{option.id} · {option.meta}</small>
+                              </span>
+                              <em>{option.sourceLabel}</em>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={loadMatches}
+                    className="shrink-0 rounded-full border border-[#73929d]/45 bg-[#274255]/28 px-2.5 py-1 text-[10px] font-medium text-[#d7edf0] transition hover:border-[#98bac2]/58 hover:bg-[#31556a]/32"
+                  >
+                    刷新
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -4013,61 +4056,29 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
           )}
         </div>
 
-        <div className="rounded-3xl border border-[#27313b]/90 bg-[linear-gradient(180deg,rgba(17,24,32,0.96),rgba(10,15,21,0.98))] p-3.5 shadow-[0_28px_64px_rgba(0,0,0,0.32)]">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">Map Workspace</p>
-                <span className="sr-only">地图视图</span>
-                <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-[11px] text-slate-300">
-                  HUD / 热力图 / 路径 / 时间轴
-                </span>
-                <button
-                  type="button"
-                  data-testid="toggle-map-workbench"
-                  onClick={() => setMapWorkbenchExpanded((current) => !current)}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
-                    mapWorkbenchExpanded
-                      ? 'border-amber-500/45 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
-                      : 'border-[#7f9da5]/50 bg-[#27404d]/28 text-[#d6edf0] shadow-[0_12px_24px_rgba(15,33,41,0.18)] hover:border-[#a3c4ca]/62'
-                  }`}
-                >
-                  {mapWorkbenchExpanded ? '工作台已展开 · 点击收起' : '工作台已折叠 · 点击展开'}
-                </button>
-              </div>
-              <h2 className="mt-1 text-base font-semibold text-slate-100">
-                地图主工作台
-                <span className="sr-only">地图与 HUD 一体化分析</span>
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                默认只保留地图与 HUD 总览，需要调整热力图、路径或重解析时再展开控制台。
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-              <span>蓝色稀疏</span>
-              <div className="h-2 w-24 rounded-full bg-[linear-gradient(90deg,#36546c_0%,#5f8b92_35%,#c7a25f_68%,#a65b52_100%)]" />
-              <span>红色最密</span>
-            </div>
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
-              热力图 {activeHeatmapLabel}
-            </span>
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
-              时间范围 {activeRangeLabel}
-            </span>
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
-              路径 {showPaths ? '开启' : '关闭'}
-            </span>
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-slate-300">
-              视野 {visionMapModeLabel}
-            </span>
-            {selectedMatch && !mapWorkbenchExpanded && (
-              <span className="text-slate-500">
-                当前已折叠地图控制区，保持主地图优先。
-              </span>
-            )}
+        <div className="replay-map-panel">
+          <div className="replay-map-overview">
+            <p className="replay-map-eyebrow">Map Workspace</p>
+            <h2>地图主工作台</h2>
+            <button
+              type="button"
+              data-testid="toggle-map-workbench"
+              onClick={() => {
+                if (mapWorkbenchExpanded) {
+                  setMapWorkbenchExpanded(false);
+                  return;
+                }
+                setMapWorkbenchRendered(true);
+                setMapWorkbenchExpanded(true);
+              }}
+              className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+                mapWorkbenchExpanded
+                  ? 'border-amber-500/45 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
+                  : 'border-[#7f9da5]/50 bg-[#27404d]/28 text-[#d6edf0] shadow-[0_12px_24px_rgba(15,33,41,0.18)] hover:border-[#a3c4ca]/62'
+              }`}
+            >
+              {mapWorkbenchExpanded ? '关闭工作台' : '打开工作台'}
+            </button>
           </div>
 
           <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
@@ -4104,10 +4115,25 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
             )}
           </div>
 
-          <div className={mapWorkbenchExpanded ? 'xl:grid xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start xl:gap-4' : ''}>
-          {selectedMatch && mapWorkbenchExpanded && (
-            <div className="mb-3 space-y-3 xl:mb-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-10rem)] xl:overflow-y-auto xl:pr-1">
-              <div data-testid="ward-analysis-panel" className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+          {selectedMatch && mapWorkbenchRendered && typeof document !== 'undefined' && createPortal(
+            <div
+              className={`replay-workbench-float ${
+                mapWorkbenchExpanded ? 'replay-workbench-float-open' : 'replay-workbench-float-closing'
+              }`}
+              role="dialog"
+              aria-label="地图图层工作台"
+            >
+              <div className="replay-workbench-float-header">
+                <div>
+                  <p>Layer Workbench</p>
+                  <h3>地图控制台</h3>
+                </div>
+                <button type="button" onClick={() => setMapWorkbenchExpanded(false)}>
+                  关闭
+                </button>
+              </div>
+              <div className="replay-workbench-scroll">
+              <div data-testid="ward-analysis-panel" className="replay-workbench-section replay-workbench-section-heatmap">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">热力图层</p>
@@ -4206,20 +4232,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   </div>
                 )}
 
-                <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 text-sm text-slate-300">
-                  <p className="font-medium text-slate-100">{activeOverlayMeta.description}</p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
-                      统计对象：{activeOverlayMeta.filterLabel}
-                    </span>
-                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
-                      聚焦：{heatmapFocusLabel}
-                    </span>
-                  </div>
-                </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+              <div className="replay-workbench-section replay-workbench-section-path">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">路径与校准</p>
@@ -4313,28 +4328,9 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   </div>
                 )}
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
-                      路径对象：{pathFocusLabel}
-                    </span>
-                    <span className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-slate-300">
-                      压缩率：{pathCompressionLabel}
-                    </span>
-                  </div>
-                  <label className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-[11px] text-slate-200">
-                    <input
-                      type="checkbox"
-                      checked={showCalibration}
-                      onChange={(event) => setShowCalibration(event.target.checked)}
-                      className="rounded"
-                    />
-                    调试校准
-                  </label>
-                </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+              <div className="replay-workbench-section replay-workbench-section-vision">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">单场视野分析</p>
@@ -4593,7 +4589,7 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+              <div className="replay-workbench-section replay-workbench-section-status">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">状态与提醒</p>
@@ -4667,171 +4663,116 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                   </div>
                 )}
               </div>
-            </div>
+              </div>
+            </div>,
+            document.querySelector('.replay-workspace-inner') ?? document.body
           )}
 
           <div className="min-w-0">
-          <div
-            className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-[248px_minmax(0,1fr)_248px]"
-            data-testid="hud-metrics-panel"
-          >
-            <div className="order-2">
-              {renderHudLane('radiant')}
-            </div>
-
-            <div className="order-1 xl:col-span-2 2xl:col-span-1 2xl:order-2 space-y-4">
-              <div className="rounded-3xl border border-slate-800/80 bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.48),_rgba(2,6,23,0.96))] p-4">
-                <div className="mb-3 space-y-2.5">
-                  <div
-                    className={`grid gap-2.5 ${
-                      mapWorkbenchExpanded
-                        ? '2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start'
-                        : 'xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">主地图</p>
-                      <h3 className="mt-1 text-lg font-semibold text-slate-100">
-                        {selectedMatch ? `比赛 ${selectedMatch} 分析视图` : '等待选择比赛'}
-                      </h3>
-                      <p className="mt-1 max-w-2xl text-xs text-slate-400">
-                        {activeOverlayMeta.description} 眼位支持 hover 跟随详情与点击固定。
-                      </p>
-                    </div>
-
-                    {floatingOverlayEnabled && (
-                      <div
-                        className={`flex max-w-full flex-col gap-1 ${
-                          mapWorkbenchExpanded ? 'items-start' : 'items-start xl:items-end'
-                        }`}
-                      >
-                        <div
-                          data-testid="map-overlay-toolbar"
-                          className={`flex max-w-full flex-wrap items-center gap-1.5 text-[11px] ${
-                            mapWorkbenchExpanded
-                              ? 'rounded-2xl border border-slate-800/80 bg-slate-950/55 px-2.5 py-2'
-                              : 'xl:justify-end'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            data-testid="focus-map-overlays"
-                            onClick={anyMapOverlayOpen ? hideAllMapOverlays : restoreDefaultMapOverlays}
-                            className={`rounded-xl border px-3 py-1.5 transition ${
-                              anyMapOverlayOpen
-                                ? 'border-amber-500/40 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
-                                : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/60'
-                            }`}
-                          >
-                            {anyMapOverlayOpen ? '专注地图' : '恢复默认浮窗'}
-                          </button>
-                          <button
-                            type="button"
-                            data-testid="toggle-map-overlay-insight"
-                            aria-pressed={mapOverlayPanels.insight.open}
-                            onClick={() => toggleMapOverlayOpen('insight')}
-                            className={`rounded-xl border px-3 py-1.5 transition ${
-                              mapOverlayPanels.insight.open
-                                ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
-                                : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
-                            }`}
-                          >
-                            {mapOverlayPanels.insight.open ? '隐藏说明' : '显示说明'}
-                          </button>
-                          <button
-                            type="button"
-                            data-testid="toggle-map-overlay-legend"
-                            aria-pressed={mapOverlayPanels.legend.open}
-                            onClick={() => toggleMapOverlayOpen('legend')}
-                            className={`rounded-xl border px-3 py-1.5 transition ${
-                              mapOverlayPanels.legend.open
-                                ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
-                                : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
-                            }`}
-                          >
-                            {mapOverlayPanels.legend.open ? '隐藏图例' : '显示图例'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={resetMapOverlayPositions}
-                            className="rounded-xl border border-slate-700 bg-slate-950/75 px-3 py-1.5 text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
-                          >
-                            重置位置
-                          </button>
-                        </div>
-                        <span className="px-1 text-[10px] text-slate-500/80">Esc 可快速清空浮窗</span>
-                      </div>
-                    )}
+            <div className="replay-map-layout" data-testid="hud-metrics-panel">
+              <div className="replay-map-stage">
+                <div className="replay-map-stage-header">
+                  <div className="replay-map-stage-title">
+                    <p>主地图</p>
+                    <h3>{selectedMatch ? `比赛 ${selectedMatch}` : '等待选择比赛'}</h3>
                   </div>
 
-                  <div
-                    className={
-                      mapWorkbenchExpanded
-                        ? 'flex flex-col gap-2'
-                        : 'flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between'
-                    }
-                  >
-                    <div
-                      data-testid="map-status-strip"
-                      className="flex max-w-full flex-wrap gap-2 text-[11px]"
-                    >
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-cyan-50">
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/80">时钟</span>
-                        <span className="font-mono">{currentGameClockLabel}</span>
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 ${
-                          isPauseActive
-                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
-                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
-                        }`}
+                  {floatingOverlayEnabled && (
+                    <div className="replay-map-overlay-group">
+                      <div
+                        data-testid="map-overlay-toolbar"
+                        className="replay-map-overlay-actions"
                       >
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-current/70">状态</span>
-                        <span>{isPauseActive ? '暂停区间' : '进行中'}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">时长</span>
-                        <span className="font-mono text-slate-100">{matchDurationClockLabel}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/75 px-3 py-1.5 text-slate-300">
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">建筑</span>
-                        <span className="font-mono text-slate-100">
-                          {objectiveSummary.alive}/{liveObjectiveMarkers.length}
-                        </span>
-                      </span>
+                        <button
+                          type="button"
+                          data-testid="focus-map-overlays"
+                          onClick={anyMapOverlayOpen ? hideAllMapOverlays : restoreDefaultMapOverlays}
+                          className={`rounded-xl border px-3 py-1.5 transition ${
+                            anyMapOverlayOpen
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-100 hover:border-amber-400/60'
+                              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100 hover:border-emerald-400/60'
+                          }`}
+                        >
+                          {anyMapOverlayOpen ? '专注地图' : '恢复默认浮窗'}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="toggle-map-overlay-insight"
+                          aria-pressed={mapOverlayPanels.insight.open}
+                          onClick={() => toggleMapOverlayOpen('insight')}
+                          className={`rounded-xl border px-3 py-1.5 transition ${
+                            mapOverlayPanels.insight.open
+                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                              : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                          }`}
+                        >
+                          {mapOverlayPanels.insight.open ? '隐藏说明' : '显示说明'}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="toggle-map-overlay-legend"
+                          aria-pressed={mapOverlayPanels.legend.open}
+                          onClick={() => toggleMapOverlayOpen('legend')}
+                          className={`rounded-xl border px-3 py-1.5 transition ${
+                            mapOverlayPanels.legend.open
+                              ? 'border-cyan-500/45 bg-cyan-500/10 text-cyan-100'
+                              : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-slate-500 hover:text-slate-100'
+                          }`}
+                        >
+                          {mapOverlayPanels.legend.open ? '隐藏图例' : '显示图例'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetMapOverlayPositions}
+                          className="rounded-xl border border-slate-700 bg-slate-950/75 px-3 py-1.5 text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+                        >
+                          重置位置
+                        </button>
+                      </div>
+                      <span>Esc 清空浮窗</span>
                     </div>
+                  )}
+                </div>
 
-                    <div
-                      data-testid="map-view-strip"
-                      className="flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-slate-800/80 bg-slate-950/65 px-2 py-1.5 text-[11px]"
+                <div className="replay-map-stage-meta">
+                  <div
+                    data-testid="map-status-strip"
+                    className="replay-map-status-strip"
+                  >
+                    <span className="replay-map-status-item replay-map-status-item-accent">
+                      <span>时钟</span>
+                      <strong>{currentGameClockLabel}</strong>
+                    </span>
+                    <span
+                      className={`replay-map-status-item ${
+                        isPauseActive ? 'replay-map-status-item-warning' : 'replay-map-status-item-live'
+                      }`}
                     >
-                      <span className="px-1 text-slate-500">主视图</span>
-                      <span className="rounded-xl bg-slate-900/85 px-2.5 py-1 text-slate-100">
-                        {activeOverlayMeta.title}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        热力 {activeHeatmapLabel}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        范围 {activeRangeLabel}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        路径 {showPaths ? '开启' : '关闭'}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        建筑 {objectiveSummary.alive}/{liveObjectiveMarkers.length}
-                      </span>
-                      <span className="rounded-xl bg-slate-900/65 px-2.5 py-1 text-slate-300">
-                        视野 {visionMapModeLabel}
-                      </span>
-                    </div>
+                      <span>状态</span>
+                      <strong>{isPauseActive ? '暂停区间' : '进行中'}</strong>
+                    </span>
+                    <span className="replay-map-status-item">
+                      <span>时长</span>
+                      <strong>{matchDurationClockLabel}</strong>
+                    </span>
+                    <span className="replay-map-status-item">
+                      <span>建筑</span>
+                      <strong>
+                        {objectiveSummary.alive}/{liveObjectiveMarkers.length}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div data-testid="map-view-strip" className="sr-only">
+                    当前图层 {activeOverlayMeta.title}，热力 {activeHeatmapLabel}，范围 {activeRangeLabel}，
+                    路径 {showPaths ? '开启' : '关闭'}，视野 {visionMapModeLabel}
                   </div>
                 </div>
 
                 {selectedMatch ? (
                   <>
                     {isMapDeclutterActive && (
-                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
+                      <div className="replay-map-focus-banner">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-200/80">分析视图净化</p>
                           <p className="mt-1 font-medium text-amber-50">
@@ -4863,11 +4804,11 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       </div>
                     )}
 
-                    <div className="flex justify-center">
+                    <div className="replay-map-arena">
                       <div
                         ref={mapOverlayContainerRef}
                         data-testid="map-overlay-container"
-                        className="relative"
+                        className="replay-map-canvas-shell"
                       >
                         <MapViewer
                           key={`${showCalibration ? 'calibration' : 'normal'}-${mapViewportSize}`}
@@ -4887,46 +4828,17 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                           onWardHoverChange={handleWardHoverChange}
                           onWardClick={handleWardClick}
                         />
+                        <div className="replay-map-hud-panel replay-map-hud-panel-radiant">
+                          {renderHudLane('radiant')}
+                        </div>
+                        <div className="replay-map-hud-panel replay-map-hud-panel-dire">
+                          {renderHudLane('dire')}
+                        </div>
                         {renderMapIntegratedOverlay()}
                       </div>
                     </div>
 
-                    <div
-                      data-testid="map-analysis-strip"
-                      className="mt-3 rounded-2xl border border-slate-800/80 bg-slate-950/75 px-3 py-2.5"
-                    >
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
-                        <span className="text-slate-500">图层</span>
-                        <span className="font-medium text-slate-100">{activeOverlayMeta.title}</span>
-                        <span className="text-slate-500">聚焦</span>
-                        <span className="truncate text-slate-300">{heatmapFocusLabel}</span>
-                        <span className="text-slate-500">样本</span>
-                        <span className="font-mono text-slate-100">
-                          {heatmapSummary ? formatHudValue(heatmapSummary.totalSamples) : '--'}
-                        </span>
-                        <span className="text-slate-500">路径</span>
-                        <span className="text-slate-300">{showPaths ? pathCompressionLabel : '关闭'}</span>
-                        <span className="text-slate-500">建筑</span>
-                        <span className="text-slate-300">
-                          存活 {objectiveSummary.alive} · 摧毁 {objectiveSummary.destroyed}
-                        </span>
-                        <span className="text-slate-500">偏移</span>
-                        <span className="font-mono text-slate-100">{timeBasisOffsetSeconds.toFixed(2)}s</span>
-                      </div>
-                      <p className="mt-1.5 text-xs text-slate-400">
-                        {showPaths ? pathFocusLabel : activeOverlayMeta.densityLabel}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/75 p-3 text-sm text-slate-300 md:hidden">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">看图指南</p>
-                      <p className="mt-2">{activeOverlayMeta.description}</p>
-                      <p className="mt-2 text-xs text-slate-400">
-                        蓝色代表稀疏，红色代表最密集；路径线表示所选时间段内的完整移动轨迹。
-                      </p>
-                    </div>
-
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950/75">
+                    <div className="replay-timeline-shell replay-timeline-shell-dock">
                       <Timeline
                         currentTime={currentTime}
                         minTime={timelineMinTime}
@@ -4941,7 +4853,18 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                       />
                     </div>
 
-                    <div className="mt-5 overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950/75">
+                    <div
+                      data-testid="map-analysis-strip"
+                      className="replay-map-footnote"
+                    >
+                      <span>{showPaths ? pathFocusLabel : activeOverlayMeta.densityLabel}</span>
+                      <span>聚焦 {heatmapFocusLabel}</span>
+                      <span>样本 {heatmapSummary ? formatHudValue(heatmapSummary.totalSamples) : '--'}</span>
+                      {showPaths && <span>路径 {pathCompressionLabel}</span>}
+                      <span>偏移 {timeBasisOffsetSeconds.toFixed(2)}s</span>
+                    </div>
+
+                    <div className="replay-chart-shell">
                       <AdvantageChart
                         matchId={selectedMatch}
                         currentGameTime={currentDisplayGameTime}
@@ -4949,24 +4872,15 @@ export function RealMatchViewer({ initialMatchId, replayEntryContext }: RealMatc
                     </div>
                   </>
                 ) : (
-                  <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-950/65">
+                  <div className="replay-map-empty-state">
                     <p className="text-sm text-slate-400">选择一场比赛后，主地图、HUD 和时间轴会在这里联动。</p>
                   </div>
                 )}
               </div>
             </div>
-
-            <div className="order-3">
-              {renderHudLane('dire')}
-            </div>
-          </div>
-          </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
-          快捷键：空格播放/暂停，← → 调整时间，↑ ↓ 调整速度，Home/End 跳到开头或结尾。热力图和路径分析已经直接叠加到主地图，不需要在页面下方额外找模块。
-        </div>
       </div>
       {renderWardPreviewPopover()}
     </div>

@@ -321,23 +321,28 @@ describe('RealMatchViewer HUD metrics panel', () => {
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
     expect(await screen.findByText('录像主工作区')).toBeTruthy();
-    expect(await screen.findByText('地图与 HUD 一体化分析')).toBeTruthy();
-    expect(await screen.findByText('现在看到什么')).toBeTruthy();
-    expect(await screen.findByText('蓝色稀疏')).toBeTruthy();
+    expect(await screen.findByText('地图主工作台')).toBeTruthy();
+    expect(screen.queryByText('地图与 HUD 一体化分析')).toBeNull();
+    expect(screen.queryByText('现在看到什么')).toBeNull();
+    expect(screen.queryByText('热力 关闭')).toBeNull();
+    expect(screen.queryByText('蓝色稀疏')).toBeNull();
     expect(screen.queryByText('热力图层')).toBeNull();
     expect(await screen.findByTestId('toggle-map-overlay-insight')).toBeTruthy();
     expect(await screen.findByTestId('toggle-map-overlay-legend')).toBeTruthy();
     expect(await screen.findByTestId('hud-metrics-panel')).toBeTruthy();
     expect(await screen.findByTestId('hud-radiant')).toBeTruthy();
     expect(await screen.findByTestId('hud-dire')).toBeTruthy();
-    expect(await screen.findByText('天辉 HUD')).toBeTruthy();
-    expect(await screen.findByText('夜魇 HUD')).toBeTruthy();
+    expect(await screen.findByText('天辉')).toBeTruthy();
+    expect(await screen.findByText('夜魇')).toBeTruthy();
     expect((await screen.findByTestId('match-radiant-name')).textContent).toBe('Team Liquid');
     expect((await screen.findByTestId('match-dire-name')).textContent).toBe('Team Spirit');
     expect((await screen.findByTestId('match-winner-badge')).textContent).toContain('胜者 Team Liquid');
     expect(await screen.findByTestId('map-status-strip')).toBeTruthy();
     expect(await screen.findByTestId('map-view-strip')).toBeTruthy();
     expect(await screen.findByTestId('map-analysis-strip')).toBeTruthy();
+    const timeline = await screen.findByTestId('timeline');
+    expect(timeline.closest('.replay-timeline-shell-dock')).toBeTruthy();
+    expect(timeline.closest('[data-testid="map-overlay-container"]')).toBeNull();
     expect(await screen.findByText('斧王')).toBeTruthy();
     expect((await screen.findByTestId('hud-player-display-radiant-1')).textContent).toContain('Ame');
     expect((await screen.findByTestId('hud-player-display-radiant-1')).className).toContain('font-semibold');
@@ -346,6 +351,12 @@ describe('RealMatchViewer HUD metrics panel', () => {
     expect(await screen.findByText('2/1/3')).toBeTruthy();
     fireEvent.click(await screen.findByTestId('toggle-map-workbench'));
     expect(await screen.findByText('热力图层')).toBeTruthy();
+    const workbench = await screen.findByRole('dialog', { name: '地图图层工作台' });
+    expect(workbench).toBeTruthy();
+    expect(workbench.className).toContain('replay-workbench-float-open');
+    expect(screen.queryByText(/路径对象/)).toBeNull();
+    expect(screen.queryByText(/压缩率/)).toBeNull();
+    expect(screen.queryByText('调试校准')).toBeNull();
   });
 
   it('keeps the replay viewer header stacked until 2xl so 14-inch widths do not squeeze the selection panel', async () => {
@@ -373,9 +384,13 @@ describe('RealMatchViewer HUD metrics panel', () => {
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
     expect(await screen.findByTestId('replay-viewer-header')).toBeTruthy();
-    expect(screen.getByTestId('replay-viewer-header').className).toContain('2xl:grid-cols-[minmax(0,1fr)_360px]');
-    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:max-w-[360px]');
-    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('2xl:justify-self-end');
+    expect(screen.getByTestId('replay-viewer-header').className).toContain('replay-command-compact');
+    expect(screen.getByTestId('replay-viewer-header-selection').className).toContain('replay-command-select');
+    const matchPickerTrigger = await screen.findByTestId('match-picker-trigger');
+    expect(matchPickerTrigger.className).toContain('replay-match-picker-trigger');
+    fireEvent.click(matchPickerTrigger);
+    expect(await screen.findByRole('dialog', { name: '选择比赛录像' })).toBeTruthy();
+    expect(screen.getByLabelText('搜索比赛录像')).toBeTruthy();
   });
 
   it('splits realtime ward status from the detailed vision workbench and no longer requires scrubbing to the end', async () => {
@@ -642,6 +657,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
       expect(screen.getByTestId('map-viewer').getAttribute('data-selected-ward-count')).toBe('2');
     });
     expect(document.querySelectorAll('[data-testid^="selected-ward-card-"]')).toHaveLength(2);
+    expect(screen.getByTestId('ward-detail-popover').querySelector('.ward-popover-list')).toBeTruthy();
     const wardDetailCards = Array.from(document.querySelectorAll('[data-testid^="selected-ward-card-"]'));
     expect(wardDetailCards.some((card) => card.textContent?.includes('0:30'))).toBe(true);
     expect(wardDetailCards.some((card) => card.textContent?.includes('被 兽王 的召唤物排掉'))).toBe(true);
@@ -661,7 +677,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
     });
   });
 
-  it('lets users expand and collapse a HUD hero by clicking the full card', async () => {
+  it('renders HUD heroes expanded by default with horizontal details', async () => {
     vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
       status: 'ok',
       match_id: 8674716612,
@@ -687,27 +703,17 @@ describe('RealMatchViewer HUD metrics panel', () => {
 
     const heroCard = await screen.findByTestId('hud-hero-card-radiant-1');
     const healthBar = await screen.findByTestId('hud-hero-health-radiant-1');
-    expect(heroCard.className).toContain('border-slate-700/70');
-    expect(heroCard.className).toContain('bg-slate-950/85');
-    expect(heroCard.getAttribute('aria-expanded')).toBe('false');
+    expect(heroCard.className).toContain('replay-hud-hero-row');
+    expect(heroCard.className).toContain('border-cyan-500/45');
+    expect(heroCard.className).toContain('bg-slate-950/96');
+    expect(heroCard.getAttribute('aria-expanded')).toBe('true');
     expect(heroCard.contains(healthBar)).toBe(true);
-
-    fireEvent.click(heroCard);
-
-    expect(await screen.findByText('NW')).toBeTruthy();
-    expect(screen.getByTestId('hud-hero-card-radiant-1').className).toContain('border-cyan-500/45');
-    expect(screen.getByTestId('hud-hero-card-radiant-1').className).toContain('bg-slate-950/96');
-    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('true');
-
-    fireEvent.click(screen.getByTestId('hud-hero-card-radiant-1'));
-
-    await waitFor(() => {
-      expect(screen.queryByText('NW')).toBeNull();
-    });
-    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('false');
+    expect(heroCard.textContent).toContain('NW');
+    expect(heroCard.querySelector('.replay-hud-row-details')).toBeTruthy();
+    expect(heroCard.querySelector('.replay-hud-row-items')).toBeTruthy();
   });
 
-  it('keeps the HUD lane header compact, restores the lane expand toggle, and keeps player meta readable', async () => {
+  it('keeps the HUD lane header compact and keeps player meta readable', async () => {
     vi.spyOn(backendAPI, 'getHudMetrics').mockResolvedValue({
       status: 'ok',
       match_id: 8674716612,
@@ -731,20 +737,13 @@ describe('RealMatchViewer HUD metrics panel', () => {
 
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
-    expect((await screen.findAllByText('先看英雄名、玩家和 KDA，悬停看提示，点击卡片展开细节。')).length).toBe(2);
-    expect(screen.getAllByRole('button', { name: '全部展开' })).toHaveLength(2);
-    expect(screen.getByTestId('toggle-hud-lane-radiant').getAttribute('title')).toBe('展开本行所有英雄卡');
-    expect(screen.getByTestId('toggle-hud-lane-dire').getAttribute('title')).toBe('展开本行所有英雄卡');
-    expect(screen.getByTestId('hud-player-meta-radiant-1').textContent).toBe('职业名 · 玩家 ID 111');
-
-    fireEvent.click(screen.getByTestId('toggle-hud-lane-radiant'));
-    expect(await screen.findByRole('button', { name: '全部收起' })).toBeTruthy();
-    expect(screen.getByTestId('toggle-hud-lane-dire').textContent).toBe('全部展开');
+    expect(screen.queryByText('先看英雄名、玩家和 KDA，悬停看提示，点击卡片展开细节。')).toBeNull();
+    expect(screen.queryByText('天辉 HUD')).toBeNull();
+    expect(screen.queryByText('夜魇 HUD')).toBeNull();
+    expect(screen.queryByTestId('toggle-hud-lane-radiant')).toBeNull();
+    expect(screen.queryByTestId('toggle-hud-lane-dire')).toBeNull();
+    expect((await screen.findByTestId('hud-player-meta-radiant-1')).textContent).toBe('职业名 · 玩家 ID 111');
     expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('true');
-
-    fireEvent.click(screen.getByTestId('toggle-hud-lane-radiant'));
-    expect(screen.getAllByRole('button', { name: '全部展开' })).toHaveLength(2);
-    expect(screen.getByTestId('hud-hero-card-radiant-1').getAttribute('aria-expanded')).toBe('false');
 
     const playerDisplay = await screen.findByTestId('hud-player-display-radiant-1');
     expect(playerDisplay.className).toContain('text-[11px]');
@@ -842,6 +841,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
     const container = await screen.findByTestId('map-overlay-container');
+    fireEvent.click(await screen.findByTestId('toggle-map-overlay-insight'));
     const insightPanel = await screen.findByTestId('map-overlay-panel-insight');
     const insightDragHandle = await screen.findByTestId('map-overlay-drag-handle-insight');
     const toggleLegend = await screen.findByTestId('toggle-map-overlay-legend');
@@ -1019,7 +1019,7 @@ describe('RealMatchViewer HUD metrics panel', () => {
 
     render(<RealMatchViewer initialMatchId={8674716612} />);
 
-    expect(await screen.findByText('地图视图')).toBeTruthy();
+    expect(await screen.findByText('地图主工作台')).toBeTruthy();
     expect(await screen.findByTestId('map-viewer')).toBeTruthy();
     expect(await screen.findByTestId('timeline')).toBeTruthy();
     expect(await screen.findByText('HUD 指标请求失败，不影响主回放。')).toBeTruthy();

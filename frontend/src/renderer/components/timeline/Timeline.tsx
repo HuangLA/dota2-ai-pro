@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { PauseCircle, PlayCircle, SkipBack, SkipForward, Square } from 'lucide-react';
 
 interface PauseSegment {
   startSourceTime: number;
@@ -359,168 +360,132 @@ export function Timeline({
 
 
   return (
-    <div className="bg-dota-surface rounded-lg p-4">
-      {/* 进度条 */}
-      <div
-        ref={progressRef}
-        className={`relative h-3 bg-gray-700 rounded-full cursor-pointer mb-4 ${
-          disabled ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleProgressMouseMove}
-        onMouseLeave={handleProgressMouseLeave}
-      >
-        {/* 暂停区间标记 */}
-        {normalizedPauseSegments.map((segment, index) => {
-          const startPercent = ((segment.start - minTime) / (maxTime - minTime)) * 100;
-          const widthPercent = ((segment.end - segment.start) / (maxTime - minTime)) * 100;
-          return (
-            <div
-              key={`${segment.start}-${segment.end}-${index}`}
-              className="absolute top-0 h-full bg-amber-500/45"
-              style={{ left: `${startPercent}%`, width: `${widthPercent}%` }}
-            />
-          );
-        })}
-
-        {/* 已播放进度 */}
-        <div
-          className="absolute top-0 left-0 h-full bg-dota-accent rounded-full"
-          style={{ width: `${progress}%` }}
-        />
-
-        {/* Hover 预览 */}
-        {hoverPreview && (
-          <div
-            className="pointer-events-none absolute -top-14 z-20 -translate-x-1/2 rounded border border-slate-500/70 bg-slate-950/95 px-2 py-1 text-center text-[11px] leading-tight text-slate-100 shadow-lg"
-            style={{ left: `${Math.max(20, Math.min(hoverPreview.x, (progressRef.current?.clientWidth ?? 0) - 20))}px` }}
-          >
-            <div className="font-mono tabular-nums whitespace-nowrap">{hoverPreviewLabel}</div>
-            <div className={`whitespace-nowrap ${hoverIsPaused ? 'text-amber-300' : 'text-slate-300'}`}>
-              {hoverIsPaused ? '暂停中' : '进行中'}
-            </div>
-          </div>
-        )}
-        
-        {/* 拖动手柄 */}
-        <div
-          className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg transform -translate-x-1/2 ${
-            isDragging ? 'scale-125' : 'hover:scale-110'
-          }`}
-          style={{ left: `${progress}%` }}
-        />
-
-        {/* 加载指示器 */}
-        {isLoading && (
-          <div className="absolute inset-0 bg-blue-500/30 rounded-full animate-pulse" />
-        )}
-      </div>
-
-      {/* 控制区域 */}
-      <div className="flex items-center justify-between">
-        {/* 左侧：播放控制 */}
-        <div className="flex items-center gap-2">
-          {/* 停止按钮 */}
+    <div className="replay-timeline">
+      <div className="replay-timeline-inline">
+        <div className="replay-timeline-control-cluster">
           <button
             onClick={stop}
             disabled={disabled}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="replay-timeline-icon-button"
             title="停止 (Home)"
+            aria-label="停止"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <rect x="4" y="4" width="12" height="12" rx="1" />
-            </svg>
+            <Square className="h-3.5 w-3.5" fill="currentColor" />
           </button>
 
-          {/* 后退 10 秒 */}
           <button
             onClick={skipBackward}
             disabled={disabled}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="replay-timeline-icon-button"
             title="后退 10 秒"
+            aria-label="后退 10 秒"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
-            </svg>
+            <SkipBack className="h-3.5 w-3.5" />
           </button>
 
-          {/* 播放/暂停按钮 */}
           <button
             onClick={togglePlay}
             disabled={disabled}
-            className="p-3 bg-dota-accent hover:bg-red-600 rounded-full text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="replay-timeline-play-button"
             title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}
+            aria-label={isPlaying ? '暂停' : '播放'}
           >
             {isPlaying ? (
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+              <PauseCircle className="h-5 w-5" />
             ) : (
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-              </svg>
+              <PlayCircle className="h-5 w-5" />
             )}
           </button>
 
-          {/* 前进 10 秒 */}
           <button
             onClick={skipForward}
             disabled={disabled}
-            className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="replay-timeline-icon-button"
             title="前进 10 秒"
+            aria-label="前进 10 秒"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
-            </svg>
+            <SkipForward className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        {/* 中间：时间显示 */}
         {showTimeDisplay && (
-          <div className="flex items-center gap-2 text-sm font-mono">
-            <span className="text-white min-w-[60px] text-right">
-              {formatLabel(displayTime)}
-            </span>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-400 min-w-[60px]">
-              {formatLabel(maxTime)}
-            </span>
+          <div className="replay-timeline-time">
+            <span>{formatLabel(displayTime)}</span>
+            <span>/</span>
+            <span>{formatLabel(maxTime)}</span>
           </div>
         )}
 
-        {/* 右侧：速度控制 */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">速度:</span>
-          <div className="flex gap-1">
-            {SPEED_OPTIONS.map(speed => (
-              <button
-                key={speed}
-                onClick={() => setPlaybackSpeed(speed)}
-                disabled={disabled}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  playbackSpeed === speed
-                    ? 'bg-dota-accent text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {speed}x
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+        <div
+          ref={progressRef}
+          className={`replay-timeline-track ${
+            disabled ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleProgressMouseMove}
+          onMouseLeave={handleProgressMouseLeave}
+        >
+          {normalizedPauseSegments.map((segment, index) => {
+            const startPercent = ((segment.start - minTime) / (maxTime - minTime)) * 100;
+            const widthPercent = ((segment.end - segment.start) / (maxTime - minTime)) * 100;
+            return (
+              <div
+                key={`${segment.start}-${segment.end}-${index}`}
+                className="absolute top-0 h-full bg-amber-500/45"
+                style={{ left: `${startPercent}%`, width: `${widthPercent}%` }}
+              />
+            );
+          })}
 
-      {/* 快捷键提示 */}
-      <div className="mt-3 text-xs text-gray-500 flex gap-4 justify-center">
-        <span>空格: 播放/暂停</span>
-        <span>← →: ±5秒</span>
-        <span>↑ ↓: 调整速度</span>
+          <div
+            className="absolute left-0 top-0 h-full rounded-full bg-dota-primary"
+            style={{ width: `${progress}%` }}
+          />
+
+          {hoverPreview && (
+            <div
+              className="replay-timeline-tooltip"
+              style={{ left: `${Math.max(20, Math.min(hoverPreview.x, (progressRef.current?.clientWidth ?? 0) - 20))}px` }}
+            >
+              <div className="font-mono tabular-nums whitespace-nowrap">{hoverPreviewLabel}</div>
+              <div className={`whitespace-nowrap ${hoverIsPaused ? 'text-amber-300' : 'text-slate-300'}`}>
+                {hoverIsPaused ? '暂停中' : '进行中'}
+              </div>
+            </div>
+          )}
+
+          <div
+            className={`replay-timeline-thumb ${
+              isDragging ? 'scale-125' : 'hover:scale-110'
+            }`}
+            style={{ left: `${progress}%` }}
+          />
+
+          {isLoading && (
+            <div className="absolute inset-0 animate-pulse rounded-full bg-blue-500/30" />
+          )}
+        </div>
+
+        <div className="replay-speed-segment" aria-label="播放速度">
+          {SPEED_OPTIONS.map(speed => (
+            <button
+              key={speed}
+              onClick={() => setPlaybackSpeed(speed)}
+              disabled={disabled}
+              className={`replay-speed-button ${
+                playbackSpeed === speed
+                  ? 'replay-speed-button-active'
+                  : ''
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {speed}x
+            </button>
+          ))}
+        </div>
       </div>
 
       {normalizedPauseSegments.length > 0 && (
-        <div className="mt-2 text-center text-xs text-amber-300/85">
-          橙色区段表示暂停区间
-        </div>
+        <span className="sr-only">橙色区段表示暂停区间</span>
       )}
     </div>
   );

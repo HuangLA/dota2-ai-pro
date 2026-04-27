@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4/4.5 已完成 ✅ + 文档对齐更新，准备进入 Phase 5 🚀 |
-| 最后更新 | 2026-04-03 |
+| 最后更新 | 2026-04-27 |
 | 更新者 | Codex |
 
 ---
@@ -31,6 +31,125 @@
 ---
 
 ## 当前进展摘要（2026-03-20）
+
+### 最新完成任务（2026-04-27）
+**✅ 修复回放返回路径，并压缩 OpenDota 实时比赛卡片**
+- `frontend/src/renderer/App.tsx` 已将 `/match` 顶部“返回工作台”从浏览器历史回退改为确定性路由：有来源上下文时回到对应库 / 数据库 / 战队页，直接打开回放页时默认回到 `/openDotaLive`；同时加了返回中的短路标记，避免现有 `currentMatchId` 自动跳转逻辑把页面重新弹回 `/match`。
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已压缩实时比赛卡片：联赛视觉区、状态区、队伍阵容和工作流按钮都改为更紧凑的排版，保留比赛、赛事、开赛、时长、联赛、数据状态、同步时间、检索标签、两队阵容与下载 / 状态详情等信息。
+- OpenDota 实时阵容里的英雄名已统一走中文英雄数据，覆盖 `hero_id`、内部名和英文名三类输入；浏览器 DOM 已确认原先的 `Tiny · ID` / `Pudge · ID` 等行现在显示为 `小小 · ID` / `帕吉 · ID` 等中文。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `10 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过；浏览器实际点击 `/match` 返回按钮后 URL 落到 `http://localhost:5173/#/openDotaLive`。
+
+### 最新完成任务（2026-04-27）
+**✅ 将地图工作台改为顶层 portal，彻底避开命令栏遮挡**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将地图控制台通过 `createPortal` 挂到 `.replay-workspace-inner`，不再作为地图面板子节点渲染，避免被地图面板 stacking context 限制。
+- `frontend/src/renderer/index.css` 已将工作台起始位置下移到命令区下方，并保留高层级右侧抽屉；实际 Chrome 页面已确认工作台打开后不再被顶部比赛选择栏遮挡。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过。
+
+### 最新完成任务（2026-04-27）
+**✅ 修复地图工作台被比赛选择栏遮挡**
+- `frontend/src/renderer/index.css` 已把右侧地图控制台提升为更高层级浮层，让打开的工作台稳定压过顶部比赛选择栏；当前层级顺序调整为工作台抽屉 > 命令栏 / 比赛选择 > 地图 / HUD。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过。
+
+### 最新完成任务（2026-04-27）
+**✅ 修复比赛录像选择面板被地图 / HUD 遮挡**
+- `frontend/src/renderer/index.css` 已给回放页命令栏建立更高的 stacking context，并让地图工作区显式处在较低层级；比赛搜索面板提升为独立高层浮层，同时加厚玻璃底色，避免 Light/Dark 下展开后被主地图和两侧 HUD 压住或透出干扰。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过。桌面 Chrome 截图仍返回 `cgWindowNotFound`，项目内也没有 Playwright 依赖，因此未完成自动截图复核。
+
+### 最新完成任务（2026-04-27）
+**✅ 按 4 条批注优化地图控制台、比赛选择和 Light 返回按钮**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已移除地图控制台路径区底部的“路径对象 / 压缩率 / 调试校准”调试尾栏，控制台内容更干净。
+- 地图控制台打开 / 关闭改为可感知的右侧滑入滑出：新增 `mapWorkbenchRendered` 暂留状态，关闭时保留组件直到退出动画完成；`index.css` 增加 `replay-workbench-slide-in / slide-out` 动画并兼容 reduced motion。
+- 顶部比赛选择从原生 select 改为搜索式录像选择器：当前比赛以按钮呈现，点击后可按队名、match id、来源筛选列表；本地比赛列表加载上限从 10 提到 100，便于后续录像数量变多时快速定位。
+- `frontend/src/renderer/App.tsx` 和 `index.css` 已修正 `/match` 顶部返回工作台按钮在 Light 模式下的文字和背景对比度，去掉硬编码白字，改用主题变量。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过。Chrome 辅助功能截图这轮返回窗口句柄错误，未完成自动视觉截图。
+
+### 最新完成任务（2026-04-27）
+**✅ 按 HUD 数据裁切批注放宽横向信息区**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已调整回放页地图尺寸断点，在 1400-1600px 区间为两侧 HUD 释放更多空间；同时移除 NW / GPM / XPM 数值上的截断类，避免经济数据被压成省略号。
+- `frontend/src/renderer/index.css` 已扩宽 `replay-map-hud-panel`，重新分配 `replay-hud-hero-main` 与 `replay-hud-row-details` 的列宽，让英雄概览、经济列和装备格都获得更稳定的最小宽度。
+- 玩家 ID pill 已取消强制截断，改为可自然换行 / 完整显示；经济列文本也取消省略号裁切。
+- 本次验证：已在 Chrome 打开 `http://localhost:5173/#/match` 检查 Light 模式下两侧 HUD；`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过。
+
+### 最新完成任务（2026-04-26）
+**✅ 按 HUD 批注改成常显横向信息行**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已移除天辉 / 夜魇 HUD 的展开收起交互，标题收敛为“天辉”“夜魇”，每个英雄卡默认常显详情，不再需要点击卡片查看装备和经济信息。
+- HUD 英雄卡已从竖向展开面板改为横向信息行：头像、英雄 / 玩家 / HP / KDA、NW / GPM / XPM 和装备格在同一行结构中呈现，保留职业名 / 玩家 ID、装备 tooltip、死亡状态、高亮和路径 / 热力选择联动。
+- `frontend/src/renderer/index.css` 已扩宽地图两侧 HUD 浮栏，并新增 `replay-hud-hero-main / replay-hud-row-details / replay-hud-row-items` 横向布局；同时轻微缩小主地图断点尺寸，给两侧 HUD 留出更稳定的横向空间。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已同步更新为“常显详情、无 HUD 后缀、横向详情区”的回归断言。
+- 本次验证：已在 Chrome 打开 `http://localhost:5173/#/match` 直接检查实际页面，确认标题仅显示“天辉 / 夜魇”，英雄卡详情常显且装备格横向展开；`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；`cd frontend && npm run build` → 通过。
+
+### 最新完成任务（2026-04-26）
+**✅ 按 3 条新批注继续优化地图浮层、眼位详情和时间轴**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将地图图层工作台调整为右侧宽抽屉，和右上角“打开 / 关闭工作台”按钮保持方向一致；热力、路径、视野和状态区域改为更明确的工作台分区。
+- `frontend/src/renderer/index.css` 已重排 `replay-workbench-float / replay-workbench-scroll / replay-workbench-section-*`：宽屏下热力与路径并排，视野和状态横向铺开，内部列表改成行式结构，减少小卡片堆叠；窄屏下自动退回单列。
+- 眼位详情浮窗已从多张大卡片改为 `ward-popover-panel` + `ward-popover-list` 紧凑滚动列表，固定多个眼位时不会继续向下撑破视口，并保留取消固定、眼位类型、坐标、插下时间、持续时间、插眼来源和消失方式。
+- 时间轴已从地图画面内部移出，改为地图下方的 `replay-timeline-shell-dock`，保留播放器式控制条但不再遮挡地图元素。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已补回归断言，确保时间轴不在 `map-overlay-container` 内，眼位详情使用新的滚动列表结构，工作台仍作为 `地图图层工作台` dialog 打开。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；已用浏览器 DOM 检查 `/match` 工作台打开后的结构。
+
+### 最新完成任务（2026-04-26）
+**✅ 按 6 条批注深度重构录像主地图工作台**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已将录像页从“地图外套多列卡片”的布局改为地图舞台：天辉 / 夜魇 HUD 直接浮在主地图左右两侧，说明和图例浮窗默认收起，地图区优先呈现战术画面本身。
+- 图层、路径和视野控制已改为视口级 `replay-workbench-float` 玻璃抽屉，打开时悬浮于屏幕上方，不再挤压地图，也减少了热力图、路径分析等区域里的说明文字和卡片套卡片。
+- `frontend/src/renderer/components/timeline/Timeline.tsx` 已压缩为单行播放器式控制条，并浮在地图底部中央；播放、停止、跳转、拖动进度和倍速功能保留，原先的大段快捷键说明与冗余标题已移除。
+- `frontend/src/renderer/index.css` 已补齐新的 command / map / HUD / workbench / timeline 样式，压缩顶部录像信息区，移除 Map Workspace 里的重复说明和右侧图层摘要，让主地图、HUD、时间轴保持在同一工作面。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已同步更新默认浮窗关闭、紧凑 header、HUD 内嵌地图和轻量 Map Workspace 的断言。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；并用浏览器检查 `/match` 默认状态与工作台打开状态。
+
+### 最新完成任务（2026-04-26）
+**✅ 继续压平录像主地图区，移除嵌套卡片与重复信息**
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已重构主地图工作区结构：外层只保留 Map Workspace 标题、工作台展开按钮和单行图层摘要；内层主地图卡片改为 `replay-map-stage` 平铺舞台，不再重复“比赛分析视图”、说明文案和主视图 chip 串。
+- 已删除主地图下方移动端“看图指南”重复卡片，将 `map-analysis-strip` 收敛为一条低存在感技术脚注，仅保留样本、聚焦、路径压缩和时间偏移等补充信息；`map-view-strip` 仍保留测试/语义锚点但不再作为可见重复模块。
+- `frontend/src/renderer/index.css` 新增 `replay-map-overview / replay-map-stage / replay-map-status-strip / replay-map-footnote / replay-timeline-shell / replay-chart-shell` 等轻量样式，主地图、时间轴和优势图之间只用分隔线组织层级，减少卡片套卡片。
+- `frontend/src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` 已同步更新旧图例断言，新的默认状态只验证轻量图层摘要。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && npm run test -- --run src/renderer/pages/RealMatchViewer.hudMetrics.test.tsx` → `16 passed`；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；`git diff --check` → 通过；已用当前 Chrome 页面查看 `/match`，确认旧的主视图 chip 串、看图指南卡片和内层大地图卡片不再出现。
+
+### 最新完成任务（2026-04-26）
+**✅ 继续逐页审计并把录像主功能区接入正式 Light/Dark UI 系统**
+- 已按反馈重新过了一遍主要页面，重点确认 `matchDatabase / openDotaLive / replayLibrary / teamProfile / poc / map / match` 都能在当前主题下正常渲染；当前后端健康检查为 `healthy`，前端页面可以连接本地后端查看更完整效果。
+- `frontend/src/renderer/theme.ts` 已新增主题工具，`App.tsx` 与 `DesktopLayout.tsx` 统一使用同一套 `readInitialTheme / applyTheme`，解决 `/match` 这种不经过桌面壳层的路由无法继承或切换 Light/Dark 的问题；回放页顶栏现在也有 Light/Dark 切换入口。
+- `frontend/src/renderer/pages/RealMatchViewer.tsx` 已把旧的硬编码深色背景、顶层 3xl 卡片和回放底部提示条替换为 `replay-workspace-page / replay-command-panel / replay-map-panel / replay-shortcut-strip` 主题类，正式接入玻璃背景、低边框、浅深色变量和更柔和的工作区层级。
+- `frontend/src/renderer/index.css` 新增回放页专属的 `replay-workspace-*` 覆盖层：统一压低旧 `slate/gray/dota-bg` 残留背景、旧大圆角、HUD 英雄卡、地图状态条、浮窗、输入和选择器的视觉重量；Light 模式下补齐 emerald / rose / amber / 任意色文本的可读性，避免胜者、状态和折叠按钮过浅。
+- `frontend/src/renderer/components/timeline/Timeline.tsx` 已重做为 `replay-timeline` 轻量控制条，替换旧的 `bg-dota-surface` 卡片、灰色按钮和手写 SVG，使用 lucide 图标、分段速度控件、主题化进度条和 hover tooltip，让回放核心控制不再像旧组件。
+- 浏览器验证：实际打开 `/match` 检查了 Light 与 Dark 两种模式，确认回放主功能区、地图工作台、主题切换、时间轴和状态条都已使用新视觉；同时抽查 `/matchDatabase` 和 `/openDotaLive` 的真实页面，确认共享工作区仍保持新玻璃语言。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`；`git diff --check` → 通过。测试日志仍有 jsdom/canvas 与本地网络沙箱相关 warning，但测试全部通过。
+
+### 最新完成任务（2026-04-26）
+**✅ 按最终柔和 Light/Dark 设计稿落地正式前端 UI 重构**
+- 已把 `frontend/public/ui-redesign-concepts-soft.html` 的最终方向正式落到 React 应用：`frontend/src/renderer/components/DesktopLayout.tsx` 新增 Light / Dark 主题切换、`localStorage` 记忆、系统偏好初始值和 `data-ts-theme` 主题挂载，用户在工作台内可随时切换。
+- `frontend/src/renderer/index.css` 已重写为一套全局 True Sight 玻璃主题系统：Dark 为低对比炭黑 + 电光青蓝，Light 为 macOS 亮色玻璃 + 系统蓝；侧栏改为 Codex 风格的连续半透明表面，顶栏、页头、筛选区、表格、按钮、KPI、输入和回放返回壳层都统一走主题变量。
+- 已继续减弱正式页面中的卡片堆叠：各 `workspace-*` 页面保留完整功能，但把 KPI、chip、表格、工具条和旧暗色嵌套块压成透明分隔、轻边框和低阴影层级，避免“卡片套卡片”的拥挤感；同时在窄窗口下把侧栏改成可横向滚动的轻量工作流条，并保证主题切换按钮仍可见。
+- `frontend/tailwind.config.js` 已同步把 `dota.primary` 调整为鲜亮系统蓝，正式组件中仍依赖 Tailwind `dota-*` token 的入口也会跟随新主题方向。
+- `frontend/src/renderer/App.tsx` 的 `/match` 回放壳层已同步接入新玻璃背景和返回按钮风格；`frontend/src/renderer/pages/POCTestPage.tsx` 将默认页签从 PixiJS 压测改为 Summary，保留 PixiJS 功能但避免进入工具页时初始挂载 canvas 导致内嵌浏览器空白。
+- 浏览器验证：已用 Codex in-app browser 实测 `/openDotaLive` 的 Light/Dark 切换与持久化，截图检查后修复了窄窗口侧栏堆叠、主题按钮隐藏、浅色模式旧任意色文本不可读等问题；随后逐路由审计 `/openDotaLive`、`/replayLibrary`、`/matchDatabase`、`/teamProfile`、`/matchList`、`/poc`、`/map`，均能渲染到 `workspace-page` 壳层并命中目标标题。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && npm run test -- --run` → `17 passed / 127 passed`。浏览器控制台仅保留 OpenDota 远端比赛请求在当前后端不可用时的 `Failed to fetch` 记录，未发现本次 UI 改动引入的页面渲染错误。
+
+### 最新完成任务（2026-04-26）
+**✅ 新增第二版更柔和的 UI 重构设计方案板，并补充 Light/Dark 双主题切换**
+- 已新增 `frontend/public/ui-redesign-concepts-soft.html`，可在 Vite 下直接浏览 `http://localhost:5173/ui-redesign-concepts-soft.html`。
+- 这版方向从“硬朗战术控制台”调整为“柔和赛事分析室”：Dark 保留更低对比的雾面炭黑，并把主强调色从墨绿改为更鲜亮的电光青蓝；Light 参考 macOS 亮色玻璃感，用系统蓝、瓷白底、低饱和辅助色和柔和阴影服务筛选、准备和会议展示。
+- 方案板已支持页面右上角 Light / Dark 随时切换，并用 `localStorage` 记忆用户选择；透明效果已覆盖导航、顶栏、面板、输入、地图浮层、列表行和推荐区，避免只换配色而没有材质变化。
+- 已按反馈把原本偏平的纯色背景升级为多方向柔和渐变底，并给屏幕内部、工作区背景、面板和列表单元补充可透出的渐变场与玻璃高光，让透明/毛玻璃效果在 Light 与 Dark 下都更明显。
+- 已按 Codex 本身侧边栏的感觉继续收敛方案板侧栏：去掉“品牌卡 + 导航项卡 + 数字胶囊”的多层卡片堆叠，改为一整片连续的半透明侧栏表面；工作区入口、导航分组、选中态和数量信息都以轻量列表形式呈现，浅色模式下更接近 Codex 左侧栏。
+- 已继续弱化内容区卡片堆叠感：指标、常用路径、英雄列表、inspector、表格、队列、比赛条和推荐清单从“二级玻璃卡片”改为透明列表、分隔线和信息行，只保留最外层面板作为功能分区。
+- 已按反馈移除偏墨绿色主题倾向，主色改为更鲜艳的 macOS 系统蓝 / 电光青蓝，并同步应用到背景渐变、Ready 状态、侧栏选中线、进度条、时间轴和地图标记。
+- 方案板覆盖三类关键屏：分析室首页（统一搜索、最近回放、队列状态、常用路径）、柔和地图复盘页（地图主画布 + 阵容摘要 + inspector + 时间轴）、准备室与战队视角（比赛准备、队列、战队快照和当前可见动作）。
+- 已用 Codex in-app browser 打开并确认 DOM 内容完整，当前浏览器 URL 已切换到该新版设计方案板；已验证右上角 Light / Dark 按钮均唯一可点击，切换后 `body[data-theme]` 分别正确落到 `light` 与 `dark`。
+
+### 最新完成任务（2026-04-26）
+**✅ 新增 True Sight 完整 UI 重构设计方案板，先定方向再动正式页面**
+- 已新增 `frontend/public/ui-redesign-concepts.html`，作为独立静态设计图，不接入正式 React 路由，方便在 Vite 下直接浏览 `http://localhost:5173/ui-redesign-concepts.html`。
+- 方案板包含三套完整方向：A `Command Map`（回放地图优先，推荐作为主方向）、B `Operations Desk`（下载/解析/库/数据库任务调度优先）、C `Coach Board`（战队长期复盘优先）。三套方案都覆盖现有功能范围，不以删功能换简洁。
+- 设计建议是以 A 为主结构，吸收 B 的任务队列和 C 的战队视角：先重构应用壳层，再重构回放页地图/HUD/inspector，最后把库和数据库收拢成任务运营台。
+- 已用 Codex in-app browser 打开并确认设计板 DOM 内容完整；浏览器截图工具在捕获该静态方案板时出现超时，但当前页已切到方案板 URL，可直接人工查看。
+
+### 最新完成任务（2026-04-26）
+**✅ 全面收敛前端桌面壳层与共享工作台样式，强化战术分析工具质感**
+- `frontend/src/renderer/components/DesktopLayout.tsx` 已把桌面壳层从大量内联渐变/边框样式收束为 `tactical-*` 共享类，保留全部核心工作流与开发工具导航入口，同时补充当前导航项的 `aria-current` 与 title 提示，导航状态更清晰、侧边栏更轻。
+- `frontend/src/renderer/index.css` 已新增并统一 `tactical-shell / sidebar / topbar / nav / content-scroll` 等壳层样式，同时把现有 `workspace-*` 页头、筛选区、KPI、面板、表格、按钮、输入与 chip 的圆角、边框、阴影和背景噪声整体压低，移除多余装饰光斑，形成更干净的深石墨战术台视觉。
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx`、`ReplayLibraryPage.tsx`、`MatchDatabasePage.tsx`、`TeamProfilePage.tsx`、`MatchListPage.tsx`、`MapTestPage.tsx` 与 `POCTestPage.tsx` 已完成页面级文案收敛：保留原有筛选、批量、回放、快照、工具入口等功能，但把长说明改为更短的操作型标签，降低首屏拥挤感。
+- `frontend/src/renderer/App.tsx` 的 `/match` 返回工作台壳层已轻量调色并收窄圆角，使回放页入口和主桌面壳层保持一致；未改动 `RealMatchViewer` 数据逻辑或各页面请求逻辑。
+- 本次验证：`cd frontend && npm run build` → 通过；`cd frontend && CI=1 ./node_modules/.bin/vitest run src/renderer/App.matchDatabaseNavigation.test.tsx src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx src/renderer/pages/ReplayLibraryPage.test.tsx src/renderer/pages/MatchDatabasePage.test.tsx src/renderer/pages/TeamProfilePage.test.tsx --reporter=dot` → `76 passed`；`git diff --check` → 通过；已用 Codex in-app browser 查看 `/openDotaLive`、`/replayLibrary`、`/matchDatabase`、`/teamProfile` 与 `/match` 的实际渲染。
 
 ### 最新完成任务（2026-04-22）
 **✅ 统一各工作页头部与筛选区布局，降低头部臃肿感并细化筛选控件质感**

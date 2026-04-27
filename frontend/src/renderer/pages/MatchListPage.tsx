@@ -184,7 +184,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
             <div className="workspace-header-copy">
               <p className="workspace-eyebrow">Legacy Match List</p>
               <h1 className="workspace-title text-dota-gold">比赛管理</h1>
-              <p className="workspace-description">上传录像、搜索比赛、管理你的游戏数据。这是保留的旧版入口，但现在也使用同一套桌面工作区视觉。</p>
+              <p className="workspace-description">旧版上传与比赛检索入口。</p>
             </div>
             <div className="workspace-header-rail">
               <div className="workspace-kpi-grid workspace-kpi-grid-compact xl:min-w-[420px]">
@@ -216,7 +216,7 @@ export function MatchListPage({ onWatch }: MatchListPageProps) {
           <div className="workspace-panel-header-inline">
             <div className="workspace-panel-header !mb-0">
               <h2 className="workspace-panel-title">搜索筛选</h2>
-              <p className="workspace-panel-description">旧版入口也收敛到同一套筛选结构，方便快速按比赛、玩家或英雄定位。</p>
+              <p className="workspace-panel-description">按比赛、玩家或英雄定位。</p>
             </div>
             <span className="workspace-panel-badge">Legacy Search</span>
           </div>

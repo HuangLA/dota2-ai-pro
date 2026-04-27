@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   ChevronRight,
@@ -5,11 +6,13 @@ import {
   Home,
   Library,
   Map,
+  Moon,
   MonitorPlay,
   Settings,
+  Sun,
   Users,
 } from 'lucide-react';
-import clsx from 'clsx';
+import { applyTheme, readInitialTheme, type ThemeMode } from '../theme';
 
 interface NavigationItem {
   name: string;
@@ -174,11 +177,11 @@ function NavigationSection({
   pathname: string;
 }) {
   return (
-    <section>
-      <div className="mb-2 px-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#6f7b86]">{title}</p>
+    <section className="tactical-nav-section">
+      <div className="tactical-nav-section-header">
+        <p className="tactical-nav-section-label">{title}</p>
       </div>
-      <nav className="space-y-px">
+      <nav className="space-y-1">
         {items.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
@@ -186,37 +189,20 @@ function NavigationSection({
               key={item.href}
               to={item.href}
               aria-label={item.name}
-              className={clsx(
-                'group relative block px-6 py-3 transition-colors duration-200',
-                isActive
-                  ? 'bg-[#18212a]/85 text-white'
-                  : 'text-[#7f8b95] hover:bg-[#141c25]/72 hover:text-[#d8e0e7]'
-              )}
+              aria-current={isActive ? 'page' : undefined}
+              title={item.hint}
+              data-active={isActive}
+              className="tactical-nav-link group"
             >
-              {isActive && (
-                <div className="absolute left-0 top-0 h-full w-1 bg-dota-gold/80" />
-              )}
               <div className="flex items-center gap-3">
-                <item.icon
-                  className={clsx(
-                    'h-4 w-4',
-                    isActive ? 'text-[#d8ecef]' : 'text-[#5b6671] group-hover:text-[#a8b7c2]'
-                  )}
-                />
+                <item.icon className="tactical-nav-icon h-4 w-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-xs font-bold uppercase tracking-wide">
+                    <p className="truncate text-xs font-semibold">
                       {item.name}
                     </p>
                     {item.badge && (
-                      <span
-                        className={clsx(
-                          'px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border',
-                          isActive
-                            ? 'border-dota-gold/25 bg-dota-gold/10 text-dota-gold'
-                            : 'border-[#2c353e] bg-[#0d1319] text-[#737f89]'
-                        )}
-                      >
+                      <span className="tactical-nav-badge">
                         {item.badge}
                       </span>
                     )}
@@ -234,6 +220,7 @@ function NavigationSection({
 export default function DesktopLayout() {
   const location = useLocation();
   const routeMeta = resolveRouteMeta(location.pathname);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(readInitialTheme);
   const currentTimeLabel = new Date().toLocaleString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
@@ -241,63 +228,89 @@ export default function DesktopLayout() {
     minute: '2-digit',
   });
 
+  useEffect(() => {
+    applyTheme(themeMode);
+  }, [themeMode]);
+
   return (
-    <div className="relative h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(108,144,163,0.16),_transparent_30%),radial-gradient(circle_at_80%_4%,_rgba(194,148,85,0.12),_transparent_22%),linear-gradient(180deg,#070b10_0%,#0b1117_48%,#0d141b_100%)] text-zinc-100">
-      <div className="relative flex h-full min-h-0 divide-x divide-[#24303a]">
-        <aside className="flex min-h-0 w-[240px] shrink-0 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(10,14,19,0.98),rgba(15,21,28,0.95))]">
-          <div className="border-b border-[#24303a] px-6 py-6">
+    <div className="tactical-shell">
+      <div className="tactical-frame">
+        <aside className="tactical-sidebar">
+          <div className="tactical-brand">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-[#42515d] bg-[linear-gradient(180deg,rgba(32,45,58,0.95),rgba(18,26,34,0.98))] text-sm font-black tracking-tighter text-dota-gold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className="tactical-logo">
                 TS
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#89b2b9]">True Sight</p>
-                <h1 className="text-sm font-bold text-white uppercase tracking-tight">桌面分析台</h1>
+                <p className="tactical-brand-eyebrow">True Sight</p>
+                <h1 className="tactical-brand-title">桌面分析台</h1>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 space-y-8 overflow-y-auto py-6">
-            <NavigationSection title="CORE WORKFLOW" items={primaryNavigation} pathname={location.pathname} />
-            <NavigationSection title="DEV TOOLS" items={devNavigation} pathname={location.pathname} />
+          <div className="tactical-sidebar-scroll">
+            <NavigationSection title="工作流" items={primaryNavigation} pathname={location.pathname} />
+            <NavigationSection title="工具" items={devNavigation} pathname={location.pathname} />
           </div>
 
-          <div className="border-t border-[#24303a] bg-[rgba(15,21,28,0.72)] p-6">
+          <div className="tactical-sidebar-status">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#6f7b86]">SYSTEM STATUS</p>
-                <p className="mt-1 text-[10px] font-mono uppercase text-[#9cc6ad]">Electron Ready</p>
+                <p className="tactical-meta-label">SYSTEM STATUS</p>
+                <p className="tactical-status-text">Electron Ready</p>
               </div>
-              <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.26)]" />
+              <div className="tactical-status-dot" />
             </div>
           </div>
         </aside>
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-          <header className="border-b border-[#24303a] bg-[linear-gradient(180deg,rgba(16,23,30,0.82),rgba(12,17,23,0.48))] px-6 py-4 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
+        <main className="tactical-main">
+          <header className="tactical-topbar">
+            <div className="flex min-w-0 items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#6f7b86]">
+                <div className="tactical-route-kicker">
                   <span>WORKSPACE</span>
                   <ChevronRight className="h-3 w-3" />
-                  <span className="text-[#a6b4bf]">{routeMeta.eyebrow}</span>
+                  <span className="tactical-route-kicker-current">{routeMeta.eyebrow}</span>
                 </div>
-                <div className="mt-1 flex items-baseline gap-4">
-                  <h2 className="text-lg font-bold tracking-tight text-white uppercase">{routeMeta.title}</h2>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-[#8a98a3]">{routeMeta.workflowLabel}</p>
+                <div className="mt-1 flex min-w-0 items-baseline gap-3">
+                  <h2 className="tactical-route-title">{routeMeta.title}</h2>
+                  <p className="tactical-route-flow">
+                    {routeMeta.workflowLabel}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-right">
+              <div className="flex shrink-0 items-center gap-3 text-right">
                 <div className="hidden sm:block">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#6f7b86]">SYSTEM TIME</p>
-                  <p className="text-xs font-mono text-[#aeb8c0]">{currentTimeLabel}</p>
+                  <p className="tactical-meta-label">SYSTEM TIME</p>
+                  <p className="tactical-time-label">{currentTimeLabel}</p>
                 </div>
-                <div className="h-8 w-px bg-[#24303a]" />
-                <div className="flex items-center gap-2">
-                  <div className="border border-[#31404b] bg-[rgba(13,19,25,0.88)] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-dota-gold">
-                    v0.1.0-BETA
-                  </div>
+                <div className="tactical-topbar-divider" />
+                <div className="tactical-theme-switch" role="group" aria-label="切换界面主题">
+                  <button
+                    type="button"
+                    aria-label="Light"
+                    aria-pressed={themeMode === 'light'}
+                    onClick={() => setThemeMode('light')}
+                    title="Light"
+                  >
+                    <Sun className="h-3.5 w-3.5" />
+                    <span>Light</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Dark"
+                    aria-pressed={themeMode === 'dark'}
+                    onClick={() => setThemeMode('dark')}
+                    title="Dark"
+                  >
+                    <Moon className="h-3.5 w-3.5" />
+                    <span>Dark</span>
+                  </button>
+                </div>
+                <div className="tactical-version">
+                  v0.1.0-BETA
                 </div>
               </div>
             </div>
@@ -306,7 +319,7 @@ export default function DesktopLayout() {
           <div className="min-h-0 flex-1 overflow-hidden">
             <div
               data-testid="workspace-scroll-region"
-              className="h-full min-h-0 overflow-y-auto"
+              className="tactical-content-scroll"
             >
               <Outlet />
             </div>

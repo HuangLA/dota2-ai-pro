@@ -33,11 +33,11 @@ export default {
           900: '#7f1d1d',
         },
         'dota': {
-          'bg': '#0b1117',
-          'surface': '#17212b',
-          'primary': '#43667c',
-          'accent': '#b88649',
-          'gold': '#d9b978',
+          'bg': '#0b1110',
+          'surface': '#141918',
+          'primary': '#007aff',
+          'accent': '#a67635',
+          'gold': '#c7a66b',
         },
       },
       backgroundImage: {

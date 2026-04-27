@@ -1806,7 +1806,7 @@ export function TeamProfilePage({
               <p className="workspace-eyebrow">Team Archive</p>
               <h1 className="workspace-title text-white">战队档案</h1>
               <p className="workspace-description">
-                基于 OpenDota 同步比赛的战队档案视图，更适合长期跟踪某支战队的联赛分布、可见比赛动作和回放准备情况。
+                按战队聚合联赛、准备状态和回放动作。
               </p>
             </div>
 
@@ -1840,7 +1840,7 @@ export function TeamProfilePage({
                 </div>
               ) : (
                 <div className="workspace-filter-note">
-                  输入战队 ID 后，这里会切换成战队级概览。
+                  输入战队 ID 后显示当前队伍概览。
                 </div>
               )}
             </div>
@@ -1859,7 +1859,7 @@ export function TeamProfilePage({
             <div className="workspace-panel-header-inline">
               <div className="workspace-panel-header !mb-0">
                 <h2 className="workspace-panel-title">战队查询与视角</h2>
-                <p className="workspace-panel-description">先确定战队和样本范围，再决定是按联赛筛选、按下载状态过滤，还是直接跳去准备回放。</p>
+                <p className="workspace-panel-description">确定战队和样本范围。</p>
               </div>
               <span className="workspace-panel-badge">Team Focus</span>
             </div>
@@ -1955,7 +1955,7 @@ export function TeamProfilePage({
             <div className="workspace-panel">
               <div className="workspace-panel-header">
                 <h2 className="workspace-panel-title">快捷视图与快照</h2>
-                <p className="workspace-panel-description">把常用视角固定成预设，或者把当前状态保存成快照，方便回到某个分析上下文。</p>
+                <p className="workspace-panel-description">保存常用视角和复盘上下文。</p>
               </div>
 
               <div className="mb-4 workspace-action-row">
@@ -2132,7 +2132,7 @@ export function TeamProfilePage({
             <div className="workspace-panel">
               <div className="workspace-panel-header">
                 <h2 className="workspace-panel-title">当前可见动作</h2>
-                <p className="workspace-panel-description">围绕“当前筛选 + 当前展开”这一批比赛执行准备、跳转和导出动作。</p>
+                <p className="workspace-panel-description">对当前可见比赛执行准备、跳转和导出。</p>
               </div>
 
               <div className="workspace-action-row">

@@ -297,7 +297,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
               <p className="workspace-eyebrow">Replay Workspace</p>
               <h1 className="workspace-title text-white">录像库与远端发现</h1>
               <p className="workspace-description">
-                本地库负责直接回放，`player_id` 和 `leagueid` 会额外直连 OpenDota 搜索可下载比赛。
+                本地回放与 OpenDota 候选统一检索。
               </p>
             </div>
             <div className="workspace-header-rail">
@@ -339,7 +339,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
             <div className="workspace-panel-header !mb-0">
               <h2 className="workspace-panel-title">筛选与发现</h2>
               <p className="workspace-panel-description">
-                `team_id` 只过滤本地已解析录像；`player_id`、`leagueid` 会同步检索 OpenDota 候选比赛。
+                `team_id` 查本地；`player_id` / `leagueid` 查远端候选。
               </p>
             </div>
             <span className="workspace-panel-badge">Local + Remote</span>
@@ -363,7 +363,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
                   placeholder="team_id（本地过滤）"
                   className="workspace-input focus:border-emerald-500"
                 />
-                <span className="workspace-field-hint">只过滤本地已解析录像。</span>
+                <span className="workspace-field-hint">本地已解析样本。</span>
               </label>
               <label className="workspace-field-stack">
                 <span className="workspace-field-label">OpenDota player_id</span>
@@ -374,7 +374,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
                   placeholder="player_id（OpenDota 搜索）"
                   className="workspace-input focus:border-emerald-500"
                 />
-                <span className="workspace-field-hint">命中后会补出可下载比赛。</span>
+                <span className="workspace-field-hint">查找可下载比赛。</span>
               </label>
               <label className="workspace-field-stack">
                 <span className="workspace-field-label">OpenDota leagueid</span>
@@ -385,7 +385,7 @@ export function ReplayLibraryPage({ onOpenReplay }: ReplayLibraryPageProps) {
                   placeholder="leagueid（OpenDota 搜索）"
                   className="workspace-input focus:border-emerald-500"
                 />
-                <span className="workspace-field-hint">适合按联赛检索待入库比赛。</span>
+                <span className="workspace-field-hint">按联赛补齐候选。</span>
               </label>
             </div>
             <div className="workspace-filter-footer">

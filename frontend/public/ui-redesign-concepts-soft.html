@@ -1,0 +1,1446 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>True Sight Soft Redesign Concept</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #080b0b;
+        --canvas: #0d1111;
+        --surface: #141918;
+        --surface-2: #1a201e;
+        --surface-3: #202723;
+        --line: rgba(222, 226, 210, 0.1);
+        --line-strong: rgba(222, 226, 210, 0.18);
+        --text: #eceee5;
+        --muted: #a2aa9d;
+        --quiet: #70796f;
+        --moss: #56c7ff;
+        --moss-2: #1687d9;
+        --copper: #c7a66b;
+        --water: #8eb8bd;
+        --rose: #c9877b;
+        --violet: #a193c3;
+        --shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
+        --page-bg:
+          linear-gradient(120deg, rgba(39, 142, 255, 0.26) 0%, rgba(39, 142, 255, 0.05) 28%, transparent 46%),
+          linear-gradient(240deg, rgba(92, 128, 132, 0.2) 0%, rgba(92, 128, 132, 0.05) 32%, transparent 55%),
+          linear-gradient(315deg, rgba(199, 166, 107, 0.17) 0%, rgba(199, 166, 107, 0.04) 30%, transparent 52%),
+          linear-gradient(180deg, #070908 0%, #0b1110 44%, #11120d 100%);
+        --workspace-field:
+          linear-gradient(118deg, rgba(86, 199, 255, 0.16), transparent 44%),
+          linear-gradient(248deg, rgba(142, 184, 189, 0.13), transparent 46%),
+          linear-gradient(180deg, rgba(8, 11, 11, 0.88), rgba(8, 11, 11, 0.72)),
+          var(--bg);
+        --screen-field:
+          linear-gradient(126deg, rgba(86, 199, 255, 0.22), transparent 42%),
+          linear-gradient(286deg, rgba(161, 147, 195, 0.13), transparent 48%),
+          linear-gradient(180deg, rgba(13, 17, 17, 0.75), rgba(13, 17, 17, 0.58)),
+          var(--screen-bg);
+        --panel-bg:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02) 38%, rgba(255, 255, 255, 0) 70%),
+          var(--glass);
+        --cell-bg:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.01) 58%),
+          var(--glass-strong);
+        --glass: rgba(20, 25, 24, 0.56);
+        --glass-strong: rgba(13, 17, 17, 0.66);
+        --glass-soft: rgba(255, 255, 255, 0.055);
+        --glass-hover: rgba(255, 255, 255, 0.06);
+        --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        --hero-copy: #bac1b5;
+        --sidebar-panel:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018) 42%, rgba(255, 255, 255, 0.035) 100%),
+          rgba(11, 15, 15, 0.34);
+        --sidebar-item-active: rgba(255, 255, 255, 0.075);
+        --sidebar-item-hover: rgba(255, 255, 255, 0.045);
+        --sidebar-accent: rgba(86, 199, 255, 0.9);
+        --topbar-bg: rgba(13, 17, 17, 0.58);
+        --input-bg: rgba(8, 12, 12, 0.58);
+        --screen-bg: rgba(13, 17, 17, 0.76);
+        --map-filter: saturate(0.68) contrast(1.04) brightness(0.64);
+      }
+
+      body[data-theme="light"] {
+        color-scheme: light;
+        --bg: #eef3f1;
+        --canvas: #f8fbf9;
+        --surface: #ffffff;
+        --surface-2: #f1f6f3;
+        --surface-3: #e7eeea;
+        --line: rgba(44, 61, 53, 0.13);
+        --line-strong: rgba(44, 61, 53, 0.2);
+        --text: #17211c;
+        --muted: #5d6b63;
+        --quiet: #7c8981;
+        --moss: #007aff;
+        --moss-2: #005ecb;
+        --copper: #a67635;
+        --water: #4f9099;
+        --rose: #aa675c;
+        --violet: #7666a2;
+        --shadow: 0 22px 64px rgba(46, 61, 53, 0.13);
+        --page-bg:
+          linear-gradient(122deg, rgba(0, 122, 255, 0.34) 0%, rgba(0, 122, 255, 0.09) 33%, transparent 54%),
+          linear-gradient(238deg, rgba(104, 164, 203, 0.36) 0%, rgba(104, 164, 203, 0.1) 34%, transparent 56%),
+          linear-gradient(315deg, rgba(226, 174, 116, 0.36) 0%, rgba(226, 174, 116, 0.09) 34%, transparent 55%),
+          linear-gradient(180deg, #fbfdfc 0%, #eef5f4 48%, #e4eeee 100%);
+        --workspace-field:
+          linear-gradient(118deg, rgba(0, 122, 255, 0.18), transparent 45%),
+          linear-gradient(250deg, rgba(94, 154, 177, 0.16), transparent 48%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4)),
+          var(--bg);
+        --screen-field:
+          linear-gradient(126deg, rgba(0, 122, 255, 0.24), transparent 42%),
+          linear-gradient(286deg, rgba(118, 102, 162, 0.14), transparent 50%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.34)),
+          var(--screen-bg);
+        --panel-bg:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.3) 42%, rgba(255, 255, 255, 0.12) 72%),
+          var(--glass);
+        --cell-bg:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.2) 62%),
+          var(--glass-strong);
+        --glass: rgba(255, 255, 255, 0.46);
+        --glass-strong: rgba(255, 255, 255, 0.62);
+        --glass-soft: rgba(255, 255, 255, 0.34);
+        --glass-hover: rgba(255, 255, 255, 0.74);
+        --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        --hero-copy: #4e5d55;
+        --sidebar-panel:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.12) 52%, rgba(255, 255, 255, 0.2) 100%),
+          rgba(255, 255, 255, 0.18);
+        --sidebar-item-active: rgba(255, 255, 255, 0.42);
+        --sidebar-item-hover: rgba(255, 255, 255, 0.28);
+        --sidebar-accent: rgba(0, 122, 255, 0.9);
+        --topbar-bg: rgba(255, 255, 255, 0.56);
+        --input-bg: rgba(255, 255, 255, 0.68);
+        --screen-bg: rgba(255, 255, 255, 0.56);
+        --map-filter: saturate(0.72) contrast(0.96) brightness(0.9);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--page-bg);
+        background-attachment: fixed;
+        color: var(--text);
+        font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        transition: background 260ms ease, color 220ms ease;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .page {
+        width: min(1480px, calc(100vw - 44px));
+        margin: 0 auto;
+        padding: 34px 0 60px;
+      }
+
+      .theme-switch {
+        position: fixed;
+        right: 22px;
+        top: 18px;
+        z-index: 20;
+        display: flex;
+        gap: 4px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px;
+        background: var(--glass);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px) saturate(1.3);
+        box-shadow: var(--shadow), var(--glass-highlight);
+      }
+
+      .theme-switch button {
+        height: 30px;
+        min-width: 66px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 750;
+        transition: background-color 180ms ease, color 180ms ease;
+      }
+
+      .theme-switch button[aria-pressed="true"] {
+        background: var(--glass-hover);
+        color: var(--text);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 380px;
+        gap: 28px;
+        align-items: end;
+        min-height: 300px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 28px;
+      }
+
+      .label {
+        color: var(--quiet);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .hero h1 {
+        margin-top: 12px;
+        max-width: 860px;
+        font-size: clamp(40px, 5.4vw, 78px);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      .hero-copy {
+        margin-top: 18px;
+        max-width: 760px;
+        color: var(--hero-copy);
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      .principles {
+        display: grid;
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--line);
+      }
+
+      .principles div {
+        background: var(--glass);
+        padding: 16px;
+        backdrop-filter: blur(18px) saturate(1.25);
+      }
+
+      .principles strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 15px;
+      }
+
+      .principles span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .section {
+        margin-top: 34px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 14px;
+      }
+
+      .section h2 {
+        margin-top: 7px;
+        font-size: clamp(26px, 3vw, 42px);
+        letter-spacing: -0.045em;
+      }
+
+      .section-text {
+        max-width: 720px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .screen {
+        min-height: 760px;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--screen-field);
+        box-shadow: var(--shadow), var(--glass-highlight);
+        backdrop-filter: blur(22px) saturate(1.2);
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 238px minmax(0, 1fr);
+        height: 100%;
+        min-height: 0;
+      }
+
+      .sidebar {
+        min-width: 0;
+        overflow: hidden;
+        border-right: 1px solid var(--line);
+        background: var(--sidebar-panel);
+        box-shadow: var(--glass-highlight);
+        backdrop-filter: blur(30px) saturate(1.35);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 66px;
+        padding: 14px 14px 10px;
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--glass-soft);
+        color: var(--text);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .brand strong {
+        display: block;
+        margin-top: 2px;
+        font-size: 14px;
+      }
+
+      .nav {
+        padding: 3px 10px 16px;
+      }
+
+      .nav-group {
+        margin-bottom: 16px;
+      }
+
+      .nav-title {
+        padding: 0 8px 6px;
+        color: var(--quiet);
+        font-size: 11px;
+      }
+
+      .nav-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 32px;
+        margin-bottom: 2px;
+        border-radius: 6px;
+        padding: 0 8px 0 11px;
+        color: var(--muted);
+        font-size: 13px;
+        transition: background-color 160ms ease, color 160ms ease;
+      }
+
+      .nav-item:hover {
+        background: var(--sidebar-item-hover);
+      }
+
+      .nav-item.active {
+        background: var(--sidebar-item-active);
+        color: var(--text);
+      }
+
+      .nav-item.active::before {
+        content: "";
+        position: absolute;
+        left: 5px;
+        width: 3px;
+        height: 16px;
+        border-radius: 999px;
+        background: var(--sidebar-accent);
+      }
+
+      .nav-item em {
+        color: var(--quiet);
+        font-size: 11px;
+        font-style: normal;
+        text-align: center;
+      }
+
+      .main {
+        min-width: 0;
+        min-height: 0;
+        background: var(--workspace-field);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 62px;
+        padding: 0 22px;
+        border-bottom: 1px solid var(--line);
+        background: var(--topbar-bg);
+        box-shadow: var(--glass-highlight);
+        backdrop-filter: blur(22px) saturate(1.22);
+      }
+
+      .crumb {
+        color: var(--quiet);
+        font-size: 12px;
+      }
+
+      .topbar strong {
+        display: block;
+        margin-top: 3px;
+        font-size: 16px;
+      }
+
+      .tabs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 3px;
+        background: var(--panel-bg);
+        backdrop-filter: blur(18px) saturate(1.18);
+      }
+
+      .tabs span {
+        border-radius: 6px;
+        padding: 7px 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .tabs .active {
+        background: var(--glass-hover);
+        color: var(--text);
+      }
+
+      .content {
+        height: calc(100% - 62px);
+        min-height: 0;
+        padding: 18px;
+      }
+
+      .soft-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-bg);
+        box-shadow: var(--glass-highlight);
+        backdrop-filter: blur(20px) saturate(1.24);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 48px;
+        border-bottom: 1px solid var(--line);
+        padding: 0 14px;
+      }
+
+      .panel-head strong {
+        font-size: 14px;
+      }
+
+      .pill-row,
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .pill,
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 0 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .button {
+        min-height: 38px;
+        min-width: 96px;
+        background: var(--glass-soft);
+        color: var(--text);
+        font-weight: 700;
+        backdrop-filter: blur(14px) saturate(1.16);
+      }
+
+      .accent {
+        border-color: rgba(86, 199, 255, 0.34);
+        background: rgba(86, 199, 255, 0.14);
+        color: #d8f4ff;
+      }
+
+      .copper {
+        border-color: rgba(199, 166, 107, 0.3);
+        background: rgba(199, 166, 107, 0.1);
+        color: #ead6aa;
+      }
+
+      .water {
+        border-color: rgba(142, 184, 189, 0.28);
+        background: rgba(142, 184, 189, 0.11);
+        color: #d4edf0;
+      }
+
+      .rose {
+        border-color: rgba(201, 135, 123, 0.28);
+        background: rgba(201, 135, 123, 0.1);
+        color: #efd1ca;
+      }
+
+      .metric-grid {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .metric {
+        min-height: 72px;
+        padding: 14px;
+        border-left: 1px solid var(--line);
+        background: transparent;
+      }
+
+      .metric:first-child {
+        border-left: 0;
+      }
+
+      .metric span {
+        color: var(--quiet);
+        font-size: 12px;
+      }
+
+      .metric b {
+        display: block;
+        margin-top: 8px;
+        font-size: 26px;
+        letter-spacing: -0.04em;
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) 320px;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 14px;
+        height: 100%;
+      }
+
+      .welcome {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 18px;
+        padding: 22px;
+      }
+
+      .welcome h3 {
+        max-width: 560px;
+        font-size: 38px;
+        line-height: 1.08;
+        letter-spacing: -0.045em;
+      }
+
+      .welcome p {
+        margin-top: 12px;
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .search {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .input {
+        display: flex;
+        align-items: center;
+        height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 12px;
+        background: var(--input-bg);
+        color: var(--quiet);
+        font-size: 13px;
+        backdrop-filter: blur(16px) saturate(1.18);
+      }
+
+      .quick-stack {
+        display: grid;
+        gap: 0;
+        padding: 8px 14px 12px;
+      }
+
+      .quick-link {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        min-height: 38px;
+        border-top: 1px solid var(--line);
+        padding: 10px 0;
+        background: transparent;
+      }
+
+      .quick-link:first-child {
+        border-top: 0;
+      }
+
+      .quick-link span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .replay-layout {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr) 300px;
+        grid-template-rows: minmax(0, 1fr) 76px;
+        gap: 14px;
+        height: 100%;
+      }
+
+      .team-list {
+        display: grid;
+        gap: 0;
+        padding: 8px 12px 12px;
+      }
+
+      .hero-row {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        min-height: 56px;
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+        padding: 8px;
+        background: transparent;
+      }
+
+      .hero-row:first-child {
+        border-top: 0;
+      }
+
+      .hero-row img {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        object-fit: cover;
+      }
+
+      .hero-row small {
+        display: block;
+        margin-top: 2px;
+        color: var(--quiet);
+        font-size: 11px;
+      }
+
+      .map-panel {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        background: var(--canvas);
+      }
+
+      .map-panel img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.72;
+        filter: var(--map-filter);
+      }
+
+      .map-label {
+        position: absolute;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 0 10px;
+        background: var(--glass);
+        backdrop-filter: blur(18px) saturate(1.25);
+        color: var(--text);
+        font-size: 12px;
+      }
+
+      .map-insight {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        z-index: 3;
+        width: 280px;
+        background: var(--glass-strong);
+        backdrop-filter: blur(18px) saturate(1.24);
+      }
+
+      .pin {
+        position: absolute;
+        z-index: 2;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.78);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .pin.green { background: var(--moss); }
+      .pin.rose { background: var(--rose); }
+      .pin.gold { background: var(--copper); }
+      .pin.water { background: var(--water); }
+
+      .inspector {
+        display: grid;
+        gap: 12px;
+        min-height: 0;
+      }
+
+      .list {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .list-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 42px;
+        border-top: 1px solid var(--line);
+        padding: 12px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .list-row:first-child {
+        border-top: 0;
+      }
+
+      .timeline {
+        grid-column: 1 / -1;
+        position: relative;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--glass);
+        backdrop-filter: blur(18px) saturate(1.2);
+      }
+
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 24px;
+        right: 24px;
+        top: 36px;
+        height: 3px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--moss), var(--copper), var(--rose));
+      }
+
+      .timeline i {
+        position: absolute;
+        top: 28px;
+        width: 12px;
+        height: 20px;
+        border-radius: 6px;
+        background: var(--text);
+      }
+
+      .ops-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 14px;
+        height: 100%;
+      }
+
+      .ops-command {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+        gap: 10px;
+        align-items: center;
+        padding: 12px;
+      }
+
+      .ops-stats {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(5, 1fr);
+      }
+
+      .table {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 112px 1.4fr 1fr 0.8fr 0.8fr 96px;
+        align-items: center;
+        min-height: 44px;
+        border-top: 1px solid var(--line);
+        padding: 0 12px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .row:first-child {
+        border-top: 0;
+      }
+
+      .row.head {
+        min-height: 36px;
+        color: var(--quiet);
+        font-size: 11px;
+      }
+
+      .queue {
+        display: grid;
+        gap: 0;
+        padding: 6px 12px 12px;
+      }
+
+      .queue-card {
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+        padding: 12px 0;
+        background: transparent;
+      }
+
+      .queue-card:first-child {
+        border-top: 0;
+      }
+
+      .queue-card p {
+        margin-top: 5px;
+        color: var(--quiet);
+        font-size: 12px;
+      }
+
+      .bar {
+        margin-top: 10px;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--moss);
+      }
+
+      .team-layout {
+        display: grid;
+        grid-template-columns: 310px minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 14px;
+        height: 100%;
+      }
+
+      .team-hero {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 14px;
+      }
+
+      .team-title {
+        padding: 22px;
+      }
+
+      .team-title h3 {
+        margin-top: 8px;
+        font-size: 44px;
+        letter-spacing: -0.05em;
+      }
+
+      .match-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0;
+        padding: 8px 12px 12px;
+      }
+
+      .match-card {
+        min-height: 112px;
+        border-left: 1px solid var(--line);
+        border-radius: 0;
+        padding: 12px;
+        background: transparent;
+      }
+
+      .match-card:first-child {
+        border-left: 0;
+      }
+
+      .match-card strong {
+        display: block;
+        margin: 13px 0 24px;
+        font-size: 19px;
+      }
+
+      .notes {
+        display: grid;
+        gap: 0;
+        padding: 8px 12px 12px;
+      }
+
+      .note {
+        border-top: 1px solid var(--line);
+        border-left: 2px solid rgba(86, 199, 255, 0.38);
+        padding: 12px 0 2px 12px;
+      }
+
+      .note:first-child {
+        border-top: 0;
+      }
+
+      .note p {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .recommendation {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 420px;
+        gap: 22px;
+        margin-top: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 22px;
+        background: var(--glass);
+        backdrop-filter: blur(20px) saturate(1.2);
+      }
+
+      .recommendation h2 {
+        margin-top: 8px;
+        font-size: 36px;
+        letter-spacing: -0.045em;
+      }
+
+      .decision-list {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .decision-list div {
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        padding: 13px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .decision-list div:first-child {
+        border-top: 0;
+      }
+
+      body[data-theme="light"] .accent {
+        background: rgba(0, 122, 255, 0.12);
+        color: #004f9f;
+      }
+
+      body[data-theme="light"] .copper {
+        background: rgba(166, 118, 53, 0.12);
+        color: #674718;
+      }
+
+      body[data-theme="light"] .water {
+        background: rgba(79, 144, 153, 0.12);
+        color: #255d65;
+      }
+
+      body[data-theme="light"] .rose {
+        background: rgba(170, 103, 92, 0.12);
+        color: #783f38;
+      }
+
+      @media (max-width: 1180px) {
+        .page {
+          width: min(100vw - 24px, 980px);
+          padding-top: 22px;
+        }
+
+        .hero,
+        .overview-grid,
+        .welcome,
+        .replay-layout,
+        .ops-layout,
+        .team-layout,
+        .team-hero,
+        .recommendation {
+          grid-template-columns: 1fr;
+        }
+
+        .screen {
+          min-height: 1040px;
+          aspect-ratio: auto;
+        }
+
+        .app {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto minmax(0, 1fr);
+        }
+
+        .sidebar {
+          display: block;
+          margin: 0;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .brand {
+          min-height: 52px;
+          padding: 10px 14px 6px;
+        }
+
+        .nav {
+          display: flex;
+          gap: 10px;
+          overflow-x: auto;
+          padding: 0 8px 8px;
+        }
+
+        .nav-group {
+          display: flex;
+          flex: 0 0 auto;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 0;
+        }
+
+        .nav-title {
+          padding: 0 6px;
+          white-space: nowrap;
+        }
+
+        .nav-item {
+          min-width: max-content;
+          margin-bottom: 0;
+        }
+
+        .row {
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="dark">
+    <div class="theme-switch" role="group" aria-label="切换界面主题">
+      <button type="button" data-theme-option="light" aria-pressed="false">Light</button>
+      <button type="button" data-theme-option="dark" aria-pressed="true">Dark</button>
+    </div>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="label">TRUE SIGHT REDESIGN V2 / LIGHT + DARK ANALYST STUDIO</p>
+          <h1>少一点控制台，多一点复盘室。</h1>
+          <p class="hero-copy">
+            这版保留战术分析的专业感，但把硬边 HUD、密集网格和军用色调换成更安静的赛事分析桌。Dark 是雾面炭黑复盘室，Light 参考 macOS 的清爽玻璃感，两者都保留同一套功能密度。
+          </p>
+        </div>
+        <div class="principles">
+          <div><strong>双主题</strong><span>Dark 用于长时间复盘，Light 用于准备、筛选和会议讨论。</span></div>
+          <div><strong>透明材质</strong><span>导航、顶栏、面板和地图浮层使用毛玻璃，不增加装饰噪声。</span></div>
+          <div><strong>功能不删</strong><span>下载、解析、库、数据库、战队、地图、HUD、眼位都保留。</span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="label">01 / HOME</p>
+            <h2>分析室首页</h2>
+          </div>
+          <p class="section-text">把现在分散的入口变成一个起点：搜索、最近回放、队列状态、常用工作流都在首屏，但不再像仪表盘卡片墙。</p>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <aside class="sidebar">
+              <div class="brand"><div class="mark">TS</div><div><span class="label">True Sight</span><strong>分析室</strong></div></div>
+              <nav class="nav">
+                <div class="nav-group">
+                  <div class="nav-title">工作</div>
+                  <div class="nav-item active"><span>开始分析</span><em>Home</em></div>
+                  <div class="nav-item"><span>回放库</span><em>42</em></div>
+                  <div class="nav-item"><span>比赛准备</span><em>128</em></div>
+                  <div class="nav-item"><span>战队档案</span><em>4</em></div>
+                </div>
+                <div class="nav-group">
+                  <div class="nav-title">工具</div>
+                  <div class="nav-item"><span>地图校准</span><em>Pixi</em></div>
+                  <div class="nav-item"><span>技术验证</span><em>Lab</em></div>
+                </div>
+              </nav>
+            </aside>
+            <section class="main">
+              <div class="topbar">
+                <div><span class="crumb">工作台 / 今日任务</span><strong>准备一场可复盘的比赛</strong></div>
+                <div class="tabs"><span class="active">总览</span><span>队列</span><span>最近</span></div>
+              </div>
+              <div class="content">
+                <div class="overview-grid">
+                  <div class="soft-panel welcome">
+                    <div>
+                      <p class="label">Morning desk</p>
+                      <h3>今天从哪一场开始？</h3>
+                      <p>输入 match、player、league 或 team，系统先告诉你是否已有本地回放；没有的话再进入下载和解析队列。</p>
+                      <div class="search">
+                        <div class="input">8735428765 / Ame / DreamLeague / Team Liquid</div>
+                        <div class="button accent">查找</div>
+                        <div class="button">同步</div>
+                      </div>
+                    </div>
+                    <div class="metric-grid" style="grid-template-columns: repeat(2, 1fr)">
+                      <div class="metric"><span>可回放</span><b>42</b></div>
+                      <div class="metric"><span>解析中</span><b>6</b></div>
+                      <div class="metric"><span>远端候选</span><b>128</b></div>
+                      <div class="metric"><span>失败待处理</span><b>3</b></div>
+                    </div>
+                  </div>
+                  <aside class="soft-panel">
+                    <div class="panel-head"><strong>常用路径</strong><span class="pill">Pinned</span></div>
+                    <div class="quick-stack">
+                      <div class="quick-link"><strong>打开最近回放</strong><span>31:42</span></div>
+                      <div class="quick-link"><strong>按战队复盘</strong><span>Liquid</span></div>
+                      <div class="quick-link"><strong>处理失败项</strong><span>3 项</span></div>
+                      <div class="quick-link"><strong>同步职业比赛</strong><span>1 min</span></div>
+                    </div>
+                  </aside>
+                  <div class="soft-panel">
+                    <div class="panel-head"><strong>最近可回放</strong><span class="pill copper">进入地图分析</span></div>
+                    <div class="match-strip">
+                      <div class="match-card"><span class="pill accent">Ready</span><strong>Liquid vs Falcons</strong><span class="label">DreamLeague</span></div>
+                      <div class="match-card"><span class="pill accent">Ready</span><strong>Spirit vs GG</strong><span class="label">ESL One</span></div>
+                      <div class="match-card"><span class="pill water">Parsing</span><strong>XG vs Tundra</strong><span class="label">PGL</span></div>
+                      <div class="match-card"><span class="pill">Remote</span><strong>Secret vs Entity</strong><span class="label">Qualifier</span></div>
+                    </div>
+                  </div>
+                  <aside class="soft-panel">
+                    <div class="panel-head"><strong>队列状态</strong><span class="pill water">Live</span></div>
+                    <div class="queue">
+                      <div class="queue-card"><strong>Download 8735428120</strong><p>62% / 8.2 MB/s</p><div class="bar"><span style="width:62%"></span></div></div>
+                      <div class="queue-card"><strong>Parse objectives</strong><p>frames + buildings + wards</p><div class="bar"><span style="width:38%;background:var(--water)"></span></div></div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="label">02 / REPLAY</p>
+            <h2>柔和地图复盘页</h2>
+          </div>
+          <p class="section-text">地图仍然是主角，但减少“战术雷达”的压迫感。HUD 变成两侧阵容摘要，事件和图层进入右侧 inspector。</p>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <aside class="sidebar">
+              <div class="brand"><div class="mark">TS</div><div><span class="label">Replay</span><strong>Liquid vs Falcons</strong></div></div>
+              <nav class="nav">
+                <div class="nav-item active"><span>地图复盘</span><em>31:42</em></div>
+                <div class="nav-item"><span>眼位</span><em>18</em></div>
+                <div class="nav-item"><span>经济</span><em>+1.8K</em></div>
+                <div class="nav-item"><span>团战</span><em>4</em></div>
+              </nav>
+            </aside>
+            <section class="main">
+              <div class="topbar">
+                <div><span class="crumb">Match 8735428765 / Game 2</span><strong>地图、HUD 与事件一起看</strong></div>
+                <div class="tabs"><span class="active">地图</span><span>路径</span><span>热力</span><span>导出</span></div>
+              </div>
+              <div class="content">
+                <div class="replay-layout">
+                  <div class="soft-panel">
+                    <div class="panel-head"><strong>天辉</strong><span class="pill accent">42K</span></div>
+                    <div class="team-list">
+                      <div class="hero-row"><img src="/assets/dota/heroes/antimage.png" alt="" /><div><strong>Ame</strong><small>Anti-Mage / 9-1-8</small></div><span class="pill">18</span></div>
+                      <div class="hero-row"><img src="/assets/dota/heroes/puck.png" alt="" /><div><strong>Nisha</strong><small>Puck / 6-2-13</small></div><span class="pill">16</span></div>
+                      <div class="hero-row"><img src="/assets/dota/heroes/tidehunter.png" alt="" /><div><strong>33</strong><small>Tidehunter / 3-4-17</small></div><span class="pill">15</span></div>
+                      <div class="hero-row"><img src="/assets/dota/heroes/rubick.png" alt="" /><div><strong>Boxi</strong><small>Rubick / 2-5-16</small></div><span class="pill">12</span></div>
+                    </div>
+                  </div>
+                  <div class="map-panel">
+                    <img src="/assets/dota/minimap/minimap_740.png" alt="" />
+                    <div class="map-label" style="left:18px;top:18px">热力图开启 · 视野当前存活</div>
+                    <div class="map-label" style="right:18px;top:18px">Roshan 01:12</div>
+                    <span class="pin green" style="left:38%;top:66%"></span>
+                    <span class="pin green" style="left:46%;top:53%"></span>
+                    <span class="pin water" style="left:54%;top:44%"></span>
+                    <span class="pin rose" style="left:66%;top:35%"></span>
+                    <span class="pin rose" style="left:72%;top:30%"></span>
+                    <span class="pin gold" style="left:52%;top:40%"></span>
+                    <div class="soft-panel map-insight">
+                      <div class="panel-head"><strong>当前局势</strong><span class="pill rose">Dire smoke</span></div>
+                      <div class="list">
+                        <div class="list-row"><span>视野优势</span><strong>天辉 +3</strong></div>
+                        <div class="list-row"><span>经济摆动</span><strong>+1.8K</strong></div>
+                        <div class="list-row"><span>下个目标</span><strong>Top T2</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                  <aside class="inspector">
+                    <div class="soft-panel">
+                      <div class="panel-head"><strong>图层</strong><span class="pill">6 项</span></div>
+                      <div class="list">
+                        <div class="list-row"><span>英雄路径</span><strong>显示</strong></div>
+                        <div class="list-row"><span>眼位生命</span><strong>显示</strong></div>
+                        <div class="list-row"><span>建筑状态</span><strong>28/36</strong></div>
+                      </div>
+                    </div>
+                    <div class="soft-panel">
+                      <div class="panel-head"><strong>事件</strong><span class="pill copper">31:42</span></div>
+                      <div class="list">
+                        <div class="list-row"><span>Smoke broken</span><strong>Dire</strong></div>
+                        <div class="list-row"><span>Observer killed</span><strong>Mid</strong></div>
+                        <div class="list-row"><span>BKB used</span><strong>AM</strong></div>
+                      </div>
+                    </div>
+                  </aside>
+                  <div class="timeline"><i style="left:18%"></i><i style="left:43%"></i><i style="left:66%"></i><i style="left:78%"></i></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="label">03 / OPERATIONS + TEAM</p>
+            <h2>准备室与战队视角</h2>
+          </div>
+          <p class="section-text">数据管理页不再像数据库后台，而像“准备样本”的工作室。战队档案则是一张长期复盘桌，保存视角、快照和可见动作。</p>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <aside class="sidebar">
+              <div class="brand"><div class="mark">TS</div><div><span class="label">Preparation</span><strong>样本准备室</strong></div></div>
+              <nav class="nav">
+                <div class="nav-item active"><span>比赛准备</span><em>128</em></div>
+                <div class="nav-item"><span>下载队列</span><em>6</em></div>
+                <div class="nav-item"><span>战队档案</span><em>Liquid</em></div>
+                <div class="nav-item"><span>失败处理</span><em>3</em></div>
+              </nav>
+            </aside>
+            <section class="main">
+              <div class="topbar">
+                <div><span class="crumb">样本准备 / Team Liquid</span><strong>先准备，再进入复盘</strong></div>
+                <div class="tabs"><span class="active">比赛</span><span>队列</span><span>战队</span></div>
+              </div>
+              <div class="content">
+                <div class="ops-layout">
+                  <div class="soft-panel ops-command">
+                    <div class="input">team_id / leagueid / match_id</div>
+                    <div class="button accent">查询</div>
+                    <div class="button">保存视角</div>
+                    <div class="button">批量准备</div>
+                  </div>
+                  <div class="metric-grid ops-stats">
+                    <div class="metric"><span>命中</span><b>128</b></div>
+                    <div class="metric"><span>可回放</span><b>42</b></div>
+                    <div class="metric"><span>解析中</span><b>6</b></div>
+                    <div class="metric"><span>失败</span><b>3</b></div>
+                    <div class="metric"><span>已选</span><b>18</b></div>
+                  </div>
+                  <div class="soft-panel">
+                    <div class="panel-head"><strong>比赛结果</strong><span class="pill">20 / 128</span></div>
+                    <div class="table">
+                      <div class="row head"><span>match</span><span>teams</span><span>league</span><span>time</span><span>status</span><span>action</span></div>
+                      <div class="row"><strong>8735428765</strong><span>Liquid vs Falcons</span><span>DreamLeague</span><span>31:42</span><span class="pill accent">Ready</span><span class="pill copper">Open</span></div>
+                      <div class="row"><strong>8735428120</strong><span>Spirit vs GG</span><span>ESL One</span><span>44:18</span><span class="pill water">Parsing</span><span class="pill">Details</span></div>
+                      <div class="row"><strong>8735428022</strong><span>XG vs Tundra</span><span>PGL</span><span>38:05</span><span class="pill">Queued</span><span class="pill">Cancel</span></div>
+                      <div class="row"><strong>8735427771</strong><span>BB vs Aurora</span><span>Elite League</span><span>52:29</span><span class="pill rose">Failed</span><span class="pill">Retry</span></div>
+                      <div class="row"><strong>8735427004</strong><span>Heroic vs OG</span><span>FISSURE</span><span>29:18</span><span class="pill">Remote</span><span class="pill">Ingest</span></div>
+                    </div>
+                  </div>
+                  <aside class="soft-panel">
+                    <div class="panel-head"><strong>队列</strong><span class="pill water">Live</span></div>
+                    <div class="queue">
+                      <div class="queue-card"><strong>Download 8735428120</strong><p>62% / 8.2 MB/s</p><div class="bar"><span style="width:62%"></span></div></div>
+                      <div class="queue-card"><strong>Parse 8735428022</strong><p>objectives + wards</p><div class="bar"><span style="width:38%;background:var(--water)"></span></div></div>
+                      <div class="queue-card"><strong>Retry 8735427771</strong><p>remote timeout</p><div class="bar"><span style="width:12%;background:var(--rose)"></span></div></div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="screen" style="min-height:640px">
+          <div class="app">
+            <aside class="sidebar">
+              <div class="brand"><div class="mark">TS</div><div><span class="label">Team</span><strong>战队档案</strong></div></div>
+              <nav class="nav">
+                <div class="nav-item active"><span>Team Liquid</span><em>20</em></div>
+                <div class="nav-item"><span>DreamLeague</span><em>8</em></div>
+                <div class="nav-item"><span>Snapshots</span><em>3</em></div>
+              </nav>
+            </aside>
+            <section class="main">
+              <div class="topbar">
+                <div><span class="crumb">Team Profile / 2163</span><strong>长期复盘视角</strong></div>
+                <div class="tabs"><span class="active">档案</span><span>联赛</span><span>快照</span></div>
+              </div>
+              <div class="content">
+                <div class="team-layout">
+                  <div class="team-hero">
+                    <div class="soft-panel team-title">
+                      <p class="label">TEAM ID 2163 / LAST 20 MATCHES</p>
+                      <h3>Team Liquid</h3>
+                      <p class="section-text" style="margin-top:10px">按最近联赛聚焦，查看可见比赛、准备动作和快照。</p>
+                    </div>
+                    <div class="metric-grid" style="grid-template-columns:repeat(3,1fr)">
+                      <div class="metric"><span>可见</span><b>20</b></div>
+                      <div class="metric"><span>可回放</span><b>8</b></div>
+                      <div class="metric"><span>联赛</span><b>4</b></div>
+                    </div>
+                  </div>
+                  <aside class="soft-panel">
+                    <div class="panel-head"><strong>视角</strong><span class="pill">Saved</span></div>
+                    <div class="quick-stack">
+                      <div class="input">team_id = 2163</div>
+                      <div class="quick-link"><strong>数量</strong><span>20</span></div>
+                      <div class="quick-link"><strong>排序</strong><span>最新优先</span></div>
+                      <div class="quick-link"><strong>下载状态</strong><span>全部</span></div>
+                      <div class="actions"><span class="button accent">查询</span><span class="button">保存快照</span></div>
+                    </div>
+                  </aside>
+                  <div class="soft-panel">
+                    <div class="panel-head"><strong>近期比赛</strong><span class="pill copper">DreamLeague</span></div>
+                    <div class="match-strip">
+                      <div class="match-card"><span class="pill accent">Ready</span><strong>vs Falcons</strong><span class="label">31:42</span></div>
+                      <div class="match-card"><span class="pill">Remote</span><strong>vs Spirit</strong><span class="label">44:18</span></div>
+                      <div class="match-card"><span class="pill water">Parsing</span><strong>vs XG</strong><span class="label">38:05</span></div>
+                      <div class="match-card"><span class="pill accent">Ready</span><strong>vs GG</strong><span class="label">52:29</span></div>
+                    </div>
+                  </div>
+                  <aside class="soft-panel">
+                    <div class="panel-head"><strong>当前可见动作</strong><span class="pill">4</span></div>
+                    <div class="notes">
+                      <div class="note"><strong>准备当前可见</strong><p>把本页所有可见比赛送入准备队列。</p></div>
+                      <div class="note"><strong>打开首场回放</strong><p>进入地图复盘页，从最近可回放样本开始。</p></div>
+                      <div class="note"><strong>导出比赛 ID</strong><p>复制当前筛选结果，给团队共享。</p></div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="recommendation">
+        <div>
+          <p class="label">Recommendation</p>
+          <h2>这版更适合作为 True Sight 的最终方向。</h2>
+          <p class="hero-copy">
+            它没有上一版那么“硬”，但仍然保持专业和高信息密度。真正重构时，我建议把这套 Light / Dark 主题做进正式产品：主题可随时切换，地图复盘默认 Dark，准备室和会议演示优先 Light。
+          </p>
+        </div>
+        <div class="decision-list">
+          <div><strong>1</strong><span>Dark 保留现在这版的雾面炭黑，用于长时间盯地图和事件。</span></div>
+          <div><strong>2</strong><span>Light 使用明亮玻璃和低饱和强调色，适合筛选、整理和会议展示。</span></div>
+          <div><strong>3</strong><span>透明层只用于信息容器和浮层，避免为了玻璃效果牺牲可读性。</span></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const storageKey = "true-sight-soft-concept-theme";
+        const buttons = Array.from(document.querySelectorAll("[data-theme-option]"));
+        const readStoredTheme = () => {
+          try {
+            const stored = localStorage.getItem(storageKey);
+            return stored === "light" || stored === "dark" ? stored : "dark";
+          } catch {
+            return "dark";
+          }
+        };
+        const applyTheme = (theme) => {
+          document.body.dataset.theme = theme;
+          buttons.forEach((button) => {
+            button.setAttribute("aria-pressed", String(button.dataset.themeOption === theme));
+          });
+          try {
+            localStorage.setItem(storageKey, theme);
+          } catch {
+            /* Ignore storage failures in private or restricted browser contexts. */
+          }
+        };
+
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const theme = button.dataset.themeOption === "light" ? "light" : "dark";
+            applyTheme(theme);
+          });
+        });
+
+        applyTheme(readStoredTheme());
+      })();
+    </script>
+  </body>
+</html>

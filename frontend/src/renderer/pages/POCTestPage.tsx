@@ -11,7 +11,7 @@ type TestTab = 'pixijs' | 'api' | 'summary';
 
 export function POCTestPage() {
   const apiBaseUrl = getApiBaseUrl();
-  const [activeTab, setActiveTab] = useState<TestTab>('pixijs');
+  const [activeTab, setActiveTab] = useState<TestTab>('summary');
   const [healthResult, setHealthResult] = useState<ApiTestResult | null>(null);
   const [matchesResult, setMatchesResult] = useState<ApiTestResult | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -40,7 +40,7 @@ export function POCTestPage() {
             <div>
               <p className="workspace-eyebrow text-cyan-300/80">POC Lab</p>
               <h1 className="workspace-title text-dota-gold">技术验证 POC</h1>
-              <p className="workspace-description">用于验证渲染、接口和中间实验能力。它不是正式业务页面，但也保持和主工作台一致的桌面端信息层次。</p>
+              <p className="workspace-description">验证渲染、接口和实验工具。</p>
             </div>
             <div className="workspace-pill-row xl:mt-0">
               <span className="workspace-pill">PixiJS</span>
