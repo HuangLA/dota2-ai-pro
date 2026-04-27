@@ -81,10 +81,10 @@ describe('OpenDotaLivePage rich search results', () => {
     expect(screen.queryByTestId('live-winner-badge-8123456789')).toBeNull();
     expect(screen.getByTestId('live-league-badge-8123456789').textContent).toContain('DreamLeague Season 26');
     expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('获胜');
-    expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('Luna');
+    expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('露娜');
     expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('miCKe');
     expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('ID 1');
-    expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('Gyrocopter');
+    expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('矮人直升机');
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('Skiter');
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('ID 11');
     expect(screen.getByRole('button', { name: '下载并入库' })).toBeTruthy();

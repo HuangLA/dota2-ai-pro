@@ -666,7 +666,7 @@ export function MatchDatabasePage({
               <p className="workspace-eyebrow">Match Database</p>
               <h1 className="workspace-title">比赛数据库</h1>
               <p className="workspace-description">
-                先筛出目标比赛，再决定下载、查看任务或直接进入回放。默认仅展示职业联赛。
+                按战队、联赛和时间筛选，随后下载或回放。
               </p>
             </div>
             <div className="workspace-header-rail">
@@ -714,7 +714,7 @@ export function MatchDatabasePage({
               <div className="workspace-panel-header !mb-0">
                 <h2 className="workspace-panel-title">查找比赛</h2>
                 <p className="workspace-panel-description">
-                  适合先用战队、联赛和时间范围缩小集合，再做下载或进入回放。
+                  缩小样本后批量处理。
                 </p>
               </div>
               <span className="workspace-panel-badge">Structured Filter</span>

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import { useMatchStore } from './store';
@@ -44,7 +44,17 @@ vi.mock('./pages/RealMatchViewer', () => ({
   ),
 }));
 
+vi.mock('./pages/OpenDotaLivePage', () => ({
+  __esModule: true,
+  default: () => <div data-testid="live-workspace">Live Workspace</div>,
+}));
+
 describe('App Match Database replay navigation', () => {
+  beforeEach(() => {
+    cleanup();
+    useMatchStore.getState().clearMatch();
+  });
+
   it('navigates to replay viewer with Match Database context', async () => {
     render(
       <MemoryRouter initialEntries={['/matchDatabase']}>
@@ -68,5 +78,19 @@ describe('App Match Database replay navigation', () => {
     expect(screen.getByTestId('return-to-workspace-button').className).not.toContain('absolute');
     expect(screen.getByTestId('replay-back-button-label').className).toContain('hidden');
     expect(screen.getByTestId('replay-back-button-label').className).toContain('2xl:block');
+  });
+
+  it('returns direct replay URLs to the live workspace instead of browser history', async () => {
+    render(
+      <MemoryRouter initialEntries={['/match']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('return-to-workspace-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('live-workspace')).toBeTruthy();
+    });
   });
 });

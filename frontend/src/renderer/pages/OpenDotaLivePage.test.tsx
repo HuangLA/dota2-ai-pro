@@ -204,10 +204,10 @@ describe('OpenDotaLivePage', () => {
     expect(screen.getByTestId('live-league-badge-8123456789').textContent).toContain('检索标签');
     expect(screen.queryByText('胜者')).toBeNull();
     expect(screen.queryByTestId('live-winner-badge-8123456789')).toBeNull();
-    expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('Luna');
+    expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('露娜');
     expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('miCKe');
     expect(screen.getByTestId('live-team-radiant-8123456789').textContent).toContain('ID 1');
-    expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('Gyrocopter');
+    expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('矮人直升机');
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('Skiter');
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('ID 11');
   });

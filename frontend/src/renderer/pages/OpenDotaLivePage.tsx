@@ -6,7 +6,7 @@ import {
   RemoteMatchStatusResponse,
   remoteService,
 } from '../api/remoteService';
-import { getHeroById, getHeroIconUrl } from '../data/heroes';
+import { getHeroById, getHeroByName, getHeroIconUrl } from '../data/heroes';
 import { formatDurationClock, formatUnixTimestampLocal } from './matchDatabaseFormatting';
 
 const PAGE_LIMIT = 20;
@@ -184,26 +184,25 @@ function getTeamRosterEntries(match: RemoteMatchRecord, side: MatchSide): TeamRo
   return getTeamLineup(match, side)
     .map((entry) => {
       if (typeof entry === 'string') {
-        const heroName = entry.trim();
+        const rawHeroName = entry.trim();
+        const hero = getHeroByName(rawHeroName);
+        const heroName = hero?.chineseName || hero?.localizedName || rawHeroName;
         return {
-          heroId: null,
+          heroId: hero?.id ?? null,
           heroName: heroName || '未知英雄',
-          heroIconUrl: null,
+          heroIconUrl: hero ? getHeroIconUrl(hero.id) : null,
           playerLabel: heroName || null,
           playerMeta: null,
         };
       }
 
       const heroId = typeof entry.hero_id === 'number' ? entry.hero_id : null;
-      const hero = heroId ? getHeroById(heroId) : undefined;
+      const hero = (heroId ? getHeroById(heroId) : undefined) ?? getHeroByName(entry.hero_name ?? '');
+      const resolvedHeroId = hero?.id ?? heroId;
       return {
-        heroId,
-        heroName:
-          entry.hero_name?.trim() ||
-          hero?.localizedName ||
-          hero?.chineseName ||
-          (heroId ? `Hero ${heroId}` : '未知英雄'),
-        heroIconUrl: heroId ? getHeroIconUrl(heroId) : null,
+        heroId: resolvedHeroId,
+        heroName: hero?.chineseName || hero?.localizedName || entry.hero_name?.trim() || (heroId ? `英雄 ${heroId}` : '未知英雄'),
+        heroIconUrl: resolvedHeroId ? getHeroIconUrl(resolvedHeroId) : null,
         playerLabel: getPlayerDisplayName(entry),
         playerMeta: getPlayerMetaLabel(entry),
       };
@@ -348,10 +347,10 @@ function LeagueArtwork({
 
   if (!assetUrl || broken) {
     return (
-      <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-sm border border-zinc-800 bg-zinc-900/50 shadow-inner">
-        <div className="relative flex min-h-[148px] items-end p-6">
+      <div className="relative isolate w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50 shadow-inner">
+        <div className="relative flex min-h-[84px] items-end p-3">
           <div className="min-w-0">
-            <div className="mb-4 flex flex-wrap gap-2">
+            <div className="mb-2 flex flex-wrap gap-2">
               <span className={`inline-flex items-center border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tagShellClass}`}>
                 {archiveLabel}
               </span>
@@ -361,10 +360,10 @@ function LeagueArtwork({
                 </span>
               ) : null}
             </div>
-            <p className="max-w-[560px] text-lg font-bold leading-tight text-white uppercase tracking-tight" title={leagueName}>
+            <p className="max-w-[560px] truncate text-sm font-bold leading-tight text-white uppercase tracking-tight" title={leagueName}>
               {leagueName}
             </p>
-            <p className="mt-1 text-[10px] font-mono leading-none text-zinc-500 uppercase tracking-[0.1em]">{subtitle}</p>
+            <p className="mt-1 text-[10px] leading-none text-zinc-500 uppercase tracking-[0.1em]">{subtitle}</p>
           </div>
         </div>
       </div>
@@ -372,7 +371,7 @@ function LeagueArtwork({
   }
 
   return (
-    <div className="relative isolate mx-auto w-full max-w-[628px] overflow-hidden rounded-sm border border-zinc-800 bg-zinc-950">
+    <div className="relative isolate w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
       <img
         src={assetUrl}
         alt={`${leagueName} 背景`}
@@ -382,10 +381,10 @@ function LeagueArtwork({
         onError={() => setBroken(true)}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/60 to-zinc-950/90" />
-      <div className="relative flex aspect-[1024/400] min-h-[146px] items-stretch">
+      <div className="relative flex h-[88px] items-stretch">
         <div
           className={`min-w-0 flex-1 ${
-            leagueAssetVariant === 'banner' ? 'flex items-center justify-center px-4 py-3.5' : 'flex items-center justify-center px-7 py-4'
+            leagueAssetVariant === 'banner' ? 'flex items-center justify-center px-3 py-2.5' : 'flex items-center justify-center px-5 py-3'
           }`}
         >
           <img
@@ -399,7 +398,7 @@ function LeagueArtwork({
             onError={() => setBroken(true)}
           />
         </div>
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap justify-between gap-2 p-3.5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap justify-between gap-2 p-2">
           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold backdrop-blur ${tagShellClass}`}>
             {archiveLabel}
           </span>
@@ -409,12 +408,12 @@ function LeagueArtwork({
             </span>
           ) : null}
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3.5">
-          <div className="max-w-[min(66%,520px)] rounded-[18px] border border-white/10 bg-slate-950/42 px-3.5 py-2.5 backdrop-blur-md">
-            <p className="text-[18px] font-semibold leading-6 text-white" title={leagueName}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-2">
+          <div className="max-w-[min(78%,420px)] rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 backdrop-blur-md">
+            <p className="truncate text-sm font-semibold leading-5 text-white" title={leagueName}>
               {leagueName}
             </p>
-            <p className="mt-1 text-[11px] leading-[18px] tracking-[0.05em] text-slate-300">{subtitle}</p>
+            <p className="text-[10px] leading-4 tracking-[0.05em] text-slate-300">{subtitle}</p>
           </div>
         </div>
       </div>
@@ -498,17 +497,17 @@ function LeagueBadge({
   return (
     <div
       data-testid={`live-league-badge-${match.match_id}`}
-      className={`w-full rounded-[28px] border px-4 py-4 shadow-[0_14px_36px_rgba(2,6,23,0.22)] ${shellClass}`}
+      className={`w-full rounded-[20px] border px-3 py-3 shadow-[0_10px_26px_rgba(2,6,23,0.18)] ${shellClass}`}
     >
       <LeagueArtwork match={match} leagueName={leagueName} subtitle={subtitle} archiveLabel={archiveLabel} />
-      <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-4">
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
         {metaCards.map((item) => (
           <div
             key={`${match.match_id}-${item.label}`}
-            className="rounded-2xl border border-slate-700/60 bg-slate-950/55 px-3 py-2.5"
+            className="rounded-xl border border-slate-700/60 bg-slate-950/55 px-2.5 py-2"
           >
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-            <p className="mt-1 truncate text-sm font-semibold text-slate-100" title={item.value}>
+            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-100" title={item.value}>
               {item.value}
             </p>
           </div>
@@ -642,7 +641,7 @@ function TeamRosterCard({
   return (
     <div
       data-testid={`live-team-${side}-${match.match_id}`}
-      className={`rounded-[24px] border p-3 ${accentClass}`}
+      className={`rounded-[18px] border p-2.5 ${accentClass}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
@@ -675,29 +674,29 @@ function TeamRosterCard({
           </div>
         </div>
         {typeof teamScore === 'number' && (
-          <div className="shrink-0 rounded-2xl border border-slate-700/80 bg-slate-950/70 px-3 py-2 text-right">
+          <div className="shrink-0 rounded-xl border border-slate-700/80 bg-slate-950/70 px-2.5 py-1.5 text-right">
             <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">击杀</p>
-            <p className="text-lg font-semibold text-white">{teamScore}</p>
+            <p className="text-base font-semibold text-white">{teamScore}</p>
           </div>
         )}
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
         {entries.length > 0 ? (
           entries.map((entry, index) => (
             <div
               key={`${match.match_id}-${side}-entry-${index}-${entry.heroName}-${entry.playerLabel ?? 'unknown'}`}
-              className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-700/70 bg-slate-900/55 px-2.5 py-2"
+              className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/55 px-2 py-1.5"
             >
               {entry.heroIconUrl ? (
                 <img
                   src={entry.heroIconUrl}
                   alt={entry.heroName}
-                  className="h-9 w-9 shrink-0 rounded-xl border border-slate-700/70 bg-slate-950 object-cover"
+                  className="h-8 w-8 shrink-0 rounded-lg border border-slate-700/70 bg-slate-950 object-cover"
                   loading="lazy"
                 />
               ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-950 text-[10px] text-slate-500">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-700/70 bg-slate-950 text-[10px] text-slate-500">
                   {entry.heroName.slice(0, 2)}
                 </div>
               )}
@@ -713,7 +712,7 @@ function TeamRosterCard({
             </div>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-700/70 px-3 py-3 text-[11px] text-slate-500 sm:col-span-2">
+          <div className="rounded-xl border border-dashed border-slate-700/70 px-3 py-2 text-[11px] text-slate-500 sm:col-span-2">
             暂无阵容信息
           </div>
         )}
@@ -1060,7 +1059,7 @@ export function OpenDotaLivePage() {
               <p className="workspace-eyebrow">OpenDota Live Intake</p>
               <h1 className="workspace-title text-dota-gold">OpenDota 职业比赛台</h1>
               <p className="workspace-description">
-                默认只展示职业比赛；搜索时仍可用一个输入框查比赛、联赛、玩家名字和 ID，继续保留职业与路人的统一搜索体验。
+                职业比赛默认入列；搜索可按比赛、玩家或联赛定位。
               </p>
             </div>
             <div className="workspace-header-rail">
@@ -1107,7 +1106,7 @@ export function OpenDotaLivePage() {
               <div className="workspace-panel-header !mb-0">
                 <h2 className="workspace-panel-title">统一搜索</h2>
                 <p className="workspace-panel-description">
-                  直接输入 `8735428765`、`Ame`、`DreamLeague`，或者用 `比赛/玩家/联赛`、`match/player/league` 前缀显式指定；默认列表只保留职业比赛。
+                  一处输入，覆盖比赛、玩家和联赛检索。
                 </p>
               </div>
               <span className="workspace-panel-badge">Single Query</span>
@@ -1159,7 +1158,7 @@ export function OpenDotaLivePage() {
 
               <div className="workspace-filter-footer">
                 <p className="workspace-field-hint max-w-3xl">
-                  默认会把文字同时拿去匹配玩家和联赛；纯数字会先按常见 ID 规则判断。想强制指定类型时，可以加 `比赛/玩家/联赛` 或 `match/player/league` 前缀。
+                  纯数字会自动判别；需要指定类型时加 `比赛/玩家/联赛` 前缀。
                 </p>
                 <div className="workspace-filter-meta">
                   <span className="workspace-pill">模式 {searchModeLabel}</span>
@@ -1173,7 +1172,7 @@ export function OpenDotaLivePage() {
             <div className="workspace-panel-header-inline">
               <div className="workspace-panel-header !mb-0">
                 <h2 className="workspace-panel-title">批量入库</h2>
-                <p className="workspace-panel-description">勾选比赛后，会顺序执行下载和解析；可随时查看单场状态详情。</p>
+                <p className="workspace-panel-description">对勾选项顺序下载并解析。</p>
               </div>
               <span className="workspace-panel-badge">Batch Intake</span>
             </div>
@@ -1322,9 +1321,9 @@ export function OpenDotaLivePage() {
                   <div
                     key={match.match_id}
                     data-testid={`live-match-card-${match.match_id}`}
-                    className="rounded-[28px] border border-slate-700/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.94))] p-4 shadow-[0_30px_80px_rgba(2,6,23,0.32)]"
+                    className="rounded-[22px] border border-slate-700/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.9))] p-3 shadow-[0_20px_54px_rgba(2,6,23,0.26)]"
                   >
-                    <div className="grid grid-cols-[20px_minmax(0,1fr)] gap-4 xl:grid-cols-[20px_minmax(0,1fr)_272px]">
+                    <div className="grid grid-cols-[18px_minmax(0,1fr)] gap-3 2xl:grid-cols-[18px_minmax(0,1fr)_220px]">
                       <div className="pt-1">
                         <input
                           aria-label={`选择比赛 ${match.match_id}`}
@@ -1343,87 +1342,74 @@ export function OpenDotaLivePage() {
 
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center rounded-full border border-dota-gold/40 bg-dota-gold/10 px-3 py-1 text-xs font-semibold text-dota-gold">
+                          <span className="inline-flex items-center rounded-full border border-dota-gold/40 bg-dota-gold/10 px-2.5 py-1 text-xs font-semibold text-dota-gold">
                             比赛 {match.match_id}
                           </span>
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${sourceClass}`}>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${sourceClass}`}>
                             {sourceLabel}
                           </span>
-                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-xs text-slate-300">
+                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-xs text-slate-300">
                             开赛 {formatUnixTimestampLocal(match.start_time)}
                           </span>
-                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1 text-xs text-slate-300">
+                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-xs text-slate-300">
                             时长 {formatDurationClock(match.duration)}
                           </span>
                         </div>
                         {shouldRenderLeagueBadge(match) ? (
-                          <div className="mt-3">
+                          <div className="mt-2">
                             <LeagueBadge match={match} leagueName={leagueName} />
                           </div>
                         ) : null}
 
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
                           <TeamRosterCard match={match} side="radiant" winnerSide={winnerSide} />
                           <TeamRosterCard match={match} side="dire" winnerSide={winnerSide} />
                         </div>
                       </div>
 
-                      <div className="col-span-2 space-y-3 xl:col-span-1">
-                        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${pipelineBadge.className}`}>
-                            {pipelineBadge.label}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${downloadBadge.className}`}>
-                            {downloadBadge.label}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${parseBadge.className}`}>
-                            {parseBadge.label}
-                          </span>
-                        </div>
-
-                        <div className="rounded-[24px] border border-slate-700/80 bg-slate-950/80 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">工作流</p>
-
-                          <div className="mt-3 space-y-2">
-                            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 px-3 py-2">
-                              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">下载</p>
-                              {live?.downloadStatus === 'downloading' ? (
-                                <div className="mt-2 space-y-2">
-                                  <div className="relative h-6 overflow-hidden rounded-full bg-slate-800">
-                                    <div
-                                      className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500"
-                                      style={{ width: `${live.downloadProgress}%` }}
-                                    />
-                                    <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
-                                      下载 {live.downloadProgress}%
-                                    </span>
-                                  </div>
-                                  <button
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void handleCancel(match.match_id);
-                                    }}
-                                    title="取消下载"
-                                    className="w-full rounded-xl border border-red-500/60 px-3 py-1.5 text-xs text-red-200 transition hover:border-red-400 hover:text-red-100"
-                                  >
-                                    取消下载
-                                  </button>
-                                </div>
-                              ) : (
-                                <p className="mt-1 text-sm font-semibold text-white">{downloadBadge.label}</p>
-                              )}
-                            </div>
-
-                            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 px-3 py-2">
-                              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">解析</p>
-                              <p className="mt-1 text-sm font-semibold text-white">{pipelineBadge.label}</p>
-                              {liveParseStatus === 'parsing' && (
-                                <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-slate-800">
-                                  <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
-                                </div>
-                              )}
-                            </div>
+                      <div className="col-span-2 2xl:col-span-1">
+                        <div className="rounded-[18px] border border-slate-700/80 bg-slate-950/78 p-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${pipelineBadge.className}`}>
+                              {pipelineBadge.label}
+                            </span>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${downloadBadge.className}`}>
+                              {downloadBadge.label}
+                            </span>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${parseBadge.className}`}>
+                              {parseBadge.label}
+                            </span>
                           </div>
+
+                          {live?.downloadStatus === 'downloading' ? (
+                            <div className="mt-2 space-y-2">
+                              <div className="relative h-5 overflow-hidden rounded-full bg-slate-800">
+                                <div
+                                  className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500"
+                                  style={{ width: `${live.downloadProgress}%` }}
+                                />
+                                <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
+                                  下载 {live.downloadProgress}%
+                                </span>
+                              </div>
+                              <button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleCancel(match.match_id);
+                                }}
+                                title="取消下载"
+                                className="w-full rounded-xl border border-red-500/60 px-3 py-1.5 text-xs text-red-200 transition hover:border-red-400 hover:text-red-100"
+                              >
+                                取消下载
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {liveParseStatus === 'parsing' && (
+                            <div className="mt-2 relative h-1.5 overflow-hidden rounded-full bg-slate-800">
+                              <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
+                            </div>
+                          )}
 
                           <div className="mt-3 grid gap-2">
                             <button
@@ -1431,7 +1417,7 @@ export function OpenDotaLivePage() {
                                 void handleIngest([match.match_id]);
                               }}
                               disabled={ingesting || batchLoading}
-                              className="rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded-xl border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {ingesting ? '入库中...' : '下载并入库'}
                             </button>
@@ -1446,7 +1432,7 @@ export function OpenDotaLivePage() {
                                 });
                                 await refreshStatusPanel(match.match_id, false);
                               }}
-                              className="rounded-2xl border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
+                              className="rounded-xl border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
                             >
                               状态详情
                             </button>

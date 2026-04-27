@@ -45,7 +45,7 @@ export function MapTestPage() {
             <div>
               <p className="workspace-eyebrow text-cyan-300/80">Map Renderer</p>
               <h1 className="workspace-title text-dota-gold">Dota 2 地图渲染测试</h1>
-              <p className="workspace-description">单独校验小地图渲染、英雄点位和眼位图层，让地图相关调试页也更像独立桌面工具。</p>
+              <p className="workspace-description">校验小地图、英雄点位和眼位图层。</p>
             </div>
             <div className="workspace-pill-row xl:mt-0">
               <span className="workspace-pill">PixiJS v8</span>
