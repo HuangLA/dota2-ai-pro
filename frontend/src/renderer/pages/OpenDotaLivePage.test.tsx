@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OpenDotaLivePage from './OpenDotaLivePage';
+import { formatUnixTimestampLocal } from './matchDatabaseFormatting';
 import { remoteService } from '../api/remoteService';
 
 describe('OpenDotaLivePage', () => {
@@ -210,6 +211,78 @@ describe('OpenDotaLivePage', () => {
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('矮人直升机');
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('Skiter');
     expect(screen.getByTestId('live-team-dire-8123456789').textContent).toContain('ID 11');
+    expect(screen.getByText(formatUnixTimestampLocal(1700054321).replace(/^\d{4}-/, ''))).toBeTruthy();
+  });
+
+  it('uses league and team text as unified search shortcuts', async () => {
+    const match = {
+      match_id: 8123456789,
+      start_time: 1700054321,
+      duration: 2450,
+      last_synced_at: 1700059999,
+      source: 'pro' as const,
+      leagueid: 15475,
+      league_name: 'DreamLeague Season 26',
+      radiant_team_id: 15,
+      dire_team_id: 9247354,
+      radiant_team_name: 'Team Liquid',
+      dire_team_name: 'Team Falcons',
+      radiant_win: true,
+      winner_team: 'radiant' as const,
+      radiant_players: [{ account_id: 1, display_name: 'miCKe', hero_id: 48, team: 'radiant' as const }],
+      dire_players: [{ account_id: 11, display_name: 'Skiter', hero_id: 72, team: 'dire' as const }],
+    };
+    vi.spyOn(remoteService, 'getRemoteMatches').mockResolvedValue({
+      status: 'ok',
+      total: 1,
+      limit: 20,
+      offset: 0,
+      matches: [match],
+    });
+    const searchSpy = vi.spyOn(remoteService, 'searchRemoteMatches').mockResolvedValue({
+      status: 'ok',
+      total: 1,
+      limit: 20,
+      offset: 0,
+      matches: [match],
+    });
+
+    render(<OpenDotaLivePage />);
+
+    expect(await screen.findByText('Team Liquid')).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '搜索联赛 DreamLeague Season 26' })[0]);
+
+    await waitFor(() => {
+      expect(searchSpy).toHaveBeenLastCalledWith({
+        q: '联赛 15475',
+        sources: ['pro', 'public'],
+        limit: 20,
+        offset: 0,
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '搜索联赛 ID 15475' }));
+
+    await waitFor(() => {
+      expect(searchSpy).toHaveBeenLastCalledWith({
+        q: '联赛 15475',
+        sources: ['pro', 'public'],
+        limit: 20,
+        offset: 0,
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '搜索战队 Team Liquid' }));
+
+    await waitFor(() => {
+      expect(searchSpy).toHaveBeenLastCalledWith({
+        q: '战队 15',
+        sources: ['pro', 'public'],
+        limit: 20,
+        offset: 0,
+      });
+    });
   });
 
   it('hides the league badge for public matches without league metadata', async () => {

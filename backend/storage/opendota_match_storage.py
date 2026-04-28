@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from utils.steam_cdn import get_team_logo_url, get_league_icon_url, get_dotabuff_league_url
 
+import re
 import time
 from typing import Any
 
@@ -305,6 +306,7 @@ class OpenDotaMatchStorage:
             upsert_rows,
         )
         conn.commit()
+        self._upsert_recent_match_lineups(matches)
         return inserted, updated
 
     def upsert_match_detail(self, detail: dict[str, Any]) -> tuple[int, int]:
@@ -461,6 +463,48 @@ class OpenDotaMatchStorage:
                 LIMIT ?
                 """,
                 (pattern, max(limit * 2, limit)),
+            )
+            for row in cursor.fetchall():
+                match_id = int(row["match_id"])
+                if match_id in seen_match_ids:
+                    continue
+                seen_match_ids.add(match_id)
+                match_ids.append(match_id)
+                if len(match_ids) >= limit:
+                    break
+
+        return match_ids
+
+    def search_match_ids_by_team_name(self, name: str, limit: int = 20) -> list[int]:
+        """Search cached match IDs by radiant/dire team name."""
+        normalized = self._normalize_search_text(name)
+        if normalized is None:
+            return []
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        seen_match_ids: set[int] = set()
+        match_ids: list[int] = []
+        search_patterns = [
+            normalized,
+            f"{normalized}%",
+            f"%{normalized}%",
+        ]
+
+        for pattern in search_patterns:
+            if len(match_ids) >= limit:
+                break
+
+            cursor.execute(
+                """
+                SELECT match_id
+                FROM opendota_matches
+                WHERE radiant_team_name LIKE ? COLLATE NOCASE
+                    OR dire_team_name LIKE ? COLLATE NOCASE
+                ORDER BY last_synced_at DESC, start_time DESC, match_id DESC
+                LIMIT ?
+                """,
+                (pattern, pattern, max(limit * 2, limit)),
             )
             for row in cursor.fetchall():
                 match_id = int(row["match_id"])
@@ -826,6 +870,94 @@ class OpenDotaMatchStorage:
             normalized_rows,
         )
         conn.commit()
+
+    def _upsert_recent_match_lineups(self, matches: list[dict[str, Any]]) -> None:
+        """Persist hero-only lineups when lightweight OpenDota rows include them."""
+        normalized_rows: list[tuple[Any, ...]] = []
+        synced_at = int(time.time())
+
+        for raw in matches:
+            match_id = self._as_int(raw.get("match_id"))
+            if match_id is None:
+                continue
+
+            for side, team_id, slot_offset in (("radiant", 2, 0), ("dire", 3, 5)):
+                hero_ids = self._extract_lineup_hero_ids(raw, side)
+                for index, hero_id in enumerate(hero_ids[:5]):
+                    normalized_rows.append(
+                        (
+                            match_id,
+                            slot_offset + index,
+                            None,
+                            hero_id,
+                            team_id,
+                            None,
+                            None,
+                            synced_at,
+                        )
+                    )
+
+        if not normalized_rows:
+            return
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.executemany(
+            """
+            INSERT INTO opendota_match_players (
+                match_id,
+                player_slot,
+                account_id,
+                hero_id,
+                team_id,
+                persona_name,
+                pro_name,
+                last_synced_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(match_id, player_slot) DO UPDATE SET
+                account_id = COALESCE(opendota_match_players.account_id, excluded.account_id),
+                hero_id = COALESCE(excluded.hero_id, opendota_match_players.hero_id),
+                team_id = COALESCE(excluded.team_id, opendota_match_players.team_id),
+                persona_name = COALESCE(opendota_match_players.persona_name, excluded.persona_name),
+                pro_name = COALESCE(opendota_match_players.pro_name, excluded.pro_name),
+                last_synced_at = excluded.last_synced_at
+            """,
+            normalized_rows,
+        )
+        conn.commit()
+
+    @classmethod
+    def _extract_lineup_hero_ids(cls, payload: dict[str, Any], side: str) -> list[int]:
+        for key in (f"{side}_lineup", f"{side}_heroes", f"{side}_hero_ids", f"{side}_team"):
+            hero_ids = cls._parse_hero_id_collection(payload.get(key))
+            if hero_ids:
+                return hero_ids
+        return []
+
+    @classmethod
+    def _parse_hero_id_collection(cls, value: object) -> list[int]:
+        if isinstance(value, dict) or isinstance(value, (int, float)):
+            return []
+
+        raw_values: list[object]
+        if isinstance(value, str):
+            raw_values = re.split(r"[\s,;|]+", value.strip())
+        elif isinstance(value, list):
+            raw_values = value
+        else:
+            return []
+
+        hero_ids: list[int] = []
+        seen: set[int] = set()
+        for raw_value in raw_values:
+            hero_id = cls._as_int(raw_value)
+            if hero_id is None or hero_id <= 0 or hero_id in seen:
+                continue
+            hero_ids.append(hero_id)
+            seen.add(hero_id)
+
+        return hero_ids
 
     @staticmethod
     def _as_bool_flag(value: object) -> int | None:

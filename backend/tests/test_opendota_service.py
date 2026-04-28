@@ -75,9 +75,14 @@ class _SuccessAsyncClient:
                 ]
             )
         if path == "/leagues/15475/matches":
-            assert params == {"limit": 2, "offset": 5}
+            assert params == {"limit": 7}
             return _FakeResponse(
                 [
+                    {"match_id": 296, "leagueid": 15475},
+                    {"match_id": 297, "leagueid": 15475},
+                    {"match_id": 298, "leagueid": 15475},
+                    {"match_id": 299, "leagueid": 15475},
+                    {"match_id": 300, "leagueid": 15475},
                     {"match_id": 301, "leagueid": 15475},
                     {"match_id": 302, "leagueid": 15475},
                 ]

@@ -85,6 +85,70 @@ def test_upsert_recent_matches_updates_changed_rows() -> None:
     assert cursor.fetchone()["duration"] == 2150
 
 
+def test_upsert_recent_matches_persists_lightweight_hero_lineups() -> None:
+    storage = OpenDotaMatchStorage()
+
+    storage.upsert_recent_matches(
+        [
+            {
+                "match_id": 251,
+                "start_time": 1700000251,
+                "duration": 2100,
+                "radiant_team": "1,2,3,4,5",
+                "dire_team": [6, 7, 8, 9, 10],
+            }
+        ],
+        source="public",
+    )
+
+    players = storage.get_match_player_identities(251)
+
+    assert [player["hero_id"] for player in players] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert [player["player_slot"] for player in players] == list(range(10))
+    assert [player["team_id"] for player in players[:5]] == [2, 2, 2, 2, 2]
+    assert [player["team_id"] for player in players[5:]] == [3, 3, 3, 3, 3]
+
+
+def test_upsert_recent_matches_lightweight_lineups_preserve_player_names() -> None:
+    storage = OpenDotaMatchStorage()
+    storage.upsert_match_detail(
+        {
+            "match_id": 252,
+            "start_time": 1700000252,
+            "duration": 2100,
+            "players": [
+                {
+                    "player_slot": 0,
+                    "account_id": 101,
+                    "hero_id": 11,
+                    "isRadiant": True,
+                    "personaname": "Known Player",
+                    "name": "Known Pro",
+                }
+            ],
+        }
+    )
+
+    storage.upsert_recent_matches(
+        [
+            {
+                "match_id": 252,
+                "start_time": 1700000252,
+                "duration": 2100,
+                "radiant_team": "11,12,13,14,15",
+            }
+        ],
+        source="public",
+    )
+
+    players = storage.get_match_player_identities(252)
+
+    assert players[0]["account_id"] == 101
+    assert players[0]["persona_name"] == "Known Player"
+    assert players[0]["pro_name"] == "Known Pro"
+    assert [player["hero_id"] for player in players[:5]] == [11, 12, 13, 14, 15]
+
+
 def test_list_recent_matches_returns_total_and_pagination() -> None:
     storage = OpenDotaMatchStorage()
     storage.upsert_recent_matches(
