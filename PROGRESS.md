@@ -11,7 +11,7 @@
 |------|-----|
 | 项目名称 | True Sight (Dota 2 录像分析工具) |
 | 当前阶段 | Phase 4/4.5 已完成 ✅ + 文档对齐更新，准备进入 Phase 5 🚀 |
-| 最后更新 | 2026-04-27 |
+| 最后更新 | 2026-04-28 |
 | 更新者 | Codex |
 
 ---
@@ -31,6 +31,54 @@
 ---
 
 ## 当前进展摘要（2026-03-20）
+
+### 最新完成任务（2026-04-28）
+**✅ OpenDota Live 比赛卡片补充比赛时间**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已在比赛卡片底部元信息中加入比赛开始时间：有 `start_time` 时显示紧凑的本地时间 `MM-DD HH:mm`，悬停可看到完整本地时间；缺少时间的数据不会额外显示空占位。
+- `frontend/src/renderer/index.css` 已为时间标签补充等宽数字样式，保持与现有“职业赛事 / 胜负 / 时长 / 状态”标签同层级，不增加卡片高度。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `9 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过。
+
+### 最新完成任务（2026-04-27）
+**✅ 修复 OpenDota Live 部分比赛缺少英雄阵容时的补齐与提示**
+- `backend/storage/opendota_match_storage.py` 已支持从 OpenDota 轻量列表行里提取 `radiant_lineup/radiant_heroes/radiant_hero_ids/radiant_team` 与 `dire_*` 英雄阵容字段，并写入 `opendota_match_players`；该 fallback 只补英雄与阵营，不会覆盖已有详情里的账号、玩家名和职业名。
+- `backend/routers/remote.py` 已调整远端搜索提示逻辑：当直接搜比赛号但 `/matches/{id}` 详情补抓失败、且返回结果缺少英雄/玩家阵容时，会把 OpenDota 限流/失败原因带回前端，避免页面静默显示空阵容。
+- 针对 `8786096329` 复测：当前本机 OpenDota 已触发 `daily api limit exceeded`，本地缓存只有 public 摘要、没有英雄阵容，因此不能凭空补出该场英雄；页面现在会明确展示限流提示。等上游额度恢复，或轻量列表同步到自带阵容字段的比赛，新逻辑会直接显示英雄头像。
+- 本次验证：`cd backend && ./.venv/bin/pytest tests/test_opendota_match_storage.py tests/test_remote_routes.py` → `35 passed`；`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `9 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过；Codex in-app browser 搜索 `8786096329` 显示 1 张结果卡与 OpenDota 429 提示，console 无 error。
+
+### 最新完成任务（2026-04-27）
+**✅ 修复 OpenDota Live 搜索标题、战队搜索与联赛翻页**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已去掉搜索标题里的“命中 X 场”，搜索态只显示当前搜索类型，例如 `联赛 ID 15475` / `战队 ID 15`。
+- `backend/routers/remote.py` 已修复战队搜索候选过滤：OpenDota team endpoint 返回的比赛会按当前战队 ID 归一化天辉 / 夜魇队伍 ID，并记录为战队候选，避免详情回填不完整时被误过滤。
+- `backend/services/opendota_service.py` 与 remote 搜索窗口已修复联赛 / 战队分页：OpenDota league/team endpoint 忽略 `offset` 的情况下，服务层改为向上游取足够多的数据再本地切片，后端会按 `offset + limit` 补足候选，让前端无限滚动能继续拿第二页及后续结果。
+- 本次验证：`cd backend && ./.venv/bin/pytest tests/test_opendota_service.py tests/test_remote_routes.py` → `35 passed`；`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `9 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过；本地 API 实测 `战队 15` 返回 `20/21`、`联赛 15475 offset=20` 返回 `20/41`；Codex in-app browser 实测 `战队 15` 显示 20 张卡片且页面无“命中”文案。
+
+### 最新完成任务（2026-04-27）
+**✅ 为 OpenDota Live 增加联赛 / 战队点击搜索**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已将比赛卡片里的联赛标题、联赛 ID 和可用战队名改为搜索入口；点击联赛名与联赛 ID 都统一落到 `联赛 {leagueid}`，保证两者结果一致，点击战队名优先落到 `战队 {team_id}`，缺少 ID 时回退 `战队 {teamName}`。
+- `backend/routers/remote.py`、`backend/services/opendota_service.py` 与 OpenDota storage 层已补齐战队搜索契约：支持 `team/team_id/team_name/战队/队伍` 前缀，优先使用缓存战队维表和本地比赛命中，并可通过 OpenDota `/teams/{team_id}/matches` 补抓远端战队比赛。
+- `frontend/src/renderer/api/remoteService.ts` 和 `docs/api_specification.md` 已同步 `team_id/team_name` 参数说明；页面仍保留原有统一搜索、无限滚动、批量入库和 Light/Dark 切换。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `9 passed`；`cd backend && ./.venv/bin/pytest tests/test_remote_routes.py` → `19 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过；Codex in-app browser 已确认点击联赛入口后搜索框为 `联赛 18959`，点击战队入口后搜索框为 `战队 9425656`，浏览器 console 无 error。
+
+### 最新完成任务（2026-04-27）
+**✅ 按批注收敛 OpenDota Live 比赛卡片队伍信息**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已删除比赛卡片内重复的 `Radiant vs Dire` 对阵摘要行，阵容区域改为承担主要队伍展示。
+- 阵容行标题现在在“天辉 / 夜魇”下显示真实队伍名；路人局或无明确队伍名时不再回退显示 `Radiant` / `Dire`。
+- 阵容行尾部重复阵营 / 分数块已移除，胜负与比分语义保留在辅助文本中，不影响现有测试断言和可访问信息。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `8 passed`；`cd frontend && npm run build` → 通过；`git diff --check` → 通过；Codex in-app browser 已确认 `.open-live-match-row` 与 `.open-live-side-foot` 数量均为 0，宽屏页面仍一行三场。
+
+### 最新完成任务（2026-04-27）
+**✅ 压缩 OpenDota Live 宽屏比赛卡片为三列布局**
+- `frontend/src/renderer/index.css` 已将 OpenDota Live 结果区改为宽屏默认三列，并通过 stage 容器查询在空间不足时自动降为两列 / 一列，避免只按视口判断导致桌面壳层内宽度误判。
+- 比赛卡片同步压缩了卡片高度、圆角、内边距、标题字号、VS 圆标、队伍行、英雄头像、底部标签和操作按钮，让一行三场时仍保留 banner 背景、天辉 / 夜魇头像、胜负和入库 / 状态动作。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `8 passed`；`cd frontend && npm run build` → 通过；Codex in-app browser 已确认 `/openDotaLive` 当前宽屏截图一行显示三场比赛。
+
+### 最新完成任务（2026-04-27）
+**✅ 按桌面端设计稿重写 OpenDota Live 正式页面**
+- `frontend/src/renderer/pages/OpenDotaLivePage.tsx` 已按确认后的桌面端设计方向重排正式页面：搜索命令栏、主结果舞台、缩窄右侧操作栏和状态抽屉都改为新的 `open-live-*` 结构；保留统一搜索、预设搜索、手动同步、单场入库、批量入库、状态详情、取消下载、自动轮询与 Light/Dark 主题切换能力。
+- 比赛结果卡片已改为 banner 背景式卡片，并同时显示天辉 / 夜魇两侧英雄头像；未选中卡片不再显示候选队列文案，只有选中后才显示“已勾选”并在右侧显示已选列表。
+- 旧分页按钮已移除，结果区改为滚动触底自动加载下一页，并通过顶部 / 底部渐隐 mask 处理比赛卡片滚动到边缘时的淡出效果。
+- `frontend/src/renderer/index.css` 已新增 OpenDota Live 专属主题样式，跟随现有 `data-ts-theme` 变量在 Light / Dark 下切换，避免影响其它工作页。
+- 本次验证：`cd frontend && npm run test -- --run src/renderer/pages/OpenDotaLivePage.test.tsx src/renderer/pages/OpenDotaLivePage.richResults.test.tsx` → `8 passed`；`cd frontend && npm run build` → 通过；Codex in-app browser 已打开 `http://127.0.0.1:5173/#/openDotaLive` 检查 Dark / Light 两种模式、无翻页按钮和选中态显示。
 
 ### 最新完成任务（2026-04-27）
 **✅ 修复回放返回路径，并压缩 OpenDota 实时比赛卡片**

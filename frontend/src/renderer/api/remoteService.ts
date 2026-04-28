@@ -81,6 +81,7 @@ export interface RemoteMatchesParams {
   offset?: number;
   match_id?: number;
   leagueid?: number;
+  team_id?: number;
   player_id?: number;
   sources?: RemoteMatchSource[];
 }
@@ -91,9 +92,11 @@ export interface RemoteSearchParams {
   offset?: number;
   match_id?: number;
   leagueid?: number;
+  team_id?: number;
   player_id?: number;
   player_name?: string;
   league_name?: string;
+  team_name?: string;
   sources?: RemoteMatchSource[];
 }
 
@@ -151,6 +154,9 @@ class RemoteService {
     if (params.leagueid !== undefined) {
       queryParams.append('leagueid', String(params.leagueid));
     }
+    if (params.team_id !== undefined) {
+      queryParams.append('team_id', String(params.team_id));
+    }
     if (params.player_id !== undefined) {
       queryParams.append('player_id', String(params.player_id));
     }
@@ -194,11 +200,17 @@ class RemoteService {
     if (params.leagueid !== undefined) {
       queryParams.append('leagueid', String(params.leagueid));
     }
+    if (params.team_id !== undefined) {
+      queryParams.append('team_id', String(params.team_id));
+    }
     if (params.player_name !== undefined && params.player_name.trim()) {
       queryParams.append('player_name', params.player_name.trim());
     }
     if (params.league_name !== undefined && params.league_name.trim()) {
       queryParams.append('league_name', params.league_name.trim());
+    }
+    if (params.team_name !== undefined && params.team_name.trim()) {
+      queryParams.append('team_name', params.team_name.trim());
     }
     if (params.sources !== undefined) {
       queryParams.append('include_pro', String(params.sources.includes('pro')));

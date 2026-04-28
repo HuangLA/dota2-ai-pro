@@ -7,7 +7,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -27,6 +27,7 @@ opendota_service = OpenDotaService()
 opendota_match_storage = OpenDotaMatchStorage()
 opendota_reference_storage = OpenDotaReferenceStorage()
 replay_download_storage = ReplayDownloadStorage()
+SEARCH_UPSTREAM_PAGE_SIZE = 20
 opendota_sync_service = OpenDotaSyncService(
     opendota_service=opendota_service,
     opendota_match_storage=opendota_match_storage,
@@ -210,16 +211,19 @@ class DerivedQueryTerms:
     match_id: int | None = None
     player_id: int | None = None
     league_id: int | None = None
+    team_id: int | None = None
     player_name: str | None = None
     league_name: str | None = None
+    team_name: str | None = None
     apply_player_filter: bool = False
     apply_league_filter: bool = False
+    apply_team_filter: bool = False
     has_explicit_scope: bool = False
     is_invalid: bool = False
 
 
 _QUERY_PREFIX_PATTERN = re.compile(
-    r"^(match|match_id|player|player_id|player_name|league|league_id|league_name|比赛|玩家|联赛)\s*[:：=]?\s*(.+)$",
+    r"^(match|match_id|player|player_id|player_name|league|league_id|league_name|team|team_id|team_name|比赛|玩家|联赛|战队|队伍)\s*[:：=]?\s*(.+)$",
     re.IGNORECASE,
 )
 
@@ -281,6 +285,25 @@ def _derive_query_terms(
             return DerivedQueryTerms(
                 league_name=normalized_value,
                 apply_league_filter=True,
+                has_explicit_scope=True,
+            )
+        if normalized_key in {"team_id"}:
+            return DerivedQueryTerms(
+                team_id=numeric_value,
+                apply_team_filter=numeric_value is not None,
+                has_explicit_scope=True,
+                is_invalid=numeric_value is None,
+            )
+        if normalized_key in {"team", "team_name", "战队", "队伍"}:
+            if numeric_value is not None:
+                return DerivedQueryTerms(
+                    team_id=numeric_value,
+                    apply_team_filter=True,
+                    has_explicit_scope=True,
+                )
+            return DerivedQueryTerms(
+                team_name=normalized_value,
+                apply_team_filter=True,
                 has_explicit_scope=True,
             )
 
@@ -521,6 +544,7 @@ def _normalize_search_matches(
     raw_matches: list[dict[str, Any]],
     *,
     forced_leagueid: int | None = None,
+    forced_team_id: int | None = None,
 ) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     seen_match_ids: set[int] = set()
@@ -533,6 +557,31 @@ def _normalize_search_matches(
         payload = dict(raw)
         if forced_leagueid is not None and not payload.get("leagueid"):
             payload["leagueid"] = forced_leagueid
+        if forced_team_id is not None:
+            team_is_radiant = payload.get("radiant")
+            opposing_team_id = _normalize_positive_int(payload.get("opposing_team_id"))
+            opposing_team_name = _normalize_search_text(payload.get("opposing_team_name"))
+            opposing_team_logo = _normalize_search_text(payload.get("opposing_team_logo"))
+            if team_is_radiant is True:
+                if not payload.get("radiant_team_id"):
+                    payload["radiant_team_id"] = forced_team_id
+                if opposing_team_id is not None:
+                    payload["dire_team_id"] = payload.get("dire_team_id") or opposing_team_id
+                if opposing_team_name is not None:
+                    payload["dire_team_name"] = payload.get("dire_team_name") or opposing_team_name
+                if opposing_team_logo is not None:
+                    payload["dire_logo_url"] = payload.get("dire_logo_url") or opposing_team_logo
+                    payload["dire_icon_url"] = payload.get("dire_icon_url") or opposing_team_logo
+            elif team_is_radiant is False:
+                if not payload.get("dire_team_id"):
+                    payload["dire_team_id"] = forced_team_id
+                if opposing_team_id is not None:
+                    payload["radiant_team_id"] = payload.get("radiant_team_id") or opposing_team_id
+                if opposing_team_name is not None:
+                    payload["radiant_team_name"] = payload.get("radiant_team_name") or opposing_team_name
+                if opposing_team_logo is not None:
+                    payload["radiant_logo_url"] = payload.get("radiant_logo_url") or opposing_team_logo
+                    payload["radiant_icon_url"] = payload.get("radiant_icon_url") or opposing_team_logo
         normalized.append(payload)
         seen_match_ids.add(match_id)
 
@@ -554,6 +603,33 @@ def _upsert_search_matches(matches: list[dict[str, Any]]) -> None:
         opendota_match_storage.upsert_recent_matches(pro_matches, source="pro")
     if public_matches:
         opendota_match_storage.upsert_recent_matches(public_matches, source="public")
+
+
+async def _fetch_search_match_pages(
+    fetch_page: Callable[[int, int], Awaitable[list[dict[str, Any]]]],
+    *,
+    window: int,
+    page_size: int = SEARCH_UPSTREAM_PAGE_SIZE,
+) -> tuple[list[dict[str, Any]], bool, list[Exception]]:
+    """Fetch enough upstream pages to cover the requested search window."""
+    rows: list[dict[str, Any]] = []
+    errors: list[Exception] = []
+    target = max(window, page_size)
+    last_page_count = 0
+
+    for page_offset in range(0, target, page_size):
+        try:
+            page_rows = await fetch_page(page_size, page_offset)
+        except Exception as exc:
+            errors.append(exc)
+            break
+
+        rows.extend(page_rows)
+        last_page_count = len(page_rows)
+        if last_page_count < page_size:
+            return rows, False, errors
+
+    return rows, last_page_count >= page_size, errors
 
 
 async def _backfill_missing_match_metadata(*, match_ids: list[int]) -> None:
@@ -623,16 +699,22 @@ async def _fetch_search_candidates(
     match_id: int | None,
     league_id: int | None,
     league_name: str | None,
+    team_id: int | None,
+    team_name: str | None,
     player_id: int | None,
     player_name: str | None,
     apply_player_filter: bool,
     apply_league_filter: bool,
+    apply_team_filter: bool,
     limit: int,
-) -> tuple[set[int], set[int], set[int], list[Exception]]:
+) -> tuple[set[int], set[int], set[int], set[int], set[int], bool, list[Exception]]:
     """Resolve live and cached match IDs for remote search inputs."""
     candidate_match_ids: set[int] = set()
     league_ids: set[int] = set()
+    team_ids: set[int] = set()
+    team_candidate_match_ids: set[int] = set()
     account_ids: set[int] = set()
+    has_more_candidates = False
     live_errors: list[Exception] = []
 
     if match_id is not None:
@@ -640,6 +722,9 @@ async def _fetch_search_candidates(
 
     if league_id is not None:
         league_ids.add(league_id)
+
+    if team_id is not None:
+        team_ids.add(team_id)
 
     if league_name is not None:
         matched_leagues = opendota_reference_storage.search_leagues_by_name(league_name, limit=limit)
@@ -649,9 +734,9 @@ async def _fetch_search_candidates(
                 league_ids.add(league_value)
 
         if not league_ids:
-            candidate_match_ids.update(
-                opendota_match_storage.search_match_ids_by_league_name(league_name, limit=limit)
-            )
+            league_name_match_ids = opendota_match_storage.search_match_ids_by_league_name(league_name, limit=limit)
+            candidate_match_ids.update(league_name_match_ids)
+            has_more_candidates = has_more_candidates or len(league_name_match_ids) >= limit
         if not league_ids and not candidate_match_ids:
             try:
                 fetched_leagues = await opendota_service.fetch_leagues(limit=max(limit * 5, 100))
@@ -661,6 +746,30 @@ async def _fetch_search_candidates(
                     league_value = record.get("leagueid")
                     if isinstance(league_value, int):
                         league_ids.add(league_value)
+            except OpenDotaServiceError as exc:
+                live_errors.append(exc)
+
+    if team_name is not None:
+        matched_teams = opendota_reference_storage.search_teams_by_name(team_name, limit=limit)
+        for record in matched_teams:
+            team_value = record.get("team_id")
+            if isinstance(team_value, int):
+                team_ids.add(team_value)
+
+        if not team_ids:
+            team_name_match_ids = opendota_match_storage.search_match_ids_by_team_name(team_name, limit=limit)
+            candidate_match_ids.update(team_name_match_ids)
+            team_candidate_match_ids.update(team_name_match_ids)
+            has_more_candidates = has_more_candidates or len(team_name_match_ids) >= limit
+        if not team_ids and not candidate_match_ids:
+            try:
+                fetched_teams = await opendota_service.fetch_teams(limit=max(limit * 5, 100))
+                opendota_reference_storage.upsert_teams(fetched_teams)
+                matched_teams = opendota_reference_storage.search_teams_by_name(team_name, limit=limit)
+                for record in matched_teams:
+                    team_value = record.get("team_id")
+                    if isinstance(team_value, int):
+                        team_ids.add(team_value)
             except OpenDotaServiceError as exc:
                 live_errors.append(exc)
 
@@ -727,15 +836,37 @@ async def _fetch_search_candidates(
                     candidate_match_ids.add(raw_match_id)
 
     if league_ids and (not use_intersection_mode or not account_ids):
-        fetch_tasks = [
-            opendota_service.fetch_league_matches(league_id_value, limit=max(limit, 20), offset=0)
-            for league_id_value in sorted(league_ids)
-        ]
-        fetched_rows = await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        for league_id_value, rows in zip(sorted(league_ids), fetched_rows, strict=False):
-            if isinstance(rows, Exception):
-                live_errors.append(rows)
-                continue
+        league_fetch_limit = max(limit, 20)
+        for league_id_value in sorted(league_ids):
+            try:
+                cached_total, cached_rows = opendota_match_storage.list_recent_matches(
+                    limit=league_fetch_limit,
+                    offset=0,
+                    leagueid=league_id_value,
+                    include_pro=True,
+                    include_public=True,
+                )
+                has_more_candidates = has_more_candidates or cached_total > len(cached_rows)
+                for row in cached_rows:
+                    raw_match_id = row.get("match_id")
+                    if isinstance(raw_match_id, int):
+                        candidate_match_ids.add(raw_match_id)
+            except Exception:
+                logger.exception("Failed to read cached OpenDota league matches for leagueid=%s", league_id_value)
+
+            async def fetch_league_page(page_limit: int, page_offset: int, *, current_league_id: int = league_id_value) -> list[dict[str, Any]]:
+                return await opendota_service.fetch_league_matches(
+                    current_league_id,
+                    limit=page_limit,
+                    offset=page_offset,
+                )
+
+            rows, has_more_league_rows, league_errors = await _fetch_search_match_pages(
+                fetch_league_page,
+                window=league_fetch_limit,
+            )
+            live_errors.extend(league_errors)
+            has_more_candidates = has_more_candidates or has_more_league_rows
             normalized_rows = _normalize_search_matches(rows, forced_leagueid=league_id_value)
             live_matches.extend(normalized_rows)
             for raw in normalized_rows:
@@ -743,10 +874,51 @@ async def _fetch_search_candidates(
                 if isinstance(raw_match_id, int):
                     candidate_match_ids.add(raw_match_id)
 
+    if team_ids:
+        team_fetch_limit = max(limit, 20)
+        for team_id_value in sorted(team_ids):
+            try:
+                cached_total, cached_rows = opendota_match_storage.list_recent_matches(
+                    limit=team_fetch_limit,
+                    offset=0,
+                    team_id=team_id_value,
+                    include_pro=True,
+                    include_public=True,
+                )
+                has_more_candidates = has_more_candidates or cached_total > len(cached_rows)
+                for row in cached_rows:
+                    raw_match_id = row.get("match_id")
+                    if isinstance(raw_match_id, int):
+                        candidate_match_ids.add(raw_match_id)
+                        team_candidate_match_ids.add(raw_match_id)
+            except Exception:
+                logger.exception("Failed to read cached OpenDota team matches for team_id=%s", team_id_value)
+
+            async def fetch_team_page(page_limit: int, page_offset: int, *, current_team_id: int = team_id_value) -> list[dict[str, Any]]:
+                return await opendota_service.fetch_team_matches(
+                    current_team_id,
+                    limit=page_limit,
+                    offset=page_offset,
+                )
+
+            rows, has_more_team_rows, team_errors = await _fetch_search_match_pages(
+                fetch_team_page,
+                window=team_fetch_limit,
+            )
+            live_errors.extend(team_errors)
+            has_more_candidates = has_more_candidates or has_more_team_rows
+            normalized_rows = _normalize_search_matches(rows, forced_team_id=team_id_value)
+            live_matches.extend(normalized_rows)
+            for raw in normalized_rows:
+                raw_match_id = raw.get("match_id")
+                if isinstance(raw_match_id, int):
+                    candidate_match_ids.add(raw_match_id)
+                    team_candidate_match_ids.add(raw_match_id)
+
     if live_matches:
         _upsert_search_matches(live_matches)
 
-    return candidate_match_ids, league_ids, account_ids, live_errors
+    return candidate_match_ids, league_ids, account_ids, team_ids, team_candidate_match_ids, has_more_candidates, live_errors
 
 
 async def _build_remote_search_results(
@@ -754,8 +926,11 @@ async def _build_remote_search_results(
     candidate_match_ids: set[int],
     league_ids: set[int],
     account_ids: set[int],
+    team_ids: set[int],
+    team_candidate_match_ids: set[int],
     apply_player_filter: bool,
     apply_league_filter: bool,
+    apply_team_filter: bool,
     include_pro: bool,
     include_public: bool,
 ) -> list[RemoteMatchRecord]:
@@ -778,6 +953,17 @@ async def _build_remote_search_results(
         row_league_id = row.get("leagueid")
         if apply_league_filter and league_ids and row_league_id not in league_ids:
             continue
+
+        if apply_team_filter and team_ids:
+            row_match_id = row.get("match_id")
+            row_radiant_team_id = row.get("radiant_team_id")
+            row_dire_team_id = row.get("dire_team_id")
+            if (
+                row_match_id not in team_candidate_match_ids
+                and row_radiant_team_id not in team_ids
+                and row_dire_team_id not in team_ids
+            ):
+                continue
 
         try:
             player_identities = opendota_match_storage.get_match_player_identities(int(row["match_id"]))
@@ -803,6 +989,7 @@ async def _list_enriched_remote_matches(
     offset: int,
     include_pro: bool,
     include_public: bool,
+    team_id: int | None = None,
     match_id: int | None = None,
     leagueid: int | None = None,
 ) -> RemoteMatchListResponse:
@@ -811,6 +998,7 @@ async def _list_enriched_remote_matches(
         offset=offset,
         include_pro=include_pro,
         include_public=include_public,
+        team_id=team_id,
         match_id=match_id,
         leagueid=leagueid,
     )
@@ -830,6 +1018,7 @@ async def _list_enriched_remote_matches(
             offset=offset,
             include_pro=include_pro,
             include_public=include_public,
+            team_id=team_id,
             match_id=match_id,
             leagueid=leagueid,
         )
@@ -849,16 +1038,18 @@ async def list_remote_matches(
     offset: int = Query(0, ge=0),
     include_pro: bool = Query(True),
     include_public: bool = Query(False),
+    team_id: int | None = Query(None, ge=1),
     match_id: int | None = Query(None, ge=1),
     leagueid: int | None = Query(None, ge=1),
 ) -> RemoteMatchListResponse:
     """List synced remote mirror matches with source filters and pagination."""
-    effective_include_public = include_public if (match_id is not None or leagueid is not None) else False
+    effective_include_public = include_public if (team_id is not None or match_id is not None or leagueid is not None) else False
     return await _list_enriched_remote_matches(
         limit=limit,
         offset=offset,
         include_pro=include_pro,
         include_public=effective_include_public,
+        team_id=team_id,
         match_id=match_id,
         leagueid=leagueid,
     )
@@ -874,8 +1065,10 @@ async def search_remote_matches(
     match_id: int | None = Query(None, ge=1),
     league_id: int | None = Query(None, ge=1),
     legacy_leagueid: int | None = Query(None, ge=1, alias="leagueid", include_in_schema=False),
+    team_id: int | None = Query(None, ge=1),
     player_id: int | None = Query(None, ge=1),
     league_name: str | None = Query(None),
+    team_name: str | None = Query(None),
     player_name: str | None = Query(None),
 ) -> RemoteMatchListResponse:
     """Return a unified enriched remote feed, optionally filtered by a free-form query."""
@@ -893,6 +1086,7 @@ async def search_remote_matches(
         derived_terms = _derive_query_terms(q)
         explicit_player_name = _normalize_search_text(player_name)
         explicit_league_name = _normalize_search_text(league_name)
+        explicit_team_name = _normalize_search_text(team_name)
 
         effective_match_id = match_id if match_id is not None else derived_terms.match_id
         effective_player_id = player_id if player_id is not None else derived_terms.player_id
@@ -903,6 +1097,7 @@ async def search_remote_matches(
             if legacy_leagueid is not None
             else derived_terms.league_id
         )
+        effective_team_id = team_id if team_id is not None else derived_terms.team_id
         effective_player_name = (
             explicit_player_name
             if explicit_player_name is not None
@@ -912,6 +1107,11 @@ async def search_remote_matches(
             explicit_league_name
             if explicit_league_name is not None
             else derived_terms.league_name
+        )
+        effective_team_name = (
+            explicit_team_name
+            if explicit_team_name is not None
+            else derived_terms.team_name
         )
         apply_player_filter = (
             player_id is not None
@@ -924,6 +1124,11 @@ async def search_remote_matches(
             or explicit_league_name is not None
             or derived_terms.apply_league_filter
         )
+        apply_team_filter = (
+            team_id is not None
+            or explicit_team_name is not None
+            or derived_terms.apply_team_filter
+        )
         if (
             derived_terms.has_explicit_scope
             and derived_terms.is_invalid
@@ -931,8 +1136,10 @@ async def search_remote_matches(
             and player_id is None
             and league_id is None
             and legacy_leagueid is None
+            and team_id is None
             and explicit_player_name is None
             and explicit_league_name is None
+            and explicit_team_name is None
         ):
             return RemoteMatchListResponse(
                 status="ok",
@@ -946,16 +1153,20 @@ async def search_remote_matches(
         if (
             effective_match_id is None
             and effective_league_id is None
+            and effective_team_id is None
             and effective_player_id is None
             and effective_league_name is None
+            and effective_team_name is None
             and effective_player_name is None
         ):
             effective_include_public = include_public if (
                 match_id is not None
                 or league_id is not None
                 or legacy_leagueid is not None
+                or team_id is not None
                 or player_id is not None
                 or league_name is not None
+                or team_name is not None
                 or player_name is not None
             ) else False
             return await _list_enriched_remote_matches(
@@ -970,15 +1181,21 @@ async def search_remote_matches(
             candidate_match_ids,
             resolved_league_ids,
             resolved_account_ids,
+            resolved_team_ids,
+            team_candidate_match_ids,
+            has_more_candidates,
             live_errors,
         ) = await _fetch_search_candidates(
             match_id=effective_match_id,
             league_id=effective_league_id,
             league_name=effective_league_name,
+            team_id=effective_team_id,
+            team_name=effective_team_name,
             player_id=effective_player_id,
             player_name=effective_player_name,
             apply_player_filter=apply_player_filter,
             apply_league_filter=apply_league_filter,
+            apply_team_filter=apply_team_filter,
             limit=search_window,
         )
 
@@ -999,18 +1216,30 @@ async def search_remote_matches(
             candidate_match_ids=candidate_match_ids,
             league_ids=resolved_league_ids,
             account_ids=resolved_account_ids,
+            team_ids=resolved_team_ids,
+            team_candidate_match_ids=team_candidate_match_ids,
             apply_player_filter=apply_player_filter,
             apply_league_filter=apply_league_filter,
+            apply_team_filter=apply_team_filter,
             include_pro=include_pro,
             include_public=include_public,
         )
 
         total = len(matches)
         paginated_matches = matches[offset : offset + limit]
+        missing_detail_payload = any(
+            not match.players and not match.hero_ids
+            for match in paginated_matches
+        )
+        reported_total = (
+            max(total, offset + len(paginated_matches) + 1)
+            if has_more_candidates and len(paginated_matches) == limit
+            else total
+        )
         return RemoteMatchListResponse(
             status="ok",
-            message=_summarize_live_search_errors(live_errors) if total == 0 else None,
-            total=total,
+            message=_summarize_live_search_errors(live_errors) if (total == 0 or missing_detail_payload) else None,
+            total=reported_total,
             limit=limit,
             offset=offset,
             matches=paginated_matches,

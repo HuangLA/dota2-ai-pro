@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Database, Info, Loader2, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import {
   RemoteMatchPlayer,
   RemoteMatchRecord,
@@ -12,6 +13,7 @@ import { formatDurationClock, formatUnixTimestampLocal } from './matchDatabaseFo
 const PAGE_LIMIT = 20;
 const DEFAULT_LIST_SOURCES: RemoteMatchSource[] = ['pro'];
 const SEARCH_SOURCES: RemoteMatchSource[] = ['pro', 'public'];
+const FALLBACK_MATCH_BANNER_URL = '/assets/dota/minimap/minimap_game.png';
 
 type MatchSide = 'radiant' | 'dire';
 
@@ -105,6 +107,20 @@ function getRosterTeamName(match: RemoteMatchRecord, side: MatchSide): string {
     return side === 'radiant' ? '天辉' : '夜魇';
   }
   return teamName;
+}
+
+function shouldShowRosterTeamName(teamName: string): boolean {
+  const normalized = teamName.trim().toLowerCase();
+  return Boolean(normalized) && !['radiant', 'dire', '天辉', '夜魇', '未知战队'].includes(normalized);
+}
+
+function buildLeagueSearchQuery(match: RemoteMatchRecord, leagueName: string): string {
+  return match.leagueid ? `联赛 ${match.leagueid}` : `联赛 ${leagueName}`;
+}
+
+function buildTeamSearchQuery(match: RemoteMatchRecord, side: MatchSide, teamName: string): string {
+  const teamId = side === 'radiant' ? match.radiant_team_id : match.dire_team_id;
+  return teamId ? `战队 ${teamId}` : `战队 ${teamName}`;
 }
 
 function getWinnerSide(match: {
@@ -320,107 +336,6 @@ function pickLeagueAssetUrl(
   return pickAssetUrl(match.league_banner_url, match.league_image_url, match.league_icon_url, match.league_logo_url);
 }
 
-function pickLeagueAssetVariant(
-  match: Pick<RemoteMatchRecord, 'league_image_url' | 'league_banner_url'>
-): 'banner' | 'logo' {
-  return match.league_banner_url || match.league_image_url ? 'banner' : 'logo';
-}
-
-function LeagueArtwork({
-  match,
-  leagueName,
-  subtitle,
-  archiveLabel,
-}: {
-  match: RemoteMatchRecord;
-  leagueName: string;
-  subtitle: string;
-  archiveLabel: string;
-}) {
-  const [broken, setBroken] = useState(false);
-  const assetUrl = pickLeagueAssetUrl(match);
-  const leagueAssetVariant = pickLeagueAssetVariant(match);
-  const tagShellClass =
-    match.source === 'public'
-      ? 'border-amber-400/30 bg-amber-500/14 text-amber-100'
-      : 'border-cyan-400/30 bg-cyan-500/14 text-cyan-100';
-
-  if (!assetUrl || broken) {
-    return (
-      <div className="relative isolate w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50 shadow-inner">
-        <div className="relative flex min-h-[84px] items-end p-3">
-          <div className="min-w-0">
-            <div className="mb-2 flex flex-wrap gap-2">
-              <span className={`inline-flex items-center border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tagShellClass}`}>
-                {archiveLabel}
-              </span>
-              {match.leagueid ? (
-                <span className="inline-flex items-center border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  联赛 {match.leagueid}
-                </span>
-              ) : null}
-            </div>
-            <p className="max-w-[560px] truncate text-sm font-bold leading-tight text-white uppercase tracking-tight" title={leagueName}>
-              {leagueName}
-            </p>
-            <p className="mt-1 text-[10px] leading-none text-zinc-500 uppercase tracking-[0.1em]">{subtitle}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative isolate w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
-      <img
-        src={assetUrl}
-        alt={`${leagueName} 背景`}
-        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-20"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        onError={() => setBroken(true)}
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/60 to-zinc-950/90" />
-      <div className="relative flex h-[88px] items-stretch">
-        <div
-          className={`min-w-0 flex-1 ${
-            leagueAssetVariant === 'banner' ? 'flex items-center justify-center px-3 py-2.5' : 'flex items-center justify-center px-5 py-3'
-          }`}
-        >
-          <img
-            src={assetUrl}
-            alt={`${leagueName} 横幅`}
-            className={`h-full w-full drop-shadow-[0_18px_32px_rgba(15,23,42,0.42)] ${
-              leagueAssetVariant === 'banner' ? 'object-contain object-center' : 'object-contain object-center'
-            }`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setBroken(true)}
-          />
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap justify-between gap-2 p-2">
-          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold backdrop-blur ${tagShellClass}`}>
-            {archiveLabel}
-          </span>
-          {match.leagueid ? (
-            <span className="inline-flex items-center rounded-full border border-white/12 bg-slate-950/48 px-2.5 py-1 text-[10px] font-semibold text-white/85 backdrop-blur">
-              联赛 {match.leagueid}
-            </span>
-          ) : null}
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-2">
-          <div className="max-w-[min(78%,420px)] rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 backdrop-blur-md">
-            <p className="truncate text-sm font-semibold leading-5 text-white" title={leagueName}>
-              {leagueName}
-            </p>
-            <p className="text-[10px] leading-4 tracking-[0.05em] text-slate-300">{subtitle}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MatchIcon({
   url,
   label,
@@ -435,11 +350,13 @@ function MatchIcon({
   fallbackSizeClassName?: string;
 }) {
   const [broken, setBroken] = useState(false);
-  const fallbackText = label === 'Radiant' ? '天' : label === 'Dire' ? '夜' : '联';
+  const isRadiantLabel = label === 'Radiant' || label === '天辉';
+  const isDireLabel = label === 'Dire' || label === '夜魇';
+  const fallbackText = isRadiantLabel ? '天' : isDireLabel ? '夜' : '联';
   const defaultFallbackClassName =
-    label === 'Radiant'
+    isRadiantLabel
       ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-      : label === 'Dire'
+      : isDireLabel
         ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
         : 'border-amber-500/40 bg-amber-500/10 text-amber-200';
   const resolvedIconClassName =
@@ -473,48 +390,69 @@ function MatchIcon({
 function LeagueBadge({
   match,
   leagueName,
+  onSearch,
 }: {
   match: RemoteMatchRecord;
   leagueName: string;
+  onSearch: (query: string) => void;
 }) {
   if (!shouldRenderLeagueBadge(match)) {
     return null;
   }
 
   const isPublic = match.source === 'public';
-  const shellClass = isPublic
-    ? 'border-amber-500/40 bg-[linear-gradient(135deg,rgba(120,53,15,0.32),rgba(15,23,42,0.94))]'
-    : 'border-amber-500/35 bg-[linear-gradient(135deg,rgba(146,64,14,0.18),rgba(15,23,42,0.94))]';
-  const subtitle = isPublic ? '公开匹配 / 路人来源' : '联赛 / 训练赛镜像';
-  const archiveLabel = isPublic ? '路人来源' : '联赛档案';
-  const metaCards = [
-    { label: '赛道', value: isPublic ? '公开匹配' : '职业镜像' },
-    { label: '数据状态', value: hasLeagueMetadata(match) ? '联赛元数据已就绪' : '仅比赛摘要' },
-    { label: '最近同步', value: match.last_synced_at ? formatUnixTimestampLocal(match.last_synced_at) : '等待刷新' },
-    { label: '检索标签', value: leagueName },
-  ];
+  const leagueSearchQuery = buildLeagueSearchQuery(match, leagueName);
+
+  const handleLeagueSearch = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onSearch(leagueSearchQuery);
+  };
 
   return (
     <div
       data-testid={`live-league-badge-${match.match_id}`}
-      className={`w-full rounded-[20px] border px-3 py-3 shadow-[0_10px_26px_rgba(2,6,23,0.18)] ${shellClass}`}
+      className="open-live-league-meta"
     >
-      <LeagueArtwork match={match} leagueName={leagueName} subtitle={subtitle} archiveLabel={archiveLabel} />
-      <div className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
-        {metaCards.map((item) => (
-          <div
-            key={`${match.match_id}-${item.label}`}
-            className="rounded-xl border border-slate-700/60 bg-slate-950/55 px-2.5 py-2"
-          >
-            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
-            <p className="mt-0.5 truncate text-xs font-semibold text-slate-100" title={item.value}>
-              {item.value}
-            </p>
-          </div>
-        ))}
-      </div>
+      <span>{isPublic ? '公开匹配' : '联赛档案'}</span>
+      <button
+        type="button"
+        title={leagueName}
+        aria-label={`搜索联赛 ${leagueName}`}
+        className="open-live-league-token open-live-league-token-strong"
+        onClick={handleLeagueSearch}
+      >
+        {leagueName}
+      </button>
+      {match.leagueid ? (
+        <button
+          type="button"
+          aria-label={`搜索联赛 ID ${match.leagueid}`}
+          className="open-live-league-token"
+          onClick={handleLeagueSearch}
+        >
+          联赛 {match.leagueid}
+        </button>
+      ) : null}
+      <span className="sr-only">{isPublic ? '路人来源' : '职业镜像'} 检索标签</span>
     </div>
   );
+}
+
+function getMatchBannerUrl(match: RemoteMatchRecord): string {
+  return pickLeagueAssetUrl(match) ?? FALLBACK_MATCH_BANNER_URL;
+}
+
+function formatLiveMatchStartTime(timestamp?: number | null): string | null {
+  if (timestamp === undefined || timestamp === null) {
+    return null;
+  }
+
+  const fullTimestamp = formatUnixTimestampLocal(timestamp);
+  if (fullTimestamp === '--') {
+    return null;
+  }
+
+  return fullTimestamp.replace(/^\d{4}-/, '');
 }
 
 function describeUnifiedSearchQuery(rawQuery: string): UnifiedSearchSpec {
@@ -524,7 +462,7 @@ function describeUnifiedSearchQuery(rawQuery: string): UnifiedSearchSpec {
   }
 
   const prefixed = trimmed.match(
-    /^(match|match_id|player|player_id|player_name|league|league_id|league_name|比赛|玩家|联赛)\s*[:：=]?\s*(.+)$/i
+    /^(match|match_id|player|player_id|player_name|league|league_id|league_name|team|team_id|team_name|比赛|玩家|联赛|战队|队伍)\s*[:：=]?\s*(.+)$/i
   );
 
   if (prefixed) {
@@ -575,6 +513,23 @@ function describeUnifiedSearchQuery(rawQuery: string): UnifiedSearchSpec {
       }
       return { label: `玩家 ID ${playerId}` };
     }
+
+    if (key === 'team' || key === 'team_name' || key === '战队' || key === '队伍') {
+      const teamId = toOptionalInt(value);
+      if (teamId !== undefined) {
+        return { label: `战队 ID ${teamId}` };
+      }
+
+      return { label: `战队 ${value}` };
+    }
+
+    if (key === 'team_id') {
+      const teamId = toOptionalInt(value);
+      if (teamId === undefined) {
+        return { label: '无效输入', error: 'team_id 之后请输入数字战队 ID。' };
+      }
+      return { label: `战队 ID ${teamId}` };
+    }
   }
 
   if (/^\d+$/.test(trimmed)) {
@@ -608,7 +563,7 @@ function SearchPresetButton({
     <button
       type="button"
       onClick={() => onPick(value)}
-      className="rounded-full border border-slate-700/80 bg-slate-950/70 px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-cyan-500/50 hover:text-cyan-100"
+      className="open-live-preset"
     >
       {children}
     </button>
@@ -619,104 +574,95 @@ function TeamRosterCard({
   match,
   side,
   winnerSide,
+  onSearch,
 }: {
   match: RemoteMatchRecord;
   side: MatchSide;
   winnerSide: MatchSide | null;
+  onSearch: (query: string) => void;
 }) {
   const teamName = getRosterTeamName(match, side);
   const entries = getTeamRosterEntries(match, side);
   const isWinner = winnerSide === side;
-  const accentClass =
-    side === 'radiant'
-      ? isWinner
-        ? 'border-emerald-500/45 bg-emerald-950/45 shadow-[0_20px_60px_rgba(16,185,129,0.08)]'
-        : 'border-slate-700/80 bg-slate-950/75'
-      : isWinner
-        ? 'border-rose-500/45 bg-rose-950/45 shadow-[0_20px_60px_rgba(244,63,94,0.08)]'
-        : 'border-slate-700/80 bg-slate-950/75';
   const sideLabel = side === 'radiant' ? '天辉' : '夜魇';
   const teamScore = side === 'radiant' ? match.radiant_score : match.dire_score;
+  const showTeamName = shouldShowRosterTeamName(teamName);
+  const statusText = [
+    isWinner ? '获胜' : null,
+    typeof teamScore === 'number' ? `击杀 ${teamScore}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const rosterText = entries
+    .map((entry) => `${entry.playerLabel ?? '未知玩家'} ${entry.heroName}${entry.playerMeta ? ` ${entry.playerMeta}` : ''}`)
+    .join(' ');
+  const logoUrl = pickAssetUrl(
+    side === 'radiant'
+      ? match.radiant_icon_url ?? match.radiant_logo_url ?? match.radiant_logo_sponsor_url
+      : match.dire_icon_url ?? match.dire_logo_url ?? match.dire_logo_sponsor_url
+  );
+  const teamSearchQuery = showTeamName ? buildTeamSearchQuery(match, side, teamName) : null;
+
+  const handleTeamSearch = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (teamSearchQuery) {
+      onSearch(teamSearchQuery);
+    }
+  };
 
   return (
     <div
       data-testid={`live-team-${side}-${match.match_id}`}
-      className={`rounded-[18px] border p-2.5 ${accentClass}`}
+      className={`open-live-side ${side === 'dire' ? 'open-live-side-dire' : ''} ${isWinner ? 'open-live-side-winner' : ''}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <MatchIcon
-            label={side === 'radiant' ? 'Radiant' : 'Dire'}
-            url={pickAssetUrl(
-              side === 'radiant'
-                ? match.radiant_icon_url ?? match.radiant_logo_url ?? match.radiant_logo_sponsor_url
-                : match.dire_icon_url ?? match.dire_logo_url ?? match.dire_logo_sponsor_url
-            )}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{sideLabel}</p>
-              {isWinner && (
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                    side === 'radiant'
-                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
-                      : 'border-rose-500/50 bg-rose-500/10 text-rose-200'
-                  }`}
-                >
-                  获胜
-                </span>
-              )}
-            </div>
-            <p className="mt-1 truncate text-sm font-semibold text-white" title={teamName}>
+      <div className="open-live-side-head">
+        <div className="open-live-side-title">
+          <span>{sideLabel}</span>
+          {showTeamName ? (
+            <button
+              type="button"
+              title={teamName}
+              aria-label={`搜索战队 ${teamName}`}
+              className="open-live-side-team-button"
+              onClick={handleTeamSearch}
+            >
               {teamName}
-            </p>
-          </div>
+            </button>
+          ) : null}
         </div>
-        {typeof teamScore === 'number' && (
-          <div className="shrink-0 rounded-xl border border-slate-700/80 bg-slate-950/70 px-2.5 py-1.5 text-right">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">击杀</p>
-            <p className="text-base font-semibold text-white">{teamScore}</p>
-          </div>
-        )}
+        <MatchIcon
+          label={sideLabel}
+          url={logoUrl}
+          iconClassName="open-live-team-logo"
+          fallbackClassName="open-live-team-logo-fallback"
+          fallbackSizeClassName="h-8 w-8"
+        />
       </div>
 
-      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+      <div className="open-live-hero-row">
         {entries.length > 0 ? (
-          entries.map((entry, index) => (
+          entries.slice(0, 5).map((entry, index) => (
             <div
               key={`${match.match_id}-${side}-entry-${index}-${entry.heroName}-${entry.playerLabel ?? 'unknown'}`}
-              className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/55 px-2 py-1.5"
+              className="open-live-hero"
+              title={`${entry.playerLabel ?? '未知玩家'} / ${entry.heroName}${entry.playerMeta ? ` / ${entry.playerMeta}` : ''}`}
             >
               {entry.heroIconUrl ? (
                 <img
                   src={entry.heroIconUrl}
                   alt={entry.heroName}
-                  className="h-8 w-8 shrink-0 rounded-lg border border-slate-700/70 bg-slate-950 object-cover"
                   loading="lazy"
                 />
               ) : (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-700/70 bg-slate-950 text-[10px] text-slate-500">
-                  {entry.heroName.slice(0, 2)}
-                </div>
+                <span>{entry.heroName.slice(0, 2)}</span>
               )}
-              <div className="min-w-0">
-                <div className="truncate text-[11px] font-semibold leading-4 text-white">
-                  {entry.playerLabel ?? '未知玩家'}
-                </div>
-                <div className="truncate text-[10px] leading-4 text-slate-400">
-                  {entry.heroName}
-                  {entry.playerMeta ? ` · ${entry.playerMeta}` : ''}
-                </div>
-              </div>
             </div>
           ))
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-700/70 px-3 py-2 text-[11px] text-slate-500 sm:col-span-2">
-            暂无阵容信息
-          </div>
+          <div className="open-live-hero-placeholder">--</div>
         )}
       </div>
+      <span className="sr-only">{`${rosterText} ${statusText}`.trim()}</span>
     </div>
   );
 }
@@ -749,10 +695,22 @@ export function OpenDotaLivePage() {
     autoPolling: boolean;
   } | null>(null);
   const [liveStatus, setLiveStatus] = useState<Map<number, LiveMatchStatus>>(new Map());
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const searchSpec = useMemo(() => describeUnifiedSearchQuery(appliedSearchText), [appliedSearchText]);
   const hasSearchQuery = appliedSearchText.trim().length > 0;
   const searchModeLabel = hasSearchQuery ? searchSpec.label : '职业镜像';
+
+  const applySearchQuery = useCallback((query: string) => {
+    const normalizedQuery = query.trim();
+    setSearchText(normalizedQuery);
+    setAppliedSearchText(normalizedQuery);
+    setOffset(0);
+    setSelectedMatchIds([]);
+    setStatusPanel(null);
+    setSearchNotice(null);
+    setFeedback(null);
+  }, []);
 
   const refreshStatusPanel = useCallback(async (matchId: number, withLoading = true) => {
     if (withLoading) {
@@ -817,12 +775,20 @@ export function OpenDotaLivePage() {
             sources: DEFAULT_LIST_SOURCES,
           });
 
-      setMatches(result.matches ?? []);
+      const incomingMatches = result.matches ?? [];
+      setMatches((current) => {
+        if (offset === 0) {
+          return incomingMatches;
+        }
+
+        const seen = new Set(current.map((match) => match.match_id));
+        return [...current, ...incomingMatches.filter((match) => !seen.has(match.match_id))];
+      });
       setTotal(result.total ?? 0);
       setSearchNotice(hasSearchQuery ? result.message ?? null : null);
       setLiveStatus((prev) => {
         const next = new Map(prev);
-        for (const match of result.matches ?? []) {
+        for (const match of incomingMatches) {
           if (next.has(match.match_id)) {
             continue;
           }
@@ -842,7 +808,9 @@ export function OpenDotaLivePage() {
       });
     } catch (fetchError) {
       console.error('Failed to fetch remote matches:', fetchError);
-      setMatches([]);
+      if (offset === 0) {
+        setMatches([]);
+      }
       setTotal(0);
       setSearchNotice(null);
       setError(hasSearchQuery ? 'OpenDota 搜索失败，请重试。' : 'OpenDota 实时列表加载失败，请重试。');
@@ -928,6 +896,30 @@ export function OpenDotaLivePage() {
     return () => window.clearTimeout(timer);
   }, [liveStatus]);
 
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || loading || matches.length >= total) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) {
+          return;
+        }
+        setOffset((current) => {
+          const nextOffset = current + PAGE_LIMIT;
+          return nextOffset >= total ? current : nextOffset;
+        });
+      },
+      { root: null, rootMargin: '220px 0px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loading, matches.length, total]);
+
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const parsed = describeUnifiedSearchQuery(searchText);
@@ -936,10 +928,7 @@ export function OpenDotaLivePage() {
       return;
     }
 
-    setOffset(0);
-    setAppliedSearchText(searchText.trim());
-    setSelectedMatchIds([]);
-    setFeedback(null);
+    applySearchQuery(searchText);
   };
 
   const handleClear = () => {
@@ -1036,11 +1025,9 @@ export function OpenDotaLivePage() {
     }
   };
 
-  const currentPageMatchIds = matches.map((match) => match.match_id).filter((matchId) => Number.isFinite(matchId) && matchId > 0);
-  const selectedCurrentPageCount = currentPageMatchIds.filter((matchId) => selectedMatchIds.includes(matchId)).length;
-  const isAllCurrentPageSelected = currentPageMatchIds.length > 0 && selectedCurrentPageCount === currentPageMatchIds.length;
-  const isSomeCurrentPageSelected = selectedCurrentPageCount > 0 && selectedCurrentPageCount < currentPageMatchIds.length;
-  const activeFilterCount = hasSearchQuery ? 1 : 0;
+  const loadedMatchIds = matches.map((match) => match.match_id).filter((matchId) => Number.isFinite(matchId) && matchId > 0);
+  const selectedLoadedCount = loadedMatchIds.filter((matchId) => selectedMatchIds.includes(matchId)).length;
+  const isAllLoadedSelected = loadedMatchIds.length > 0 && selectedLoadedCount === loadedMatchIds.length;
   const activePipelineCount = matches.filter((match) => {
     const live = liveStatus.get(match.match_id);
     return !isTerminalPipelineStatus(live?.downloadStatus ?? match.download_status, live?.parseStatus ?? match.local_parse_status);
@@ -1049,380 +1036,234 @@ export function OpenDotaLivePage() {
     const live = liveStatus.get(match.match_id);
     return resolvePipelineParseStatus(live?.downloadStatus ?? match.download_status, live?.parseStatus ?? match.local_parse_status) === 'completed';
   }).length;
+  const canLoadMore = matches.length < total;
+  const resultHeading = hasSearchQuery ? searchModeLabel : '职业赛事';
+  const currentQueryLabel = hasSearchQuery ? appliedSearchText.trim() : '职业赛事';
+  const selectedPreviewIds = selectedMatchIds.slice(0, 4);
+
+  const handleToggleLoadedSelection = () => {
+    setSelectedMatchIds((current) => {
+      if (isAllLoadedSelected) {
+        return current.filter((id) => !loadedMatchIds.includes(id));
+      }
+      return Array.from(new Set([...current, ...loadedMatchIds]));
+    });
+  };
 
   return (
-    <div className="workspace-page bg-dota-bg">
-      <div className="workspace-stack">
-        <div className="workspace-header workspace-header-compact">
-          <div className="workspace-header-row">
-            <div className="workspace-header-copy">
-              <p className="workspace-eyebrow">OpenDota Live Intake</p>
-              <h1 className="workspace-title text-dota-gold">OpenDota 职业比赛台</h1>
-              <p className="workspace-description">
-                职业比赛默认入列；搜索可按比赛、玩家或联赛定位。
-              </p>
-            </div>
-            <div className="workspace-header-rail">
-              <div className="workspace-kpi-grid workspace-kpi-grid-compact 2xl:min-w-[392px]">
-              <div className="workspace-kpi">
-                <p className="workspace-kpi-label">流水线进行中</p>
-                <p className="workspace-kpi-value">{activePipelineCount}</p>
-                <p className="workspace-kpi-hint">下载或解析未结束</p>
-              </div>
-              <div className="workspace-kpi">
-                <p className="workspace-kpi-label">可回放</p>
-                <p className="workspace-kpi-value">{replayReadyCount}</p>
-                <p className="workspace-kpi-hint">当前页已解析完成</p>
-              </div>
-              <div className="workspace-kpi">
-                <p className="workspace-kpi-label">已勾选</p>
-                <p className="workspace-kpi-value">{selectedMatchIds.length}</p>
-                <p className="workspace-kpi-hint">准备批量入库</p>
-              </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="workspace-pill-row workspace-pill-row-compact">
-            <span className="workspace-pill">自动同步 每 1 分钟</span>
-            <span className="workspace-pill workspace-pill-accent">模式 {searchModeLabel}</span>
-            <span className="workspace-pill">激活筛选 {activeFilterCount}</span>
-            <span className="workspace-pill">当前页 {matches.length} / 总数 {total}</span>
-            <button
-              onClick={() => {
-                void handleManualSync();
-              }}
-              disabled={syncing}
-              className="workspace-chip-button border border-dota-primary/50 bg-dota-primary/15 text-[#d8ecf0] transition hover:bg-dota-primary/25 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {syncing ? '同步中...' : '立即同步远端列表'}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.18fr)_320px]">
-          <div className="workspace-panel">
-            <div className="workspace-panel-header-inline">
-              <div className="workspace-panel-header !mb-0">
-                <h2 className="workspace-panel-title">统一搜索</h2>
-                <p className="workspace-panel-description">
-                  一处输入，覆盖比赛、玩家和联赛检索。
-                </p>
-              </div>
-              <span className="workspace-panel-badge">Single Query</span>
-            </div>
-
-            <form onSubmit={handleSearch} className="workspace-filter-shell">
-              <div className="workspace-field-stack">
-                <label className="workspace-field-label">搜索词</label>
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                  <input
-                    aria-label="统一搜索"
-                    value={searchText}
-                    onChange={(event) => setSearchText(event.target.value)}
-                    placeholder="8735428765 / Ame / DreamLeague / 玩家 86745912"
-                    className="workspace-input flex-1"
-                  />
-                  <div className="workspace-action-row lg:flex-nowrap">
-                    <button
-                      type="submit"
-                      className="workspace-action-button min-w-[112px] flex-1 border border-dota-primary/60 bg-dota-primary text-white transition hover:bg-[#557a92] sm:flex-none"
-                    >
-                      查询
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleClear}
-                      className="workspace-action-button min-w-[112px] flex-1 border border-slate-500/60 bg-slate-700 text-white transition hover:bg-slate-600 sm:flex-none"
-                    >
-                      清空
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                  <SearchPresetButton value="8735428765" onPick={setSearchText}>
-                    比赛 8735428765
-                  </SearchPresetButton>
-                  <SearchPresetButton value="Ame" onPick={setSearchText}>
-                    玩家 Ame
-                  </SearchPresetButton>
-                  <SearchPresetButton value="DreamLeague" onPick={setSearchText}>
-                    联赛 DreamLeague
-                  </SearchPresetButton>
-                  <SearchPresetButton value="联赛 15475" onPick={setSearchText}>
-                    联赛 15475
-                  </SearchPresetButton>
-              </div>
-
-              <div className="workspace-filter-footer">
-                <p className="workspace-field-hint max-w-3xl">
-                  纯数字会自动判别；需要指定类型时加 `比赛/玩家/联赛` 前缀。
-                </p>
-                <div className="workspace-filter-meta">
-                  <span className="workspace-pill">模式 {searchModeLabel}</span>
-                  <span className="workspace-pill">激活筛选 {activeFilterCount}</span>
-                </div>
-              </div>
-            </form>
-          </div>
-
-          <div className="workspace-panel">
-            <div className="workspace-panel-header-inline">
-              <div className="workspace-panel-header !mb-0">
-                <h2 className="workspace-panel-title">批量入库</h2>
-                <p className="workspace-panel-description">对勾选项顺序下载并解析。</p>
-              </div>
-              <span className="workspace-panel-badge">Batch Intake</span>
-            </div>
-            <div className="workspace-filter-shell">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between 2xl:flex-col 2xl:items-start">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">当前选择</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">{selectedMatchIds.length}</p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {selectedMatchIds.length === 0 ? '请先勾选要下载的比赛。' : '准备下载并入库选中比赛。'}
-                  </p>
-                </div>
-                <span className="rounded-full border border-slate-700/80 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-300">
-                  下载后会自动进入解析阶段
-                </span>
-              </div>
-              <div data-testid="live-batch-button-row" className="mt-4 workspace-action-row workspace-action-row-soft">
-                <button
-                  onClick={() => {
-                    void handleIngest(selectedMatchIds);
-                  }}
-                  disabled={selectedMatchIds.length === 0 || batchLoading || actionMatchId !== null}
-                  className="workspace-action-button min-w-[148px] flex-1 border border-emerald-500/60 bg-emerald-700 text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
-                >
-                  {batchLoading ? '批量入库中...' : '批量下载并入库'}
-                </button>
-                <button
-                  onClick={() => setSelectedMatchIds([])}
-                  disabled={selectedMatchIds.length === 0}
-                  className="workspace-action-button min-w-[120px] flex-1 border border-slate-600 text-white transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
-                >
-                  清空勾选
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {feedback && (
-          <div
-            className={`rounded border px-4 py-3 text-sm ${
-              feedback.type === 'success'
-                ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-200'
-                : 'border-red-500/60 bg-red-900/20 text-red-200'
-            }`}
-          >
-            {feedback.message}
-          </div>
-        )}
-
-        {error && <div className="rounded border border-red-600 bg-red-900/20 px-4 py-3 text-red-200">{error}</div>}
-
-        {searchNotice && (
-          <div className="rounded border border-amber-500/60 bg-amber-900/20 px-4 py-3 text-sm text-amber-100">
-            {searchNotice}
-          </div>
-        )}
-
-        <div className="workspace-table-shell overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-5 py-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-100">
-                {hasSearchQuery ? '远端搜索结果' : '实时比赛列表'}
-              </p>
-              <p className="mt-1 text-sm text-slate-300">
-                {hasSearchQuery ? (
-                  <>
-                    当前查询 <span className="font-semibold text-white">{searchModeLabel}</span>，
-                    页面会同时保留英雄和玩家信息，方便直接挑选入库。
-                  </>
-                ) : (
-                  <>
-                    默认展示职业比赛，当前页可选 <span className="font-semibold text-white">{currentPageMatchIds.length}</span> 场，
-                    已勾选 <span className="font-semibold text-white">{selectedMatchIds.length}</span> 场，
-                    当前页命中 <span className="font-semibold text-white">{selectedCurrentPageCount}</span> 场。
-                  </>
-                )}
-              </p>
-            </div>
-            <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
-              查看“状态详情”可追踪单场下载与解析链路
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-950/50 px-5 py-3">
-            <label className="inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-200">
+    <div className="workspace-page open-live-page">
+      <div className="open-live-shell">
+        <section className="open-live-stage">
+          <div className="open-live-map-field" aria-hidden="true" />
+          <div className="open-live-stage-content">
+            <form onSubmit={handleSearch} className="open-live-command">
+              <span className="sr-only">统一搜索</span>
+              <span className="open-live-command-icon" aria-hidden="true">
+                <Search className="h-4 w-4" />
+              </span>
               <input
-                aria-label="全选当前页"
-                type="checkbox"
-                checked={isAllCurrentPageSelected}
-                ref={(element) => {
-                  if (element) {
-                    element.indeterminate = isSomeCurrentPageSelected;
-                  }
-                }}
-                onChange={() => {
-                  setSelectedMatchIds((current) => {
-                    if (isAllCurrentPageSelected) {
-                      return current.filter((id) => !currentPageMatchIds.includes(id));
-                    }
-                    return Array.from(new Set([...current, ...currentPageMatchIds]));
-                  });
-                }}
-                className="h-4 w-4 accent-cyan-500"
+                aria-label="统一搜索"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="8735428765 / Ame / DreamLeague / 玩家 86745912"
               />
-              全选当前页
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
-                当前页 {currentPageMatchIds.length} 场
-              </span>
-              <span className="rounded-full border border-slate-700/80 bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
-                已勾选 {selectedCurrentPageCount} 场
-              </span>
+              <button type="submit" className="open-live-command-button open-live-command-button-primary">
+                <Search className="h-3.5 w-3.5" />
+                查询
+              </button>
+              <button type="button" onClick={handleClear} className="open-live-command-button">
+                <X className="h-3.5 w-3.5" />
+                清空
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleManualSync();
+                }}
+                disabled={syncing}
+                className="open-live-command-button"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                同步
+              </button>
+            </form>
+
+            <div className="open-live-presets">
+              <SearchPresetButton value="8735428765" onPick={setSearchText}>
+                比赛 8735428765
+              </SearchPresetButton>
+              <SearchPresetButton value="Ame" onPick={setSearchText}>
+                玩家 Ame
+              </SearchPresetButton>
+              <SearchPresetButton value="DreamLeague" onPick={setSearchText}>
+                联赛 DreamLeague
+              </SearchPresetButton>
+              <SearchPresetButton value="联赛 15475" onPick={setSearchText}>
+                联赛 15475
+              </SearchPresetButton>
             </div>
-          </div>
 
-          <div className="space-y-4 px-5 py-5">
-            {loading ? (
-              <div className="rounded-[24px] border border-dashed border-slate-700/70 bg-slate-950/55 px-4 py-10 text-center text-slate-400">
-                {searchModeLabel}加载中...
+            <div className="open-live-search-head">
+              <div className="min-w-0">
+                <p className="open-live-eyebrow">{hasSearchQuery ? 'Search Results' : 'Live Intake'}</p>
+                <h1>{resultHeading}</h1>
+                <span className="sr-only">{hasSearchQuery ? '远端搜索结果' : '实时比赛列表'}</span>
               </div>
-            ) : matches.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-700/70 bg-slate-950/55 px-4 py-10 text-center text-slate-400">
-                {hasSearchQuery ? '未找到匹配的远端比赛。' : '未找到实时比赛。'}
+              <div className="open-live-query-summary">
+                <span>Current Query</span>
+                <strong title={currentQueryLabel}>{currentQueryLabel}</strong>
               </div>
-            ) : (
-              matches.map((match) => {
-                const leagueName = getLeagueLabel(match.league_name, match.leagueid);
-                const winnerSide = getWinnerSide(match);
-                const ingesting = actionMatchId === match.match_id;
-                const live = liveStatus.get(match.match_id);
-                const liveParseStatus = live ? resolvePipelineParseStatus(live.downloadStatus, live.parseStatus) : null;
-                const effectiveDownloadStatus = live?.downloadStatus ?? match.download_status;
-                const effectiveParseStatus = live?.parseStatus ?? match.local_parse_status;
-                const pipelineBadge = getPipelineStatusBadge(effectiveDownloadStatus, effectiveParseStatus);
-                const downloadBadge = getDownloadStatusBadge(effectiveDownloadStatus);
-                const parseBadge = getParseStatusBadge(effectiveParseStatus);
-                const sourceLabel = match.source === 'public' ? '路人局' : '职业赛事';
-                const sourceClass =
-                  match.source === 'public'
-                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                    : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200';
+            </div>
 
-                return (
-                  <div
-                    key={match.match_id}
-                    data-testid={`live-match-card-${match.match_id}`}
-                    className="rounded-[22px] border border-slate-700/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.9))] p-3 shadow-[0_20px_54px_rgba(2,6,23,0.26)]"
-                  >
-                    <div className="grid grid-cols-[18px_minmax(0,1fr)] gap-3 2xl:grid-cols-[18px_minmax(0,1fr)_220px]">
-                      <div className="pt-1">
-                        <input
-                          aria-label={`选择比赛 ${match.match_id}`}
-                          type="checkbox"
-                          checked={selectedMatchIds.includes(match.match_id)}
-                          onChange={() => {
-                            setSelectedMatchIds((current) =>
-                              current.includes(match.match_id)
-                                ? current.filter((id) => id !== match.match_id)
-                                : [...current, match.match_id]
-                            );
-                          }}
-                          className="h-4 w-4 shrink-0 accent-cyan-500"
-                        />
-                      </div>
+            <div className="open-live-alerts">
+              {feedback && (
+                <div className={`open-live-alert ${feedback.type === 'success' ? 'open-live-alert-success' : 'open-live-alert-error'}`}>
+                  {feedback.message}
+                </div>
+              )}
+              {error && <div className="open-live-alert open-live-alert-error">{error}</div>}
+              {searchNotice && <div className="open-live-alert open-live-alert-warning">{searchNotice}</div>}
+            </div>
 
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center rounded-full border border-dota-gold/40 bg-dota-gold/10 px-2.5 py-1 text-xs font-semibold text-dota-gold">
-                            比赛 {match.match_id}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${sourceClass}`}>
-                            {sourceLabel}
-                          </span>
-                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-xs text-slate-300">
-                            开赛 {formatUnixTimestampLocal(match.start_time)}
-                          </span>
-                          <span className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1 text-xs text-slate-300">
-                            时长 {formatDurationClock(match.duration)}
-                          </span>
-                        </div>
-                        {shouldRenderLeagueBadge(match) ? (
-                          <div className="mt-2">
-                            <LeagueBadge match={match} leagueName={leagueName} />
+            <div className="open-live-results-field">
+              <div className="open-live-radar" aria-hidden="true" />
+              <div className="open-live-result-lane">
+                {loading && offset === 0 ? (
+                  <div className="open-live-empty">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {searchModeLabel}加载中...
+                  </div>
+                ) : matches.length === 0 ? (
+                  <div className="open-live-empty">
+                    {hasSearchQuery ? '未找到匹配的远端比赛。' : '未找到实时比赛。'}
+                  </div>
+                ) : (
+                  matches.map((match) => {
+                    const leagueName = getLeagueLabel(match.league_name, match.leagueid);
+                    const winnerSide = getWinnerSide(match);
+                    const ingesting = actionMatchId === match.match_id;
+                    const live = liveStatus.get(match.match_id);
+                    const liveParseStatus = live ? resolvePipelineParseStatus(live.downloadStatus, live.parseStatus) : null;
+                    const effectiveDownloadStatus = live?.downloadStatus ?? match.download_status;
+                    const effectiveParseStatus = live?.parseStatus ?? match.local_parse_status;
+                    const pipelineBadge = getPipelineStatusBadge(effectiveDownloadStatus, effectiveParseStatus);
+                    const sourceLabel = match.source === 'public' ? '公开匹配' : '职业赛事';
+                    const winnerLabel = winnerSide === 'radiant' ? '天辉胜' : winnerSide === 'dire' ? '夜魇胜' : null;
+                    const fullStartTimeLabel = formatUnixTimestampLocal(match.start_time);
+                    const compactStartTimeLabel = formatLiveMatchStartTime(match.start_time);
+                    const isSelected = selectedMatchIds.includes(match.match_id);
+                    const cardStyle = {
+                      '--open-live-banner': `url(${getMatchBannerUrl(match)})`,
+                    } as React.CSSProperties & { '--open-live-banner': string };
+
+                    return (
+                      <article
+                        key={match.match_id}
+                        data-testid={`live-match-card-${match.match_id}`}
+                        className={`open-live-result-card ${isSelected ? 'open-live-result-card-selected' : ''}`}
+                        style={cardStyle}
+                        onClick={() => {
+                          setSelectedMatchIds((current) =>
+                            current.includes(match.match_id)
+                              ? current.filter((id) => id !== match.match_id)
+                              : [...current, match.match_id]
+                          );
+                        }}
+                      >
+                        <div className="open-live-result-main">
+                          <div className="open-live-result-top">
+                            <span className="open-live-match-id">比赛 {match.match_id}</span>
+                            <button
+                              type="button"
+                              aria-label={`选择比赛 ${match.match_id}`}
+                              aria-pressed={isSelected}
+                              className="open-live-select-control"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedMatchIds((current) =>
+                                  current.includes(match.match_id)
+                                    ? current.filter((id) => id !== match.match_id)
+                                    : [...current, match.match_id]
+                                );
+                              }}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" />
+                                  已勾选
+                                </>
+                              ) : (
+                                <span aria-hidden="true" />
+                              )}
+                            </button>
                           </div>
-                        ) : null}
 
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">
-                          <TeamRosterCard match={match} side="radiant" winnerSide={winnerSide} />
-                          <TeamRosterCard match={match} side="dire" winnerSide={winnerSide} />
+                          <h2 title={leagueName}>
+                            <button
+                              type="button"
+                              aria-label={`搜索联赛 ${leagueName}`}
+                              className="open-live-title-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                applySearchQuery(buildLeagueSearchQuery(match, leagueName));
+                              }}
+                            >
+                              {leagueName}
+                            </button>
+                          </h2>
+                          <LeagueBadge match={match} leagueName={leagueName} onSearch={applySearchQuery} />
                         </div>
-                      </div>
 
-                      <div className="col-span-2 2xl:col-span-1">
-                        <div className="rounded-[18px] border border-slate-700/80 bg-slate-950/78 p-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${pipelineBadge.className}`}>
-                              {pipelineBadge.label}
+                        <div className="open-live-lineup-block">
+                          <TeamRosterCard match={match} side="radiant" winnerSide={winnerSide} onSearch={applySearchQuery} />
+                          <TeamRosterCard match={match} side="dire" winnerSide={winnerSide} onSearch={applySearchQuery} />
+                        </div>
+
+                        <div className="open-live-result-footer">
+                          <div className="open-live-tag-list">
+                            <span className={`open-live-tag ${match.source === 'public' ? 'open-live-tag-amber' : 'open-live-tag-cyan'}`}>
+                              {sourceLabel}
                             </span>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${downloadBadge.className}`}>
-                              {downloadBadge.label}
-                            </span>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${parseBadge.className}`}>
-                              {parseBadge.label}
-                            </span>
+                            {winnerLabel ? <span className="open-live-tag open-live-tag-green">{winnerLabel}</span> : null}
+                            {compactStartTimeLabel ? (
+                              <span className="open-live-tag open-live-tag-time" title={`比赛时间 ${fullStartTimeLabel}`}>
+                                {compactStartTimeLabel}
+                              </span>
+                            ) : null}
+                            <span className="open-live-tag">{formatDurationClock(match.duration)}</span>
+                            <span className={`open-live-status-pill ${pipelineBadge.className}`}>{pipelineBadge.label}</span>
                           </div>
 
-                          {live?.downloadStatus === 'downloading' ? (
-                            <div className="mt-2 space-y-2">
-                              <div className="relative h-5 overflow-hidden rounded-full bg-slate-800">
-                                <div
-                                  className="absolute inset-y-0 left-0 rounded-full bg-cyan-500 transition-all duration-500"
-                                  style={{ width: `${live.downloadProgress}%` }}
-                                />
-                                <span className="relative z-10 flex h-full items-center justify-center text-[10px] font-semibold text-white select-none">
-                                  下载 {live.downloadProgress}%
-                                </span>
-                              </div>
+                          <div className="open-live-card-actions">
+                            {live?.downloadStatus === 'downloading' ? (
                               <button
+                                type="button"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   void handleCancel(match.match_id);
                                 }}
-                                title="取消下载"
-                                className="w-full rounded-xl border border-red-500/60 px-3 py-1.5 text-xs text-red-200 transition hover:border-red-400 hover:text-red-100"
+                                className="open-live-card-button open-live-card-button-danger"
                               >
-                                取消下载
+                                取消下载 {live.downloadProgress}%
                               </button>
-                            </div>
-                          ) : null}
-
-                          {liveParseStatus === 'parsing' && (
-                            <div className="mt-2 relative h-1.5 overflow-hidden rounded-full bg-slate-800">
-                              <div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-amber-500 transition-all duration-500" />
-                            </div>
-                          )}
-
-                          <div className="mt-3 grid gap-2">
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleIngest([match.match_id]);
+                                }}
+                                disabled={ingesting || batchLoading}
+                                className="open-live-card-button open-live-card-button-ingest"
+                              >
+                                <Database className="h-3.5 w-3.5" />
+                                {ingesting ? '入库中...' : '下载并入库'}
+                              </button>
+                            )}
                             <button
-                              onClick={() => {
-                                void handleIngest([match.match_id]);
-                              }}
-                              disabled={ingesting || batchLoading}
-                              className="rounded-xl border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              {ingesting ? '入库中...' : '下载并入库'}
-                            </button>
-                            <button
-                              onClick={async () => {
+                              type="button"
+                              onClick={async (event) => {
+                                event.stopPropagation();
                                 setStatusPanel({
                                   matchId: match.match_id,
                                   loading: true,
@@ -1432,153 +1273,173 @@ export function OpenDotaLivePage() {
                                 });
                                 await refreshStatusPanel(match.match_id, false);
                               }}
-                              className="rounded-xl border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
+                              className="open-live-card-button"
                             >
+                              <Info className="h-3.5 w-3.5" />
                               状态详情
                             </button>
                           </div>
                         </div>
-                      </div>
-                    </div>
+
+                        {liveParseStatus === 'parsing' ? <div className="open-live-parse-bar" aria-hidden="true" /> : null}
+                      </article>
+                    );
+                  })
+                )}
+
+                {matches.length > 0 ? (
+                  <div ref={loadMoreRef} className="open-live-load-sentinel">
+                    {loading && offset > 0 ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        加载中
+                      </>
+                    ) : canLoadMore ? (
+                      <strong>加载更多</strong>
+                    ) : (
+                      <span>已加载 {matches.length} / {total}</span>
+                    )}
                   </div>
-                );
-              })
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside className="open-live-inspector">
+          <div className="open-live-inspector-scroll">
+            <section className="open-live-section">
+              <p className="open-live-eyebrow">Facets</p>
+              <h2><SlidersHorizontal className="h-4 w-4" />筛选</h2>
+              <div className="open-live-filter-list">
+                <div className="open-live-filter-row"><span>来源</span><strong>{hasSearchQuery ? '职业 + 公开' : '职业'}</strong></div>
+                <div className="open-live-filter-row"><span>状态</span><strong>未入库优先</strong></div>
+                <div className="open-live-filter-row"><span>联赛</span><strong>{hasSearchQuery ? searchModeLabel.replace(/^全域\s+/, '') : 'OpenDota'}</strong></div>
+                <div className="open-live-filter-row"><span>排序</span><strong>时间 / 相关度</strong></div>
+              </div>
+            </section>
+
+            <section className="open-live-section">
+              <p className="open-live-eyebrow">Batch Intake</p>
+              <h2><Database className="h-4 w-4" />批量入库</h2>
+              <div data-testid="live-batch-button-row" className="workspace-action-row open-live-batch-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleIngest(selectedMatchIds);
+                  }}
+                  disabled={selectedMatchIds.length === 0 || batchLoading || actionMatchId !== null}
+                  className="open-live-large-action"
+                >
+                  {batchLoading ? '批量入库中...' : '下载选中并入库'}
+                </button>
+              </div>
+              <div className="open-live-mini-list">
+                <div className="open-live-mini-row"><span>已加载</span><strong>{matches.length} / {total}</strong></div>
+                <div className="open-live-mini-row"><span>流水线</span><strong>{activePipelineCount}</strong></div>
+                <div className="open-live-mini-row"><span>可回放</span><strong>{replayReadyCount}</strong></div>
+              </div>
+
+              {selectedMatchIds.length > 0 ? (
+                <div className="open-live-selected-block">
+                  <div className="open-live-mini-row"><span>已勾选</span><strong>{selectedMatchIds.length}</strong></div>
+                  {selectedPreviewIds.map((matchId) => (
+                    <div key={matchId} className="open-live-mini-row"><span>{matchId}</span><strong>selected</strong></div>
+                  ))}
+                  {selectedMatchIds.length > selectedPreviewIds.length ? (
+                    <div className="open-live-mini-row"><span>更多</span><strong>+{selectedMatchIds.length - selectedPreviewIds.length}</strong></div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="open-live-side-buttons">
+                <button type="button" onClick={handleToggleLoadedSelection} disabled={loadedMatchIds.length === 0}>
+                  {isAllLoadedSelected ? '取消已加载' : '全选已加载'}
+                </button>
+                <button type="button" onClick={() => setSelectedMatchIds([])} disabled={selectedMatchIds.length === 0}>
+                  清空勾选
+                </button>
+              </div>
+            </section>
+          </div>
+        </aside>
+      </div>
+
+      {statusPanel && (
+        <div className="open-live-status-drawer">
+          <div className="open-live-status-head">
+            <div>
+              <h2>下载/解析状态</h2>
+              <p>match_id: {statusPanel.matchId}</p>
+              <span>{statusPanel.autoPolling ? '自动轮询中' : '自动轮询已停止'}</span>
+            </div>
+            <div className="open-live-status-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  void refreshStatusPanel(statusPanel.matchId, true);
+                }}
+              >
+                刷新
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusPanel((current) => {
+                    if (!current) {
+                      return current;
+                    }
+                    return {
+                      ...current,
+                      autoPolling: !current.autoPolling,
+                    };
+                  });
+                }}
+              >
+                {statusPanel.autoPolling ? '停止轮询' : '开启轮询'}
+              </button>
+              <button type="button" onClick={() => setStatusPanel(null)}>
+                关闭
+              </button>
+            </div>
+          </div>
+
+          <div className="open-live-status-body">
+            {statusPanel.loading && <div className="open-live-status-item">状态加载中...</div>}
+            {statusPanel.error && <div className="open-live-status-item open-live-alert-error">{statusPanel.error}</div>}
+            {statusPanel.detail && (
+              <>
+                <div className="open-live-status-item">
+                  <div className="open-live-status-chip-row">
+                    <span
+                      className={`open-live-status-pill ${getPipelineStatusBadge(
+                        statusPanel.detail.download_task?.status,
+                        statusPanel.detail.local_parse_status
+                      ).className}`}
+                    >
+                      {getPipelineStatusBadge(statusPanel.detail.download_task?.status, statusPanel.detail.local_parse_status).label}
+                    </span>
+                    {typeof statusPanel.detail.download_task?.progress === 'number' ? (
+                      <span>下载 {statusPanel.detail.download_task.progress}%</span>
+                    ) : null}
+                  </div>
+                  {typeof statusPanel.detail.download_task?.progress === 'number' ? (
+                    <div className="open-live-progress">
+                      <div style={{ width: `${statusPanel.detail.download_task.progress}%` }} />
+                    </div>
+                  ) : null}
+                </div>
+                <div className="open-live-status-item"><span>下载阶段</span><strong>{getDownloadStatusBadge(statusPanel.detail.download_task?.status).label}</strong></div>
+                <div className="open-live-status-item"><span>下载错误</span><strong>{statusPanel.detail.download_task?.error_code ?? '--'}{statusPanel.detail.download_task?.error_message ? `: ${statusPanel.detail.download_task.error_message}` : ''}</strong></div>
+                <div className="open-live-status-item"><span>解析阶段</span><strong>{getParseStatusBadge(statusPanel.detail.local_parse_status).label}</strong></div>
+                <div className="open-live-status-item"><span>文件状态</span><strong>DEM {statusPanel.detail.replay_dem_exists ? '已生成' : '缺失'} | 压缩包 {statusPanel.detail.replay_bz2_exists ? '已保留' : '缺失'}</strong></div>
+                <div className="open-live-status-item"><span>本地录像路径</span><strong>{statusPanel.detail.local_replay_path ?? '--'}</strong></div>
+              </>
             )}
           </div>
-
-          <div className="flex items-center justify-between border-t border-slate-700 px-6 py-4 text-sm">
-            <span className="text-slate-400">
-              偏移 <span className="text-white">{offset}</span> / 总数 <span className="text-white">{total}</span>
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setOffset((current) => Math.max(0, current - PAGE_LIMIT))}
-                disabled={offset === 0}
-                className="rounded border border-slate-600 bg-slate-700 px-4 py-2 text-white transition hover:bg-slate-600 disabled:opacity-40"
-              >
-                上一页
-              </button>
-              <button
-                onClick={() => setOffset((current) => current + PAGE_LIMIT)}
-                disabled={offset + matches.length >= total}
-                className="rounded border border-slate-600 bg-slate-700 px-4 py-2 text-white transition hover:bg-slate-600 disabled:opacity-40"
-              >
-                下一页
-              </button>
-            </div>
-          </div>
         </div>
-
-        {statusPanel && (
-          <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md border-l border-slate-700 bg-slate-900/95 shadow-2xl">
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">下载/解析状态</h2>
-                  <p className="mt-1 text-xs font-mono text-slate-400">match_id: {statusPanel.matchId}</p>
-                  <p className="mt-1 text-xs text-cyan-300/90">
-                    {statusPanel.autoPolling ? '自动轮询中（每3秒）' : '自动轮询已停止'}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      void refreshStatusPanel(statusPanel.matchId, true);
-                    }}
-                    className="rounded border border-cyan-500/60 px-3 py-1.5 text-sm text-cyan-200 hover:border-cyan-400"
-                  >
-                    刷新
-                  </button>
-                  <button
-                    onClick={() => {
-                      setStatusPanel((current) => {
-                        if (!current) {
-                          return current;
-                        }
-                        return {
-                          ...current,
-                          autoPolling: !current.autoPolling,
-                        };
-                      });
-                    }}
-                    className="rounded border border-amber-500/60 px-3 py-1.5 text-sm text-amber-200 hover:border-amber-400"
-                  >
-                    {statusPanel.autoPolling ? '停止轮询' : '开启轮询'}
-                  </button>
-                  <button
-                    onClick={() => setStatusPanel(null)}
-                    className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:border-slate-500"
-                  >
-                    关闭
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 px-5 py-4 text-sm">
-                {statusPanel.loading && <div className="text-slate-400">状态加载中...</div>}
-                {statusPanel.error && (
-                  <div className="rounded border border-red-500/60 bg-red-900/20 px-3 py-2 text-red-200">
-                    {statusPanel.error}
-                  </div>
-                )}
-                {statusPanel.detail && (
-                  <>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getPipelineStatusBadge(
-                            statusPanel.detail.download_task?.status,
-                            statusPanel.detail.local_parse_status
-                          ).className}`}
-                        >
-                          {getPipelineStatusBadge(statusPanel.detail.download_task?.status, statusPanel.detail.local_parse_status).label}
-                        </span>
-                        {typeof statusPanel.detail.download_task?.progress === 'number' && (
-                          <span className="text-xs text-slate-400">下载进度 {statusPanel.detail.download_task.progress}%</span>
-                        )}
-                      </div>
-                      {typeof statusPanel.detail.download_task?.progress === 'number' && (
-                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-700">
-                          <div
-                            className="h-full rounded-full bg-cyan-500 transition-[width] duration-300"
-                            style={{ width: `${statusPanel.detail.download_task.progress}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">下载阶段</div>
-                      <div className="text-white">{getDownloadStatusBadge(statusPanel.detail.download_task?.status).label}</div>
-                    </div>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">下载错误</div>
-                      <div className="text-white break-words">
-                        {statusPanel.detail.download_task?.error_code ?? '--'}
-                        {statusPanel.detail.download_task?.error_message ? `: ${statusPanel.detail.download_task.error_message}` : ''}
-                      </div>
-                    </div>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">解析阶段</div>
-                      <div className="text-white">{getParseStatusBadge(statusPanel.detail.local_parse_status).label}</div>
-                    </div>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">文件状态</div>
-                      <div className="text-white">
-                        DEM {statusPanel.detail.replay_dem_exists ? '已生成' : '缺失'} | 压缩包 {statusPanel.detail.replay_bz2_exists ? '已保留' : '缺失'}
-                      </div>
-                    </div>
-                    <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-                      <div className="text-slate-400">本地录像路径</div>
-                      <div className="font-mono text-white break-all">{statusPanel.detail.local_replay_path ?? '--'}</div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+      )}
       </div>
-    </div>
   );
 }
 

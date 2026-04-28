@@ -100,15 +100,37 @@ class OpenDotaService:
     ) -> list[dict[str, Any]]:
         """Fetch league matches directly from OpenDota search endpoint."""
         bounded_limit = max(1, min(limit, 100))
+        requested_offset = max(0, offset)
         params: dict[str, int] = {
-            "limit": bounded_limit,
-            "offset": max(0, offset),
+            "limit": requested_offset + bounded_limit,
         }
 
         return await self._fetch_list_endpoint(
             path=f"/leagues/{league_id}/matches",
             bounded_limit=bounded_limit,
             params=params,
+            slice_offset=requested_offset,
+        )
+
+    async def fetch_team_matches(
+        self,
+        team_id: int,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Fetch team match history directly from OpenDota."""
+        bounded_limit = max(1, min(limit, 100))
+        requested_offset = max(0, offset)
+        params: dict[str, int] = {
+            "limit": requested_offset + bounded_limit,
+        }
+
+        return await self._fetch_list_endpoint(
+            path=f"/teams/{team_id}/matches",
+            bounded_limit=bounded_limit,
+            params=params,
+            slice_offset=requested_offset,
         )
 
     async def fetch_teams(self, limit: int = 100) -> list[dict[str, Any]]:
@@ -160,6 +182,7 @@ class OpenDotaService:
         path: str,
         bounded_limit: int,
         params: dict[str, Any] | None = None,
+        slice_offset: int = 0,
     ) -> list[dict[str, Any]]:
         """Fetch a list endpoint and apply shared timeout/error handling."""
 
@@ -180,7 +203,8 @@ class OpenDotaService:
             typed_payload: list[dict[str, Any]] = [
                 item for item in payload if isinstance(item, dict)
             ]
-            return typed_payload[:bounded_limit]
+            start = max(0, slice_offset)
+            return typed_payload[start : start + bounded_limit]
 
         except httpx.TimeoutException as exc:
             raise OpenDotaServiceError("OpenDota request timed out.") from exc

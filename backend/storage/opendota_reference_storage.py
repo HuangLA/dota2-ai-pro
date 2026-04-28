@@ -296,6 +296,59 @@ class OpenDotaReferenceStorage:
 
         return rows
 
+    def search_teams_by_name(self, name: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Search teams by name or tag using cached reference data."""
+        normalized = self._normalize_search_text(name)
+        if normalized is None:
+            return []
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        rows: list[dict[str, Any]] = []
+        seen_team_ids: set[int] = set()
+        patterns = [
+            normalized,
+            f"{normalized}%",
+            f"%{normalized}%",
+        ]
+
+        for pattern in patterns:
+            if len(seen_team_ids) >= limit:
+                break
+            cursor.execute(
+                """
+                SELECT team_id, name, tag, icon_url, logo_url, logo_sponsor_url, wins, losses, last_synced_at
+                FROM opendota_teams
+                WHERE name LIKE ? COLLATE NOCASE
+                    OR tag LIKE ? COLLATE NOCASE
+                ORDER BY last_synced_at DESC, team_id DESC
+                LIMIT ?
+                """,
+                (pattern, pattern, max(limit * 2, limit)),
+            )
+            for row in cursor.fetchall():
+                team_id = int(row["team_id"])
+                if team_id in seen_team_ids:
+                    continue
+                seen_team_ids.add(team_id)
+                rows.append(
+                    {
+                        "team_id": team_id,
+                        "name": row["name"],
+                        "tag": row["tag"],
+                        "icon_url": row["icon_url"],
+                        "logo_url": row["logo_url"],
+                        "logo_sponsor_url": row["logo_sponsor_url"],
+                        "wins": int(row["wins"]),
+                        "losses": int(row["losses"]),
+                        "last_synced_at": int(row["last_synced_at"]),
+                    }
+                )
+                if len(seen_team_ids) >= limit:
+                    break
+
+        return rows
+
     @staticmethod
     def _as_int(value: object) -> int | None:
         if value is None:
